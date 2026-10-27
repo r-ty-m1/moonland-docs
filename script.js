@@ -155,7 +155,7 @@ function mediaUrl(n, kind) {
 function inline(s) {
   let h = esc(s);
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, href) => {
+  h = h.replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\(([^)\s]+)\)/g, (m, text, href) => {
     if (href.startsWith('#h-')) return `<a href="#" data-to="${href.slice(1)}">${text}</a>`;
     if (/^https?:/.test(href)) return `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
     return `<a href="${href}">${text}</a>`;
@@ -291,7 +291,7 @@ function blocks(lines) {
 const renderMarkup = (src) => { headingCount = 0; return blocks(String(src).replace(/\r/g, '').split('\n')); };
 const plainText = (src) => String(src)
   .replace(/\[(i|v|a|embed)\s[^\]]*\]/g, ' ')
-  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')
   .replace(/[*#>|:@?]/g, ' ');
 
 // ---------------------------------------------------------

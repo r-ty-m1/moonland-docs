@@ -286,7 +286,7 @@
 `},
 
 'img-outpaint': {
-  t: '圖片拓展', level: '進階', minutes: 4, models: ['FLUX.2 [klein]'],
+  t: '圖片拓展', level: '進階', minutes: 4, models: ['FLUX.2 [Klein]'],
   d: '延伸畫布、生成原圖之外的場景，把被裁切或太局促的圖片變完整。',
   src: '3bc55cb6aede80b68f04d9a5064b462c',
   body: `
@@ -300,7 +300,7 @@
 
 :::steps
 @ 選擇模型與圖片
-點左側「生成」，在下方切換到「圖片」，選擇「FLUX.2 [klein]」，再上傳要拓展的圖片。
+點左側「生成」，在下方切換到「圖片」，選擇「FLUX.2 [Klein]」，再上傳要拓展的圖片。
 [i 213]
 
 @ 設定擴展畫布
