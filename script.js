@@ -483,6 +483,19 @@ function spy() {
 }
 addEventListener('scroll', spy, { passive: true });
 
+// 跳到錨點：上方的圖片載入後會把目標往下推，所以載入期間持續對齊
+function jumpTo(el) {
+  const above = [...view.querySelectorAll('img')].filter((i) => i.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+  above.forEach((i) => { i.loading = 'eager'; });
+  el.scrollIntoView({ behavior: 'smooth' });
+  let stop = false;
+  const cancel = () => { stop = true; };
+  ['wheel', 'touchstart', 'keydown'].forEach((t) => addEventListener(t, cancel, { once: true, passive: true }));
+  const realign = (e) => { if (!stop && above.includes(e.target)) el.scrollIntoView({ behavior: 'auto' }); };
+  view.addEventListener('load', realign, true);
+  setTimeout(() => { stop = true; view.removeEventListener('load', realign, true); }, 5000);
+}
+
 // 本頁錨點、複製提示詞、回饋、放大圖片
 document.addEventListener('click', async (e) => {
   const to = e.target.closest('a[data-to]');
@@ -492,7 +505,7 @@ document.addEventListener('click', async (e) => {
     if (el) {
       const d = el.closest('details');
       if (d) d.open = true;
-      el.scrollIntoView({ behavior: 'smooth' });
+      jumpTo(el);
     }
     return;
   }
