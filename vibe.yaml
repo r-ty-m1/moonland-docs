@@ -1,0 +1,9 @@
+version: 1
+container:
+  port: 8080
+healthcheck:
+  path: /healthz
+persistence:
+  enabled: false
+auth:
+  mode: none

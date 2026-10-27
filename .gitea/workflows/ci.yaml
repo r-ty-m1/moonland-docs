@@ -1,0 +1,189 @@
+# 由 vibe-deploy 的 containerize skill 產生。
+#
+# 這份 workflow 不含任何 Secret，也不含任何基礎設施位址（除了下方的
+# DEPLOYMENT_API）。Registry 位址、帳號與 image 名稱都由 Deployment API 在驗證
+# 這個 job 之後回傳——因為 Gitea 的 Actions job token 對 Container Registry 沒有
+# 任何權限。細節見 deploy-site/references/platform-contract.md。
+#
+# 要重新產生這個檔案，重跑 containerize skill。不要就地修改平台互動的部分：
+# 契約變動時，改的是 skill 裡的範本。
+name: CI
+
+on:
+  # push 只限分支，推 tag 不觸發；Pull Request 照樣建置與測試。tag 指向的 commit 已經在
+  # 推分支時測過、部署過，再跑一次只會和分支那次同時搶 runner。
+  push:
+    branches: ['**']
+  pull_request:
+
+env:
+  DEPLOYMENT_API: http://192.168.8.64:3000
+  # 每次執行唯一。同一個 commit 同時跑兩次時，容器與映像不會撞名，收拾時也只刪自己的。
+  # 推到 Registry 的 tag 仍是完整 SHA，部署契約不變。
+  CI_NAME: ci-${{ gitea.run_id }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # job token 只需要讀取自己的 repository。packages: write 對 Registry 沒有
+    # 作用，不要加。
+    permissions:
+      contents: read
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 測試
+        run: node server/test.js
+
+      - name: 建置映像
+        run: |
+          echo "CI_NAME=$CI_NAME"
+          docker build -t "$CI_NAME" .
+
+      - name: 冒煙測試：容器要真的能服務請求
+        run: |
+          set -eu
+          name="$CI_NAME-smoke"
+          docker rm -f "$name" >/dev/null 2>&1 || true
+          docker run -d --name "$name" "$CI_NAME"
+
+          # 等 Dockerfile 的 HEALTHCHECK 轉綠。那條檢查在容器內執行，會實際打
+          # health endpoint，所以資料庫或可寫入路徑有問題也會在這裡被抓到。
+          status=starting
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$name")
+            [ "$status" = healthy ] && break
+            [ "$status" = unhealthy ] && break
+            sleep 2
+          done
+
+          if [ "$status" != healthy ]; then
+            echo "容器未進入 healthy，最後狀態：$status"
+            docker logs "$name"
+            exit 1
+          fi
+          echo "容器 healthy"
+
+      - name: 收拾冒煙測試容器
+        if: always()
+        run: docker rm -f "$CI_NAME-smoke" >/dev/null 2>&1 || true
+
+      # 以下只在推送到預設分支時執行。Pull Request 與其他分支只做建置與測試。
+      # 分支名稱取自 repository 的實際預設分支，不寫死 main——公司有 repository
+      # 用的是 master。
+      - name: 向 Deployment API 取得 Registry 憑證
+        id: credentials
+        if: gitea.event_name == 'push' && gitea.ref == format('refs/heads/{0}', gitea.event.repository.default_branch)
+        run: |
+          set -eu
+          code=$(curl -sS -m 15 -o /tmp/registry-credentials.json -w '%{http_code}' \
+            -X POST "${DEPLOYMENT_API}/v1/registry-credentials" \
+            -H "Authorization: Bearer ${{ secrets.GITEA_TOKEN }}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"repository\":\"${{ gitea.repository }}\",\"commitSha\":\"${{ gitea.sha }}\"}")
+          if [ "$code" != 200 ]; then
+            echo "取得憑證失敗：HTTP $code"
+            # 回應可能含錯誤說明，但絕不含憑證以外的機敏資料時才印。
+            python3 -c "import json;print(json.load(open('/tmp/registry-credentials.json')).get('error'))" || true
+            exit 1
+          fi
+
+          field() { python3 -c "import json;print(json.load(open('/tmp/registry-credentials.json'))['$1'])"; }
+          # image 由 API 指定，CI 不自行組合位址。
+          echo "registry=$(field registry)" >> "$GITEA_OUTPUT"
+          echo "image=$(field image)" >> "$GITEA_OUTPUT"
+
+      - name: 發布不可變映像
+        if: gitea.event_name == 'push' && gitea.ref == format('refs/heads/{0}', gitea.event.repository.default_branch)
+        run: |
+          set -eu
+          registry='${{ steps.credentials.outputs.registry }}'
+          image='${{ steps.credentials.outputs.image }}'
+
+          python3 -c "import json;print(json.load(open('/tmp/registry-credentials.json'))['password'])" \
+            | docker login "$registry" \
+                -u "$(python3 -c "import json;print(json.load(open('/tmp/registry-credentials.json'))['username'])")" \
+                --password-stdin
+
+          # 部署只引用不可變的完整 SHA。
+          docker tag "$CI_NAME" "${image}:${{ gitea.sha }}"
+          docker push -q "${image}:${{ gitea.sha }}"
+
+          docker logout "$registry" >/dev/null 2>&1 || true
+          rm -f /tmp/registry-credentials.json
+
+      # API 可能要等同一個應用程式的其他請求（最多 60 秒），再花最多 45 秒設定公司登入
+      # 與物件儲存，所以單次等 135 秒。只有三個錯誤碼代表「稍後重送就會成功」，依 API
+      # 給的 Retry-After 重試：最多三次請求，從第一次起算共 6 分鐘。其他錯誤一次就停。
+      # 重送同一個 commit 是安全的：API 會沿用既有的部署紀錄。
+      - name: 建立部署
+        if: gitea.event_name == 'push' && gitea.ref == format('refs/heads/{0}', gitea.event.repository.default_branch)
+        env:
+          DEPLOY_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          DEPLOY_REPOSITORY: ${{ gitea.repository }}
+          DEPLOY_COMMIT: ${{ gitea.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, socket, sys, time, urllib.error, urllib.request
+
+          RETRYABLE = {"application_busy", "s3_credential_change_blocked", "application_provisioning_timeout"}
+          TIMEOUT = float(os.environ.get("DEPLOY_REQUEST_TIMEOUT", "135"))
+          BUDGET = float(os.environ.get("DEPLOY_RETRY_BUDGET", "360"))
+          MAX_REQUESTS = 3
+
+          url = os.environ["DEPLOYMENT_API"].rstrip("/") + "/v1/deployments"
+          body = json.dumps({"repository": os.environ["DEPLOY_REPOSITORY"],
+                             "commitSha": os.environ["DEPLOY_COMMIT"]}).encode()
+          timeouts = (TimeoutError, socket.timeout)
+          # 內網位址是明文 HTTP：環境變數裡的 proxy 會看到 token，所以不用 proxy。
+          # HTTPS 時 proxy 只轉送加密的通道，照環境設定走。
+          handlers = [] if url.startswith("https://") else [urllib.request.ProxyHandler({})]
+          opener = urllib.request.build_opener(*handlers)
+          started = time.monotonic()
+          for attempt in range(1, MAX_REQUESTS + 1):
+              request = urllib.request.Request(url, data=body, method="POST", headers={
+                  "Authorization": "Bearer " + os.environ["DEPLOY_TOKEN"],
+                  "Content-Type": "application/json",
+              })
+              try:
+                  with opener.open(request, timeout=TIMEOUT) as response:
+                      status, raw, headers = response.status, response.read(), response.headers
+              except urllib.error.HTTPError as error:
+                  status, raw, headers = error.code, error.read(65536), error.headers
+              except (urllib.error.URLError, OSError) as error:
+                  reason = getattr(error, "reason", error)
+                  if isinstance(reason, timeouts) or isinstance(error, timeouts):
+                      sys.exit(f"建立部署逾時：Deployment API 在 {TIMEOUT:g} 秒內沒有回應，可能仍在處理。"
+                               "重跑這個 job 即可，同一個 commit 會沿用既有的部署紀錄")
+                  sys.exit(f"連不到 Deployment API：{type(reason).__name__}")
+
+              text = raw.decode("utf-8", "replace")
+              print(text)
+              # 201 建立、200 表示同一個 SHA 已經有部署紀錄，兩者都算成功。
+              if status in (200, 201):
+                  sys.exit(0)
+              try:
+                  code = json.loads(text)["error"]["code"]
+              except (ValueError, KeyError, TypeError):
+                  code = None
+              if code not in RETRYABLE:
+                  sys.exit(f"建立部署失敗：HTTP {status}")
+              wait = (headers.get("Retry-After") or "").strip()
+              # 正整數秒；0 等於不等待就重送。
+              if not re.fullmatch(r"[1-9][0-9]{0,3}", wait):
+                  sys.exit(f"建立部署失敗：API 回 {code}，但沒有合法的 Retry-After，不重試")
+              wait = int(wait)
+              if attempt == MAX_REQUESTS or time.monotonic() - started + wait + TIMEOUT > BUDGET:
+                  sys.exit(f"建立部署失敗：{code}。另一個部署正在使用這個應用程式的設定，"
+                           "重試後仍未完成；請稍後重跑這個 job")
+              print(f"API 回 {code}，{wait} 秒後重試（第 {attempt}/{MAX_REQUESTS - 1} 次重試）", flush=True)
+              time.sleep(wait)
+          PY
+
+      - name: 清理
+        if: always()
+        run: |
+          rm -f /tmp/registry-credentials.json
+          # 映像以執行編號命名，不刪會在 runner 共用的 Docker 上累積。發布已推到 Registry。
+          docker rmi "$CI_NAME" >/dev/null 2>&1 || true

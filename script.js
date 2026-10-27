@@ -5,7 +5,6 @@
 // - 圖片、影片、音訊對照表在 data/media.js（window.MEDIA）
 // =========================================================
 
-const NOTION_BASE = 'https://phrygian-friction-260.notion.site';
 
 const ICONS = {
   home: 'M5 12l-2 0l9 -9l9 9l-2 0 M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7 M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6',
@@ -136,18 +135,13 @@ SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
 }));
 
 // ---------------------------------------------------------
-// 2. 媒體網址：透過 Notion 公開頁面的代理讀取
+// 2. 媒體網址：檔案放在 assets/media/（對照表見 data/media.js）
 // ---------------------------------------------------------
-const dash = (s) => s.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
-function mediaUrl(n, kind) {
+function mediaUrl(n) {
   const e = MEDIA[n];
-  if (!e) return '';
-  const [block, file, name] = e.split('|');
-  const src = encodeURIComponent(`attachment:${dash(file)}:${name || 'image.png'}`);
-  return kind === 'i'
-    ? `${NOTION_BASE}/image/${src}?table=block&id=${dash(block)}&width=1600&cache=v2`
-    : `${NOTION_BASE}/signed/${src}?table=block&id=${dash(block)}`;
+  return e ? `assets/media/${e[0]}` : '';
 }
+const mediaRatio = (n) => (MEDIA[n] && MEDIA[n][1]) || 0;
 
 // ---------------------------------------------------------
 // 3. 文章標記語法 → HTML（語法說明見 README.md）
@@ -184,11 +178,13 @@ function media(t) {
   let m = t.match(/^\[(i|v|a)\s+(\d+)(?:\s+(.+))?\]$/);
   if (m) {
     const [, k, n, cap] = m;
-    const url = mediaUrl(n, k);
+    const url = mediaUrl(n);
+    const ar = mediaRatio(n);
+    const box = ar ? ` style="aspect-ratio:${ar}"` : '';
     const capHtml = cap ? `<figcaption>${inline(cap)}</figcaption>` : '';
     if (!url) return `<div class="media-missing">找不到媒體 #${n}</div>`;
-    if (k === 'i') return `<figure class="fig"><img src="${url}" alt="${esc(cap || '')}" loading="lazy" decoding="async" data-zoom>${capHtml}</figure>`;
-    if (k === 'v') return `<figure class="fig"><video src="${url}" controls preload="metadata" playsinline></video>${capHtml}</figure>`;
+    if (k === 'i') return `<figure class="fig"><img src="${url}" alt="${esc(cap || '')}" loading="lazy" decoding="async"${box} data-zoom>${capHtml}</figure>`;
+    if (k === 'v') return `<figure class="fig"><video src="${url}" controls preload="metadata" playsinline${box}></video>${capHtml}</figure>`;
     return `<figure class="fig audio"><audio src="${url}" controls preload="none"></audio>${capHtml}</figure>`;
   }
   m = t.match(/^\[embed\s+(\S+)(?:\s+(.+))?\]$/);
@@ -374,8 +370,7 @@ function articleView(id) {
     : `<h1>${esc(a.t)}</h1>`;
   return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}
     <div class="prose">${renderMarkup(a.body)}</div>
-    ${c ? articleList(c) : ''}
-    ${a.src ? `<p class="source">${ic('ext', 'ic sm')} 本文整理自 <a href="${NOTION_BASE}/${a.src}" target="_blank" rel="noopener">Notion 原文</a></p>` : ''}`;
+    ${c ? articleList(c) : ''}`;
 }
 
 function catView(id) {
@@ -531,12 +526,6 @@ document.addEventListener('click', async (e) => {
 // 圖片無法載入時顯示提示
 document.addEventListener('error', (e) => {
   const el = e.target;
-  // 小圖用大尺寸讀取有時會失敗：依序改用 800 寬、原始尺寸重試
-  if (el.tagName === 'IMG' && el.src.includes(NOTION_BASE)) {
-    const tries = +(el.dataset.retried || 0);
-    if (tries === 0) { el.dataset.retried = '1'; el.src = el.src.replace(/&width=\d+/, '&width=800'); return; }
-    if (tries === 1) { el.dataset.retried = '2'; el.src = el.src.replace(/&width=\d+&cache=v2/, ''); return; }
-  }
   if (el.tagName === 'IMG' && el.closest('.fig') && !el.dataset.failed) {
     el.dataset.failed = '1';
     el.closest('.fig').classList.add('failed');

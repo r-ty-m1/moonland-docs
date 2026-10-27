@@ -4,6 +4,8 @@
 
 純靜態網站，不需要安裝或建置。推到 `main` 後，GitHub Pages 約 1～2 分鐘自動更新。
 
+所有圖片、影片、音訊都放在網站自己的 `assets/media/`，不再依賴 Notion。
+
 ## 檔案結構
 
 | 檔案 | 內容 |
@@ -12,9 +14,12 @@
 | `style.css` | 配色、字體與排版。最上方 `:root` 是深色配色，下面兩段是淺色配色 |
 | `script.js` | `SECTIONS` 是左側目錄與分類結構；其餘是顯示、搜尋、明暗模式等功能 |
 | `data/*.js` | 所有文章內容，依分類分檔 |
-| `data/media.js` | 圖片、影片、音訊的對照表 |
+| `data/media.js` | 媒體編號 → 檔名與寬高比的對照表 |
+| `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
+| `server/` | 公司內部部署用的小型伺服器與冒煙測試（GitHub Pages 用不到） |
+| `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
 
@@ -62,10 +67,23 @@
 
 ## 圖片與影片
 
-目前的圖片、影片與音訊直接讀取 Notion 公開頁面上的檔案，所以 **Notion 頁面必須保持公開**，否則媒體會無法顯示。
+新增一張圖：
 
-正式上線前建議改成自己存放：從 Notion 匯出所有檔案，放進 `assets/media/`，再把 `script.js` 的 `mediaUrl()` 改成讀取本機路徑即可，文章不用改。
+1. 轉成 WebP、寬度不超過 1600px（影片用 H.264 的 MP4，最長邊不超過 1280px），放進 `assets/media/`。
+2. 在 `data/media.js` 用一個沒用過的編號加一筆：`600:["600.webp",1.5]`，第二個數字是寬 ÷ 高，讓圖片載入前先保留位置，頁內跳轉才不會跑掉。
+3. 文章裡寫 `[i 600 說明文字]`。
+
+`node server/test.js` 會檢查每個文章引用的編號都有對照、檔案都存在。
 
 ## 發布更新時
 
-`index.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261027c`）。每次更新內容後把版本號改掉，訪客的瀏覽器才會抓到新版，而不是用快取的舊檔。
+`index.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261028a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+
+部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
+
+## 部署到公司內部
+
+- 本機測試：`docker compose up --build`，打開 http://localhost:8080
+- 測試：`node server/test.js`（不需要安裝任何套件）
+- 網站不需要登入（`vibe.yaml` 的 `auth.mode: none`），網址對外公開。
+- 推到公司 Gitea 的預設分支後，CI 會自動測試、建置並部署。

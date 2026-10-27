@@ -1,0 +1,6 @@
+# 只供本機測試：docker compose up --build，再打開 http://localhost:8080
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
