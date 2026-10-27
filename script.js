@@ -518,6 +518,12 @@ document.addEventListener('click', async (e) => {
 // 圖片無法載入時顯示提示
 document.addEventListener('error', (e) => {
   const el = e.target;
+  // 小圖用大尺寸讀取有時會失敗：依序改用 800 寬、原始尺寸重試
+  if (el.tagName === 'IMG' && el.src.includes(NOTION_BASE)) {
+    const tries = +(el.dataset.retried || 0);
+    if (tries === 0) { el.dataset.retried = '1'; el.src = el.src.replace(/&width=\d+/, '&width=800'); return; }
+    if (tries === 1) { el.dataset.retried = '2'; el.src = el.src.replace(/&width=\d+&cache=v2/, ''); return; }
+  }
   if (el.tagName === 'IMG' && el.closest('.fig') && !el.dataset.failed) {
     el.dataset.failed = '1';
     el.closest('.fig').classList.add('failed');
