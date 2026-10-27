@@ -1,0 +1,25 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+
+const data = Astro.locals.starlightRoute.entry.data as Record<string, any>;
+const { type, level, models, minutes, migration, notionUrl } = data;
+const showMeta = type || level || (models && models.length) || minutes;
+---
+
+<Default />
+
+{showMeta && (
+  <div class="ml-meta">
+    {level && <span class={`ml-chip ml-level-${level}`}>{level}</span>}
+    {type && <span class="ml-chip">{type}</span>}
+    {models?.map((m: string) => <span class="ml-chip">適用 {m}</span>)}
+    {minutes && <span class="ml-chip">約 {minutes} 分鐘</span>}
+  </div>
+)}
+
+{migration === 'todo' && (
+  <p class="ml-todo">
+    這篇文章還沒搬移到新網站。
+    {notionUrl && <a href={notionUrl} target="_blank" rel="noopener">先看 Notion 原文</a>}
+  </p>
+)}

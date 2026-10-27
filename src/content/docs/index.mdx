@@ -1,0 +1,48 @@
+---
+title: moonland.ai 說明中心
+description: moonland.ai 官方使用教學，從第一張圖到團隊管理都在這裡。
+template: splash
+hero:
+  tagline: 從第一張 AI 圖片到團隊管理，所有操作教學都在這裡。按 Ctrl + K（Mac 為 ⌘ + K）搜尋。
+  actions:
+    - text: 5 分鐘快速入門
+      link: /getting-started/quick-start/
+      icon: right-arrow
+    - text: 看所有模型
+      link: /models/
+      variant: minimal
+---
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## 你想做什麼？
+
+<CardGrid>
+  <Card title="第一次使用" icon="rocket">
+    先從[交談](/chat/basics/)開始，用一句話就能生成圖片。接著試試[圖片生成](/image/basics/)和[影片生成](/video/basics/)。
+  </Card>
+  <Card title="進階應用" icon="setting">
+    想精修角度、光線或風格？到[實驗室](/lab/)調整 LoRA、ControlNet 等進階參數。
+  </Card>
+  <Card title="團隊管理" icon="seti:folder">
+    邀請成員、分配點數、管理專案，請看[帳號與團隊](/account/)。
+  </Card>
+</CardGrid>
+
+## 功能教學
+
+<CardGrid>
+  <LinkCard title="圖片生成" href="/image/" description="用文字或參考圖生成、修改圖片" />
+  <LinkCard title="影片生成" href="/video/" description="圖片轉影片、動作模仿、頭尾幀" />
+  <LinkCard title="交談" href="/chat/" description="用對話生成與編輯，最容易上手" />
+  <LinkCard title="實驗室" href="/lab/" description="LoRA、ControlNet、IP-Adapter" />
+  <LinkCard title="登月幣工具" href="/credit-tools/" description="Seedance、Kling 等外部模型" />
+  <LinkCard title="其他工具" href="/other-tools/" description="3D 模型、音樂生成" />
+</CardGrid>
+
+## 最近更新
+
+- 2026/08/14：內容更新
+- 2026/05/05：內容更新
+- 2026/04/23：部分內文附圖更新
+
+[看完整更新日誌 →](/changelog/)

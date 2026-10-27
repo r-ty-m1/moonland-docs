@@ -1,0 +1,79 @@
+/* moonland.ai 品牌色：黑底 + 螢光綠 */
+:root {
+  --sl-font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  --sl-content-width: 46rem;
+  --sl-line-height: 1.8;
+}
+
+/* 深色模式（預設） */
+:root {
+  --sl-color-accent-low: #0d2a1a;
+  --sl-color-accent: #2fd27a;
+  --sl-color-accent-high: #a8f5c8;
+  --sl-color-black: #0b0d0c;
+  --sl-color-gray-6: #151917;
+  --sl-color-gray-5: #232926;
+}
+
+/* 淺色模式 */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d6f7e3;
+  --sl-color-accent: #0f8a4a;
+  --sl-color-accent-high: #064726;
+}
+
+/* 桌機版收合左側目錄（按鈕在 SiteTitle.astro） */
+@media (min-width: 50rem) {
+  :root[data-nav-collapsed] {
+    --sl-sidebar-width: 0rem;
+  }
+  :root[data-nav-collapsed] .sidebar-pane {
+    display: none;
+  }
+}
+
+/* 文章標題下方的標籤列 */
+.ml-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.ml-chip {
+  font-size: var(--sl-text-xs);
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--sl-color-gray-5);
+  color: var(--sl-color-gray-2);
+}
+.ml-level-新手 {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent-high);
+  background: var(--sl-color-accent-low);
+}
+.ml-todo {
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--sl-color-orange);
+  background: var(--sl-color-orange-low);
+  font-size: var(--sl-text-sm);
+}
+
+/* 步驟截圖：可點放大、圓角 */
+.sl-markdown-content img {
+  border-radius: 0.5rem;
+  border: 1px solid var(--sl-color-gray-5);
+}
+
+/* 並排範例圖 */
+.ml-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+.ml-grid figure { margin: 0; }
+.ml-grid figcaption {
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+  margin-top: 0.25rem;
+}
