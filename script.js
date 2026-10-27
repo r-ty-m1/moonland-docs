@@ -210,7 +210,9 @@ function container(type, arg, inner) {
       if (depth === 0 && t === '|||') { cells.push({ lines: [] }); continue; }
       cells[cells.length - 1].lines.push(line);
     }
-    return `<div class="row" style="--n:${cells.length}">${cells.map((c) => `<div class="cell">${blocks(c.lines)}</div>`).join('')}</div>`;
+    // 每一欄都只有一張圖或影片時，手機上維持兩欄並排
+    const mediaOnly = cells.every((c) => { const ls = c.lines.map((l) => l.trim()).filter(Boolean); return ls.length === 1 && /^\[(i|v)\s+\d+/.test(ls[0]); });
+    return `<div class="row${mediaOnly ? ' media' : ''}" style="--n:${cells.length}">${cells.map((c) => `<div class="cell">${blocks(c.lines)}</div>`).join('')}</div>`;
   }
   if (type === 'faq') {
     const qs = splitAt(inner, (t) => t.startsWith('?? ')).filter((p) => p.head);
@@ -260,7 +262,7 @@ function blocks(lines) {
         i++;
       }
       const [head, ...body] = rows;
-      out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c, i) => `<td data-label="${esc(plainText(head[i] || ''))}">${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
       continue;
     }
     if (/^\[(i|v|a|embed)\s/.test(t)) { out += media(t); i++; continue; }
@@ -587,6 +589,43 @@ themeBtn.addEventListener('click', () => {
   paintThemeBtn();
 });
 sysLight.addEventListener('change', paintThemeBtn);
+
+// ---------------------------------------------------------
+// 字體大小：標準／大／特大，記在這台裝置上
+// ---------------------------------------------------------
+const FS = [['標準', 16], ['大', 19], ['特大', 22]];
+const fsBtn = document.getElementById('fsBtn');
+const fsPop = document.createElement('div');
+fsPop.className = 'fs-pop';
+fsPop.hidden = true;
+fsPop.setAttribute('role', 'dialog');
+fsPop.setAttribute('aria-label', '字體大小');
+fsPop.innerHTML = `<p class="fs-title">字體大小</p><div class="fs-opts">${FS.map(([t, px], i) => `<button type="button" data-fs="${i}"><b style="font-size:${px}px">字</b><small>${t}</small></button>`).join('')}</div>`;
+document.body.appendChild(fsPop);
+const currentFs = () => +(root.dataset.fs || 0);
+function paintFs() {
+  fsPop.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.fs === currentFs())));
+}
+function toggleFs(open) {
+  fsPop.hidden = !open;
+  fsBtn.setAttribute('aria-expanded', String(open));
+  if (open) { paintFs(); fsPop.querySelector('[aria-pressed="true"]').focus(); }
+}
+fsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFs(fsPop.hidden); });
+fsPop.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-fs]');
+  if (!b) return;
+  const n = +b.dataset.fs;
+  // 放大或縮小後，讓正在讀的那一段留在畫面上
+  const anchorEl = [...view.querySelectorAll('h2, h3, p, li, .fig')].find((el) => el.getBoundingClientRect().bottom > 80);
+  const before = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
+  if (n) root.dataset.fs = n; else delete root.dataset.fs;
+  try { localStorage.setItem('ml-fs', n); } catch (err) {}
+  if (anchorEl) window.scrollBy(0, anchorEl.getBoundingClientRect().top - before);
+  paintFs();
+});
+document.addEventListener('click', (e) => { if (!fsPop.hidden && !fsPop.contains(e.target)) toggleFs(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !fsPop.hidden) { toggleFs(false); fsBtn.focus(); } });
 
 // ---------------------------------------------------------
 // 搜尋：標題、摘要與內文全文
