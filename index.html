@@ -2,32 +2,63 @@
 <html lang="zh-Hant-TW">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>moonland.ai 說明中心</title>
-<meta name="description" content="moonland.ai 官方使用教學：圖片生成、影片生成、交談、實驗室與團隊管理。">
+<meta name="description" content="moonland.ai 官方使用教學：交談、圖片生成、影片生成、實驗室、模型指南與團隊管理。">
 <meta name="robots" content="noindex">
+<link rel="icon" href="assets/favicon.png">
+<script>
+  // 在畫面繪製前套用使用者上次選的明暗模式與目錄狀態，避免閃爍
+  try {
+    var t = localStorage.getItem('ml-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    if (localStorage.getItem('ml-nav') === '1') document.documentElement.classList.add('nav-collapsed');
+  } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <button class="menu" id="menuBtn" aria-expanded="true" aria-controls="side" aria-label="收合目錄"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-  <a class="brand" href="#home"><svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0b0d0c"/><path d="M9 23V9l7 9 7-9v14" fill="none" stroke="#2fd27a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>moonland.ai 說明中心</span></a>
-  <button class="search" id="searchBtn" type="button">搜尋教學、模型、問題…<kbd>Ctrl K</kbd></button>
-  <div class="hlinks"><a href="https://moonland.ai/pricing?direct">價目表</a><a href="#contact">聯絡我們</a></div>
+<a class="skip" href="#view">跳到主要內容</a>
+
+<header class="top">
+  <button class="icon-btn nav-btn" id="navBtn" type="button" aria-controls="side" aria-expanded="true" aria-label="收合目錄"></button>
+  <a class="brand" href="#home" aria-label="moonland.ai 說明中心首頁">
+    <img class="logo logo-on-dark" src="assets/logo-white.png" alt="moonland" width="780" height="118">
+    <img class="logo logo-on-light" src="assets/logo-dark.png" alt="moonland" width="780" height="118">
+    <span class="brand-sub">說明中心</span>
+  </a>
+  <button class="search-pill" id="searchBtn" type="button" aria-label="搜尋">
+    <span data-icon="search"></span><span class="sp-text">搜尋教學、模型、問題…</span><kbd>Ctrl K</kbd>
+  </button>
+  <nav class="top-links" aria-label="外部連結">
+    <a href="https://moonland.ai/pricing?direct" target="_blank" rel="noopener">價目表</a>
+    <a href="#contact">聯絡我們</a>
+  </nav>
+  <button class="icon-btn" id="themeBtn" type="button"></button>
 </header>
 
-<div class="wrap">
+<div class="shell">
   <nav class="side" id="side" aria-label="文章目錄"></nav>
-  <main><div class="content" id="view"></div></main>
-  <aside class="toc" id="toc" aria-label="本頁目錄"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="page" id="main">
+    <article class="content" id="view" tabindex="-1"></article>
+    <aside class="toc" id="toc" aria-label="本頁目錄"></aside>
+  </main>
 </div>
 
-<dialog id="dlg" aria-label="搜尋">
-  <input id="q" placeholder="例如：提示詞、ControlNet、點數" autocomplete="off">
-  <div id="results"></div>
+<dialog class="search" id="dlg" aria-label="搜尋">
+  <div class="search-head">
+    <span data-icon="search"></span>
+    <input id="q" type="search" placeholder="例如：提示詞、ControlNet、點數" autocomplete="off" aria-label="搜尋關鍵字">
+    <button class="icon-btn sm" id="dlgClose" type="button" aria-label="關閉搜尋" data-icon="x"></button>
+  </div>
+  <div id="results" role="listbox" aria-label="搜尋結果"></div>
+  <div class="search-foot"><span>↑ ↓ 選擇</span><span>Enter 開啟</span><span>Esc 關閉</span></div>
 </dialog>
+
 <script src="script.js"></script>
 </body>
 </html>
