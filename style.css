@@ -143,7 +143,7 @@ kbd { font-family: var(--mono); font-size: 0.6875rem; }
 .nav-btn .m-only { display: none; }
 
 .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg); margin-left: 4px; }
-.logo { height: 21px; width: auto; }
+.logo { height: 21px; width: auto; object-fit: contain; object-position: left center; }  /* 窄螢幕被擠時等比縮小，不壓扁 */
 .logo-on-dark { display: var(--logo-on-dark); }
 .logo-on-light { display: var(--logo-on-light); }
 .brand-sub {

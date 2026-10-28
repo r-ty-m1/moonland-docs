@@ -77,7 +77,7 @@
 
 ## 發布更新時
 
-`index.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261028b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261028c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
 
