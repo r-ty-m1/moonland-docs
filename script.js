@@ -38,9 +38,23 @@ const ICONS = {
   clock: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 7v5l3 3',
   message: 'M8 9h8 M8 13h6 M9 18h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-3l-3 3l-3 -3z',
   up: 'M12 5l0 14 M18 11l-6 -6 M6 11l6 -6',
+  globe: 'M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M3.6 9h16.8 M3.6 15h16.8 M11.5 3a17 17 0 0 0 0 18 M12.5 3a17 17 0 0 1 0 18',
 };
 const ic = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------------------------------------------------------
+// 0. 語言：中文（預設）／英文，index.html 開頭依 ?lang= 或上次的選擇設定 <html lang>
+//    介面文字一律寫中文、外面包 T()；英文對照在 data/en/ui.js，英文文章在 data/en/*.js
+//    T('約 {n} 分鐘', { n: 5 })：大括號裡的名稱會換成對應的值
+// ---------------------------------------------------------
+const LANG = document.documentElement.lang === 'en' ? 'en' : 'zh';
+const UI_EN = window.UI_EN || {};
+function T(s, vars) {
+  let r = (LANG === 'en' && s && UI_EN[s]) || s;
+  if (vars) r = r.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+  return r;
+}
 
 // ---------------------------------------------------------
 // 1. 網站結構
@@ -113,11 +127,29 @@ const ALIASES = {
   'a-1': 'admin-1', 'a-2': 'admin-2', 'a-3': 'admin-3', 'a-4': 'admin-4', 'a-5': 'admin-5', 'a-6': 'admin-6',
 };
 
-const ARTICLES = window.ARTICLES || {};
+// 英文版：目錄名稱換成英文；文章用 data/en/*.js 的標題、摘要與內文蓋過中文（等級、分鐘數等沿用中文版）
+// 還沒翻譯的文章維持中文，頁面上會提示
+const ZH_ARTICLES = window.ARTICLES || {};
+const EN_ARTICLES = window.ARTICLES_EN || {};
+const ARTICLES = LANG === 'en'
+  ? Object.fromEntries(Object.entries(ZH_ARTICLES).map(([k, a]) => [k, EN_ARTICLES[k] ? { ...a, ...EN_ARTICLES[k] } : { ...a, untranslated: true }]))
+  : ZH_ARTICLES;
 const MEDIA = window.MEDIA || {};
+if (LANG === 'en') {
+  SECTIONS.forEach((sec) => {
+    sec.label = T(sec.label);
+    sec.rows.forEach((r) => {
+      ['t', 'd', 'n', 'tag'].forEach((k) => { if (r[k]) r[k] = T(r[k]); });
+      (r.groups || []).forEach((g) => {
+        g.g = T(g.g);
+        g.items.forEach((it) => { it[1] = T(it[1]); if (it[2]) it[2] = T(it[2]); });
+      });
+    });
+  });
+}
 
 // 由 SECTIONS 建立頁面索引
-const PAGES = { home: { t: '首頁', crumb: [] } };
+const PAGES = { home: { t: T('首頁'), crumb: [] } };
 const CATS = {};
 const ORDER = [];
 SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
@@ -131,7 +163,7 @@ SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
     }));
   } else {
     const t = (ARTICLES[r.id] && ARTICLES[r.id].t) || r.t || r.id;
-    PAGES[r.id] = { t, n: r.n || t, tag: r.tag, crumb: [sec.label] };
+    PAGES[r.id] = { t, n: r.n || (ARTICLES[r.id] && ARTICLES[r.id].n) || t, tag: r.tag, crumb: [sec.label] };
     r.t = t;
     ORDER.push(r.id);
   }
@@ -185,13 +217,13 @@ function media(t) {
     const ar = mediaRatio(n);
     const box = ar ? ` style="aspect-ratio:${ar}"` : '';
     const capHtml = cap ? `<figcaption>${inline(cap)}</figcaption>` : '';
-    if (!url) return `<div class="media-missing">找不到媒體 #${n}</div>`;
+    if (!url) return `<div class="media-missing">${T('找不到媒體 #{n}', { n })}</div>`;
     if (k === 'i') return `<figure class="fig"><img src="${url}" alt="${esc(cap || '')}" loading="lazy" decoding="async"${box} data-zoom>${capHtml}</figure>`;
     if (k === 'v') return `<figure class="fig"><video src="${url}" controls preload="metadata" playsinline${box}></video>${capHtml}</figure>`;
     return `<figure class="fig audio"><audio src="${url}" controls preload="none"></audio>${capHtml}</figure>`;
   }
   m = t.match(/^\[embed\s+(\S+)(?:\s+(.+))?\]$/);
-  if (m) return `<figure class="fig embed"><iframe src="${esc(m[1])}" loading="lazy" title="${esc(m[2] || '前後比較')}"></iframe>${m[2] ? `<figcaption>${inline(m[2])}</figcaption>` : ''}</figure>`;
+  if (m) return `<figure class="fig embed"><iframe src="${esc(m[1])}" loading="lazy" title="${esc(m[2] || T('前後比較'))}"></iframe>${m[2] ? `<figcaption>${inline(m[2])}</figcaption>` : ''}</figure>`;
   return '';
 }
 
@@ -254,7 +286,7 @@ function blocks(lines) {
     if (t.startsWith('>')) {
       const buf = [];
       while (i < lines.length && lines[i].trim().startsWith('>')) { buf.push(lines[i].trim().replace(/^>\s?/, '')); i++; }
-      out += `<div class="prompt"><pre>${esc(buf.join('\n'))}</pre><button type="button" class="copy" aria-label="複製提示詞">${ic('copy')}<span>複製</span></button></div>`;
+      out += `<div class="prompt"><pre>${esc(buf.join('\n'))}</pre><button type="button" class="copy" aria-label="${T('複製提示詞')}">${ic('copy')}<span>${T('複製')}</span></button></div>`;
       continue;
     }
     if (t.startsWith('|')) {
@@ -316,22 +348,24 @@ function navRow(r) {
   return `<div class="nav-cat" data-cat="${r.id}">
     <div class="nav-row cat-row">
       <a class="cat-link" href="#${r.id}" data-id="${r.id}">${ic(r.icon)}<span class="lbl">${esc(r.t)}</span>${tagHtml(r.tag)}</a>
-      <button class="cat-toggle" type="button" aria-expanded="false" aria-label="展開${esc(r.t)}">${ic('chev', 'ic chev')}</button>
+      <button class="cat-toggle" type="button" aria-expanded="false" aria-label="${esc(T('展開{x}', { x: r.t }))}">${ic('chev', 'ic chev')}</button>
     </div>
     <div class="nav-children"><div class="nav-children-in">${kids}</div></div>
   </div>`;
 }
 
 side.innerHTML =
-  `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">首頁</span></a>` +
+  `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">${T('首頁')}</span></a>` +
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
-  `<div class="side-foot"><b>找不到答案？</b>寫信到 support@moonshine.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。</div>`;
+  // 手機上頂部列放不下語言按鈕，改放在目錄裡
+  `<button class="nav-row lang-row" type="button" data-switch-lang lang="${LANG === 'en' ? 'zh-Hant' : 'en'}">${ic('globe')}<span class="lbl">${LANG === 'en' ? '中文' : 'English'}</span></button>` +
+  `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonshine.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
 
 function setOpen(cat, open) {
   cat.classList.toggle('open', open);
   const b = cat.querySelector('.cat-toggle');
   b.setAttribute('aria-expanded', String(open));
-  b.setAttribute('aria-label', (open ? '收合' : '展開') + cat.querySelector('.lbl').textContent);
+  b.setAttribute('aria-label', T(open ? '收合{x}' : '展開{x}', { x: cat.querySelector('.lbl').textContent }));
 }
 side.addEventListener('click', (e) => {
   const b = e.target.closest('.cat-toggle');
@@ -345,22 +379,22 @@ function crumb(id) {
   const p = PAGES[id];
   if (!p.crumb.length) return '';
   const parts = p.crumb.map((c, i) => (i === 1 && p.cat ? `<a href="#${p.cat}">${esc(c)}</a>` : `<span>${esc(c)}</span>`));
-  return `<nav class="crumb" aria-label="目前位置">${parts.join('<span class="sep">/</span>')}</nav>`;
+  return `<nav class="crumb" aria-label="${T('目前位置')}">${parts.join('<span class="sep">/</span>')}</nav>`;
 }
 const card = (href, icon, title, desc, tag) =>
   `<a class="card" href="${href}"><span class="tile">${ic(icon)}</span><b>${esc(title)}${tagHtml(tag)}</b><span class="d">${esc(desc)}</span></a>`;
 
 function metaHtml(a) {
   const chips = [];
-  if (a.level) chips.push(`<span class="chip${a.level === '新手' ? ' brand' : ''}">${esc(a.level)}</span>`);
-  if (a.tool) chips.push(`<span class="chip">使用${esc(a.tool)}</span>`);
+  if (a.level) chips.push(`<span class="chip${a.level === '新手' ? ' brand' : ''}">${esc(T(a.level))}</span>`);
+  if (a.tool) chips.push(`<span class="chip">${esc(T('使用{x}', { x: T(a.tool) }))}</span>`);
   (a.models || []).forEach((m) => chips.push(`<span class="chip">${esc(m)}</span>`));
-  if (a.minutes) chips.push(`<span class="chip">${ic('clock', 'ic sm')}約 ${a.minutes} 分鐘</span>`);
+  if (a.minutes) chips.push(`<span class="chip">${ic('clock', 'ic sm')}${T('約 {n} 分鐘', { n: a.minutes })}</span>`);
   return chips.length ? `<div class="meta">${chips.join('')}</div>` : '';
 }
 
 function articleList(c) {
-  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || '這個分類的文章')}</h2><div class="list">` +
+  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || T('這個分類的文章'))}</h2><div class="list">` +
     g.items.map(([aid, n, tag]) => {
       const a = ARTICLES[aid] || {};
       return `<a class="list-row" href="#${aid}"><span class="list-t"><b>${esc(a.t || n)}</b>${a.d ? `<small>${esc(a.d)}</small>` : ''}</span>${tag ? `<span class="chip brand">${esc(tag)}</span>` : ''}${ic('chev', 'ic chev')}</a>`;
@@ -373,7 +407,8 @@ function articleView(id) {
   const head = c
     ? `<div class="cat-head"><span class="cat-icon">${ic(c.icon)}</span><h1>${esc(a.t)}</h1></div>`
     : `<h1>${esc(a.t)}</h1>`;
-  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}
+  const notYet = a.untranslated ? `<div class="callout note">${T('這篇還沒有英文版，以下先顯示中文內容。')}</div>` : '';
+  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}${notYet}
     <div class="prose">${renderMarkup(a.body)}</div>
     ${c ? articleList(c) : ''}`;
 }
@@ -387,55 +422,55 @@ function catView(id) {
 const VIEWS = {
   home: () => `
     <section class="hero">
-      <div class="eyebrow">MOONLAND.AI 說明中心</div>
-      <h1><span class="seg">從第一張圖到團隊管理，</span><span class="seg"><em>所有操作</em>都查得到</span></h1>
-      <p>交談、圖片、影片、音樂、實驗室與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。</p>
-      <button class="hero-search" type="button" data-open-search>${ic('search')}<span class="sp-text">例如：換衣服、頭尾幀、ControlNet、點數</span><kbd>Ctrl K</kbd></button>
-      <div class="popular">熱門：<a href="#chat-prompts">提示詞寫法</a><a href="#outfit">人物換衣</a><a href="#v-i2v">圖片生成影片</a><a href="#v-mimic">動作模仿</a><a href="#credits">點數怎麼算</a></div>
+      <div class="eyebrow">${T('MOONLAND.AI 說明中心')}</div>
+      <h1><span class="seg">${T('從第一張圖到團隊管理，')}</span><span class="seg">${T('<em>所有操作</em>都查得到')}</span></h1>
+      <p>${T('交談、圖片、影片、音樂、實驗室與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。')}</p>
+      <button class="hero-search" type="button" data-open-search>${ic('search')}<span class="sp-text">${T('例如：換衣服、頭尾幀、ControlNet、點數')}</span><kbd>Ctrl K</kbd></button>
+      <div class="popular">${T('熱門：')}<a href="#chat-prompts">${T('提示詞寫法')}</a><a href="#outfit">${T('人物換衣')}</a><a href="#v-i2v">${T('圖片生成影片')}</a><a href="#v-mimic">${T('動作模仿')}</a><a href="#credits">${T('點數怎麼算')}</a></div>
     </section>
 
-    <h2 id="h-path">依你的程度開始</h2>
+    <h2 id="h-path">${T('依你的程度開始')}</h2>
     <div class="grid">
-      ${card('#quick-start', 'rocket', '第一次使用', '五分鐘走完登入、用交談生成第一張圖，再把它變成影片。', '新手')}
-      ${card('#lab', 'flask', '想要更多控制', '到實驗室用 LoRA、ControlNet、IP-Adapter 精修畫面。')}
-      ${card('#admin', 'shield', '管理團隊', '管理員六堂課：邀請成員、貼標籤、分配點數。')}
+      ${card('#quick-start', 'rocket', T('第一次使用'), T('五分鐘走完登入、用交談生成第一張圖，再把它變成影片。'), T('新手'))}
+      ${card('#lab', 'flask', T('想要更多控制'), T('到實驗室用 LoRA、ControlNet、IP-Adapter 精修畫面。'))}
+      ${card('#admin', 'shield', T('管理團隊'), T('管理員六堂課：邀請成員、貼標籤、分配點數。'))}
     </div>
 
-    <h2 id="h-tools">創作工具</h2>
+    <h2 id="h-tools">${T('創作工具')}</h2>
     <div class="grid">
-      ${card('#chat', 'chat', '交談', '用對話生成與編輯，最容易上手。')}
-      ${card('#image', 'image', '圖片生成', '生成、放大、拓展、旋轉視角。')}
-      ${card('#video', 'video', '影片生成', '圖片轉影片、運動軌跡、動作模仿。')}
-      ${card('#lab', 'flask', '實驗室', 'LoRA、ControlNet、IP-Adapter。')}
-      ${card('#music-3d', 'music', '音樂與 3D', '歌曲、BGM、音效與 3D 模型。')}
-      ${card('#models', 'layers', '模型指南', '依用途挑選圖片、影片、音樂模型。')}
+      ${card('#chat', 'chat', T('交談'), T('用對話生成與編輯，最容易上手。'))}
+      ${card('#image', 'image', T('圖片生成'), T('生成、放大、拓展、旋轉視角。'))}
+      ${card('#video', 'video', T('影片生成'), T('圖片轉影片、運動軌跡、動作模仿。'))}
+      ${card('#lab', 'flask', T('實驗室'), T('LoRA、ControlNet、IP-Adapter。'))}
+      ${card('#music-3d', 'music', T('音樂與 3D'), T('歌曲、BGM、音效與 3D 模型。'))}
+      ${card('#models', 'layers', T('模型指南'), T('依用途挑選圖片、影片、音樂模型。'))}
     </div>
 
-    <div class="sec-head"><h2 id="h-recipes">應用範例</h2><a href="#recipes">看全部 →</a></div>
+    <div class="sec-head"><h2 id="h-recipes">${T('應用範例')}</h2><a href="#recipes">${T('看全部 →')}</a></div>
     <div class="grid">
-      ${card('#pvc', 'sparkles', 'PVC 公仔風格', '把照片或角色變成公仔產品照。')}
-      ${card('#logo', 'sparkles', 'LOGO 創作', '用對話定義品牌色彩與風格。')}
-      ${card('#outfit', 'sparkles', '人物角色換衣', '裁切、下指令，換上指定服裝。')}
+      ${card('#pvc', 'sparkles', T('PVC 公仔風格'), T('把照片或角色變成公仔產品照。'))}
+      ${card('#logo', 'sparkles', T('LOGO 創作'), T('用對話定義品牌色彩與風格。'))}
+      ${card('#outfit', 'sparkles', T('人物角色換衣'), T('裁切、下指令，換上指定服裝。'))}
     </div>`,
   feedback: () => {
     const groups = {};
     ORDER.filter((k) => ARTICLES[k]).forEach((k) => { const g = PAGES[k].crumb.join(' / '); (groups[g] = groups[g] || []).push(k); });
     const opts = Object.entries(groups).map(([g, ks]) => `<optgroup label="${esc(g)}">${ks.map((k) => `<option value="${k}"${k === fbFrom ? ' selected' : ''}>${esc(PAGES[k].t)}</option>`).join('')}</optgroup>`).join('');
-    return `${crumb('feedback')}<div class="cat-head"><span class="cat-icon">${ic('message')}</span><h1>意見回饋</h1></div>
-    <p class="lead">照著教學做還是卡住、看完仍然不懂，或有讓說明中心更好的建議，都歡迎告訴我們。帳號、點數等需要即時處理的問題，請改用<a href="#contact">聯絡我們</a>。</p>
+    return `${crumb('feedback')}<div class="cat-head"><span class="cat-icon">${ic('message')}</span><h1>${T('意見回饋')}</h1></div>
+    <p class="lead">${T('照著教學做還是卡住、看完仍然不懂，或有讓說明中心更好的建議，都歡迎告訴我們。帳號、點數等需要即時處理的問題，請改用<a href="#contact">聯絡我們</a>。')}</p>
     <form class="fb-form" id="fbForm" novalidate>
-      <fieldset class="fb-field"><legend>回饋類型</legend>
-        <div class="fb-types">${FB_TYPES.map(([v, t, d]) => `<label class="fb-type"><input type="radio" name="type" value="${v}"><span><b>${t}</b><small>${d}</small></span></label>`).join('')}</div>
+      <fieldset class="fb-field"><legend>${T('回饋類型')}</legend>
+        <div class="fb-types">${FB_TYPES.map(([v, t, d]) => `<label class="fb-type"><input type="radio" name="type" value="${v}"><span><b>${T(t)}</b><small>${T(d)}</small></span></label>`).join('')}</div>
       </fieldset>
-      <label class="fb-field"><span class="fb-label">相關頁面</span>
-        <select name="page"><option value="">整個網站／沒有特定頁面</option>${opts}</select></label>
-      <label class="fb-field"><span class="fb-label">內容</span>
-        <textarea name="message" rows="6" maxlength="2000" placeholder="${esc(FB_HINT.other)}"></textarea>
+      <label class="fb-field"><span class="fb-label">${T('相關頁面')}</span>
+        <select name="page"><option value="">${T('整個網站／沒有特定頁面')}</option>${opts}</select></label>
+      <label class="fb-field"><span class="fb-label">${T('內容')}</span>
+        <textarea name="message" rows="6" maxlength="2000" placeholder="${esc(T(FB_HINT.other))}"></textarea>
         <small class="fb-count">0 / 2000</small></label>
-      <label class="fb-field"><span class="fb-label">聯絡方式<small>選填，需要我們回覆時再填</small></span>
-        <input name="contact" maxlength="120" autocomplete="email" placeholder="E-mail 或 LINE ID"></label>
+      <label class="fb-field"><span class="fb-label">${T('聯絡方式')}<small>${T('選填，需要我們回覆時再填')}</small></span>
+        <input name="contact" maxlength="120" autocomplete="email" placeholder="${T('E-mail 或 LINE ID')}"></label>
       <p class="fb-error" role="alert"></p>
-      <button class="fb-submit" type="submit">送出回饋</button>
+      <button class="fb-submit" type="submit">${T('送出回饋')}</button>
     </form>`;
   },
 };
@@ -444,9 +479,9 @@ function pager(id) {
   const i = ORDER.indexOf(id);
   if (i < 0) return '';
   const p = ORDER[i - 1], n = ORDER[i + 1];
-  return `<nav class="pager" aria-label="上一篇與下一篇">${p ? `<a href="#${p}"><small>上一篇</small>${esc(PAGES[p].t)}</a>` : ''}${n ? `<a class="next" href="#${n}"><small>下一篇</small>${esc(PAGES[n].t)}</a>` : ''}</nav>`;
+  return `<nav class="pager" aria-label="${T('上一篇與下一篇')}">${p ? `<a href="#${p}"><small>${T('上一篇')}</small>${esc(PAGES[p].t)}</a>` : ''}${n ? `<a class="next" href="#${n}"><small>${T('下一篇')}</small>${esc(PAGES[n].t)}</a>` : ''}</nav>`;
 }
-const feedback = () => `<div class="feedback">這篇有幫助嗎？<button type="button" aria-pressed="false" data-vote="up">有幫助</button><button type="button" aria-pressed="false" data-vote="down">還需要改進</button><span class="fb-thanks" role="status"></span></div>`;
+const feedback = () => `<div class="feedback">${T('這篇有幫助嗎？')}<button type="button" aria-pressed="false" data-vote="up">${T('有幫助')}</button><button type="button" aria-pressed="false" data-vote="down">${T('還需要改進')}</button><span class="fb-thanks" role="status"></span></div>`;
 
 // ---------------------------------------------------------
 // 回饋：送到網站伺服器（server/server.js 的 /api/feedback），後台頁 admin.html 查看。
@@ -474,9 +509,19 @@ function visitorId() {
     return v;
   } catch (e) { return ''; }
 }
-// 回傳 'server'（存到伺服器）、'local'（預覽版，存在這台電腦）或 'failed'
+// 回傳 'server'（存到 Google 試算表或伺服器）、'local'（預覽版，存在這台電腦）或 'failed'
+// 頁面標題一律送中文版的，後台才不會同一篇出現中英兩種名稱
 async function sendFeedback(entry) {
-  entry = { ...entry, vid: visitorId() };
+  const zhTitle = entry.page ? (ZH_ARTICLES[entry.page] && ZH_ARTICLES[entry.page].t) || entry.pageTitle : '';
+  entry = { ...entry, pageTitle: zhTitle, vid: visitorId(), lang: LANG };
+  const google = window.SITE_CONFIG && window.SITE_CONFIG.googleScriptUrl;
+  if (google) {
+    try {
+      // 不指定 content-type（預設 text/plain），Apps Script 才收得到（不會觸發跨網域預檢）
+      const r = await fetch(google, { method: 'POST', body: JSON.stringify(entry) });
+      return (await r.json()).ok ? 'server' : 'failed';
+    } catch (e) { return 'failed'; }
+  }
   try {
     const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
     if (r.ok) return 'server';
@@ -505,7 +550,7 @@ function render() {
   if (VIEWS[id]) body = VIEWS[id]();
   else if (ARTICLES[id]) body = articleView(id);
   else if (CATS[id]) body = catView(id);
-  else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">這篇內容整理中。</p>`;
+  else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">${T('這篇內容整理中。')}</p>`;
   view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' ? '' : feedback()));
   fbFrom = '';
   document.body.classList.toggle('is-home', id === 'home');
@@ -526,7 +571,7 @@ function render() {
   }
 
   buildToc();
-  document.title = (id === 'home' ? '' : PAGES[id].t + '｜') + 'moonland.ai 說明中心';
+  document.title = (id === 'home' ? '' : PAGES[id].t + (LANG === 'en' ? ' | ' : '｜')) + T('moonland.ai 說明中心');
   window.scrollTo(0, 0);
   closeDrawer();
 }
@@ -534,7 +579,7 @@ function render() {
 function buildToc() {
   const hs = [...view.querySelectorAll('h2[id]')];
   toc.innerHTML = hs.length > 1
-    ? `<div class="toc-label">本頁目錄</div>` + hs.map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent)}</a>`).join('')
+    ? `<div class="toc-label">${T('本頁目錄')}</div>` + hs.map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent)}</a>`).join('')
     : '';
   spy();
 }
@@ -578,8 +623,8 @@ document.addEventListener('click', async (e) => {
     const text = cp.parentElement.querySelector('pre').textContent;
     try { await navigator.clipboard.writeText(text); }
     catch (err) { const r = document.createRange(); r.selectNodeContents(cp.parentElement.querySelector('pre')); getSelection().removeAllRanges(); getSelection().addRange(r); }
-    cp.classList.add('done'); cp.querySelector('span').textContent = '已複製';
-    setTimeout(() => { cp.classList.remove('done'); cp.querySelector('span').textContent = '複製'; }, 1600);
+    cp.classList.add('done'); cp.querySelector('span').textContent = T('已複製');
+    setTimeout(() => { cp.classList.remove('done'); cp.querySelector('span').textContent = T('複製'); }, 1600);
     return;
   }
   const fb = e.target.closest('.feedback button');
@@ -589,8 +634,8 @@ document.addEventListener('click', async (e) => {
     fb.setAttribute('aria-pressed', 'true');
     const id = currentId(), up = fb.dataset.vote === 'up';
     const msg = fb.parentElement.querySelector('.fb-thanks');
-    msg.innerHTML = up ? '謝謝你的回饋！' : `謝謝！<a href="#feedback" data-fb-from="${id}">告訴我們哪裡需要改進 →</a>`;
-    if (await sendFeedback({ kind: 'vote', page: id, pageTitle: PAGES[id].t, value: fb.dataset.vote }) === 'failed') msg.textContent = '送出失敗，請稍後再試。';
+    msg.innerHTML = up ? T('謝謝你的回饋！') : `${T('謝謝！')}<a href="#feedback" data-fb-from="${id}">${T('告訴我們哪裡需要改進 →')}</a>`;
+    if (await sendFeedback({ kind: 'vote', page: id, pageTitle: PAGES[id].t, value: fb.dataset.vote }) === 'failed') msg.textContent = T('送出失敗，請稍後再試。');
     return;
   }
   const from = e.target.closest('[data-fb-from]');
@@ -628,8 +673,8 @@ navBtn.innerHTML = ic('sidebar', 'ic d-only') + ic('menu', 'ic m-only');
 function syncNavBtn() {
   const open = mqMobile.matches ? root.classList.contains('drawer-open') : !root.classList.contains('nav-collapsed');
   navBtn.setAttribute('aria-expanded', String(open));
-  navBtn.setAttribute('aria-label', open ? '收合目錄' : '展開目錄');
-  navBtn.title = open ? '收合目錄' : '展開目錄';
+  navBtn.setAttribute('aria-label', T(open ? '收合目錄' : '展開目錄'));
+  navBtn.title = T(open ? '收合目錄' : '展開目錄');
 }
 function closeDrawer() { root.classList.remove('drawer-open'); syncNavBtn(); }
 navBtn.addEventListener('click', () => {
@@ -653,8 +698,8 @@ const currentTheme = () => root.dataset.theme || (sysLight.matches ? 'light' : '
 function paintThemeBtn() {
   const dark = currentTheme() === 'dark';
   themeBtn.innerHTML = ic(dark ? 'sun' : 'moon');
-  themeBtn.setAttribute('aria-label', dark ? '切換到淺色模式' : '切換到深色模式');
-  themeBtn.title = dark ? '切換到淺色模式' : '切換到深色模式';
+  themeBtn.setAttribute('aria-label', T(dark ? '切換到淺色模式' : '切換到深色模式'));
+  themeBtn.title = T(dark ? '切換到淺色模式' : '切換到深色模式');
 }
 themeBtn.addEventListener('click', () => {
   const next = currentTheme() === 'dark' ? 'light' : 'dark';
@@ -673,8 +718,8 @@ const fsPop = document.createElement('div');
 fsPop.className = 'fs-pop';
 fsPop.hidden = true;
 fsPop.setAttribute('role', 'dialog');
-fsPop.setAttribute('aria-label', '字體大小');
-fsPop.innerHTML = `<p class="fs-title">字體大小</p><div class="fs-opts">${FS.map(([t, px], i) => `<button type="button" data-fs="${i}"><b style="font-size:${px}px">字</b><small>${t}</small></button>`).join('')}</div>`;
+fsPop.setAttribute('aria-label', T('字體大小'));
+fsPop.innerHTML = `<p class="fs-title">${T('字體大小')}</p><div class="fs-opts">${FS.map(([t, px], i) => `<button type="button" data-fs="${i}"><b style="font-size:${px}px">${T('字')}</b><small>${T(t)}</small></button>`).join('')}</div>`;
 document.body.appendChild(fsPop);
 const currentFs = () => +(root.dataset.fs || 0);
 function paintFs() {
@@ -727,7 +772,7 @@ function snippet(x, w) {
 let sel = 0;
 function search() {
   const s = q.value.trim().toLowerCase();
-  if (!s) { results.innerHTML = '<p>輸入關鍵字，搜尋所有文章的標題與內文。</p>'; return; }
+  if (!s) { results.innerHTML = `<p>${T('輸入關鍵字，搜尋所有文章的標題與內文。')}</p>`; return; }
   const words = s.split(/\s+/);
   const r = INDEX
     .filter((x) => words.every((w) => x.hay.includes(w)))
@@ -738,7 +783,7 @@ function search() {
   sel = 0;
   results.innerHTML = r.length
     ? r.map((x, i) => `<a href="#${x.k}" role="option" class="${i ? '' : 'sel'}">${esc(x.t)}<small>${esc(x.path)}</small><span class="snip">${snippet(x, words[0])}</span></a>`).join('')
-    : '<p>找不到符合的文章，換個關鍵字試試。</p>';
+    : `<p>${T('找不到符合的文章，換個關鍵字試試。')}</p>`;
 }
 function moveSel(d) {
   const as = [...results.querySelectorAll('a')];
@@ -773,7 +818,7 @@ document.addEventListener('keydown', (e) => {
 // ---------------------------------------------------------
 view.addEventListener('change', (e) => {
   const f = e.target.form;
-  if (f && f.id === 'fbForm' && e.target.name === 'type') f.message.placeholder = FB_HINT[e.target.value];
+  if (f && f.id === 'fbForm' && e.target.name === 'type') f.message.placeholder = T(FB_HINT[e.target.value]);
 });
 view.addEventListener('input', (e) => {
   if (e.target.name === 'message' && e.target.form && e.target.form.id === 'fbForm') {
@@ -786,22 +831,22 @@ view.addEventListener('submit', async (e) => {
   e.preventDefault();
   const err = f.querySelector('.fb-error');
   const type = f.type.value, message = f.message.value.trim();
-  if (!type) { err.textContent = '請選擇回饋類型。'; f.querySelector('input[name="type"]').focus(); return; }
-  if (!message) { err.textContent = '請寫下回饋內容。'; f.message.focus(); return; }
+  if (!type) { err.textContent = T('請選擇回饋類型。'); f.querySelector('input[name="type"]').focus(); return; }
+  if (!message) { err.textContent = T('請寫下回饋內容。'); f.message.focus(); return; }
   err.textContent = '';
   const btn = f.querySelector('.fb-submit');
-  btn.disabled = true; btn.textContent = '送出中…';
+  btn.disabled = true; btn.textContent = T('送出中…');
   const page = f.page.value;
   const res = await sendFeedback({ kind: 'note', type, page, pageTitle: page ? PAGES[page].t : '', message, contact: f.contact.value.trim() });
   if (res === 'failed') {
-    err.textContent = '送出失敗，請稍後再試，或改用「聯絡我們」的管道。';
-    btn.disabled = false; btn.textContent = '送出回饋';
+    err.textContent = T('送出失敗，請稍後再試，或改用「聯絡我們」的管道。');
+    btn.disabled = false; btn.textContent = T('送出回饋');
     return;
   }
-  f.outerHTML = `<div class="fb-done" role="status" tabindex="-1">${ic('check')}<div><b>已收到你的回饋，謝謝！</b>
-    <p>我們會參考你的意見持續改進說明中心。${f.contact.value.trim() ? '需要回覆時會依你留的聯絡方式聯繫。' : ''}</p>
-    ${res === 'local' ? '<p class="fb-preview">目前是預覽版，回饋只存在這台電腦的瀏覽器，可以到<a href="admin.html">後台頁</a>查看。</p>' : ''}
-    <button type="button" class="fb-again">再寫一則</button></div></div>`;
+  f.outerHTML = `<div class="fb-done" role="status" tabindex="-1">${ic('check')}<div><b>${T('已收到你的回饋，謝謝！')}</b>
+    <p>${T('我們會參考你的意見持續改進說明中心。')}${f.contact.value.trim() ? T('需要回覆時會依你留的聯絡方式聯繫。') : ''}</p>
+    ${res === 'local' ? `<p class="fb-preview">${T('目前是預覽版，回饋只存在這台電腦的瀏覽器，可以到<a href="admin.html">後台頁</a>查看。')}</p>` : ''}
+    <button type="button" class="fb-again">${T('再寫一則')}</button></div></div>`;
   view.querySelector('.fb-done').focus();
 });
 view.addEventListener('click', (e) => { if (e.target.closest('.fb-again')) render(); });
@@ -817,6 +862,34 @@ toTop.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   view.focus({ preventScroll: true });
 });
+
+// ---------------------------------------------------------
+// 語言切換：記在這台裝置上，並把 ?lang= 寫進網址（複製網址給別人也是同一種語言），再重新載入
+// ---------------------------------------------------------
+const langBtn = document.getElementById('langBtn');
+langBtn.textContent = LANG === 'en' ? '中文' : 'EN';
+langBtn.lang = LANG === 'en' ? 'zh-Hant' : 'en';
+langBtn.title = LANG === 'en' ? '切換為中文' : 'Switch to English';
+langBtn.setAttribute('aria-label', langBtn.title);
+langBtn.dataset.switchLang = '';
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-switch-lang]')) return;
+  const next = LANG === 'en' ? 'zh' : 'en';
+  try { localStorage.setItem('ml-lang', next); } catch (err) {}
+  const u = new URL(location.href);
+  u.searchParams.set('lang', next);
+  location.href = u.href;
+});
+
+// index.html 裡寫死的文字：有 data-t 的換內文，aria-label／title／placeholder 有對照就換
+if (LANG === 'en') {
+  document.querySelectorAll('[data-t]').forEach((el) => { el.innerHTML = T(el.innerHTML.trim()); });
+  document.querySelectorAll('[aria-label], [title], [placeholder]').forEach((el) => ['aria-label', 'title', 'placeholder'].forEach((at) => {
+    if (el.hasAttribute(at)) el.setAttribute(at, T(el.getAttribute(at)));
+  }));
+  const md = document.querySelector('meta[name="description"]');
+  if (md) md.content = T(md.content);
+}
 
 // 啟動
 document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', ic(el.dataset.icon)));

@@ -13,13 +13,31 @@ const MEDIA = window.MEDIA;
 
 // --- 1. 媒體 ---
 const refs = new Set();
-for (const f of fs.readdirSync(path.join(ROOT, 'data'))) {
-  const src = fs.readFileSync(path.join(ROOT, 'data', f), 'utf8');
+const dataFiles = (dir) => fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.js')).map((f) => path.join(ROOT, dir, f));
+for (const file of [...dataFiles('data'), ...dataFiles('data/en')]) {
+  const src = fs.readFileSync(file, 'utf8');
   for (const m of src.matchAll(/\[(?:i|v|a)\s+(\d+)/g)) refs.add(m[1]);
 }
 const missing = [...refs].filter((n) => !MEDIA[n] || !fs.existsSync(path.join(ROOT, 'assets/media', MEDIA[n][0])));
 assert.deepEqual(missing, [], `找不到媒體：${missing.join(', ')}`);
 console.log(`✓ 文章引用 ${refs.size} 個媒體，檔案都在`);
+
+// --- 1b. 英文版：每篇中文文章都有英文版，且引用的媒體、站內連結、錨點都和中文版一樣 ---
+global.SNIP = {};
+for (const file of dataFiles('data')) require(file);
+for (const file of dataFiles('data/en')) require(file);
+const ZH = window.ARTICLES, EN = window.ARTICLES_EN;
+const pick = (s, re) => (String(s).match(re) || []).sort().join(' ');
+const noEn = Object.keys(ZH).filter((k) => !EN[k]);
+assert.deepEqual(noEn, [], `這些文章還沒有英文版：${noEn.join(', ')}`);
+for (const k of Object.keys(EN)) {
+  assert.ok(ZH[k], `英文版多了中文版沒有的文章：${k}`);
+  assert.ok(EN[k].t && EN[k].d, `英文版 ${k} 缺標題或摘要`);
+  for (const re of [/\[(?:i|v|a)\s+\d+/g, /\]\(#[\w-]+\)/g, /\{#[\w-]+\}/g]) {
+    assert.equal(pick(EN[k].body, re), pick(ZH[k].body, re), `英文版 ${k} 的媒體或連結和中文版不同`);
+  }
+}
+console.log(`✓ ${Object.keys(EN).length} 篇文章都有英文版，媒體與連結和中文版一致`);
 
 // --- 2. 伺服器 ---
 const PORT = 18080 + Math.floor(Math.random() * 1000);
@@ -46,6 +64,9 @@ const base = `http://127.0.0.1:${PORT}`;
     const part = await fetch(`${base}/assets/media/${vid}`, { headers: { range: 'bytes=0-99' } });
     assert.equal(part.status, 206);
     assert.equal((await part.arrayBuffer()).byteLength, 100);
+    assert.equal((await fetch(base + '/data/en/ui.js')).status, 200, '英文版檔案要能讀到');
+    assert.equal((await fetch(base + '/config.js')).status, 200, 'config.js 要能讀到');
+    assert.equal((await fetch(base + '/google-apps-script/Code.gs')).status, 404);
     assert.equal((await fetch(base + '/server/server.js')).status, 404);
     assert.equal((await fetch(base + '/assets/../server/server.js')).status, 404);
     console.log('✓ 伺服器：健康檢查、首頁雜湊、快取標頭、影片 Range、404 都正常');

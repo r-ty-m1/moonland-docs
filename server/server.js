@@ -35,7 +35,7 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/script\.js$/, /^\/admin\.(?:css|js)$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config)\.js$/, /^\/admin\.(?:css|js)$/, /^\/data\/(?:en\/)?[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
@@ -64,7 +64,7 @@ function cleanFeedback(b) {
   if (!b || typeof b !== 'object') return null;
   const page = str(b.page, 80);
   if (page && !/^[\w-]+$/.test(page)) return null;
-  const base = { id: crypto.randomUUID(), at: new Date().toISOString(), page, pageTitle: str(b.pageTitle, 120), vid: str(b.vid, 40) };
+  const base = { id: crypto.randomUUID(), at: new Date().toISOString(), page, pageTitle: str(b.pageTitle, 120), vid: str(b.vid, 40), lang: b.lang === 'en' ? 'en' : 'zh' };
   if (b.kind === 'vote' && page && (b.value === 'up' || b.value === 'down')) return { ...base, kind: 'vote', value: b.value };
   if (b.kind === 'note' && NOTE_TYPES.includes(b.type) && str(b.message, 2000)) {
     return { ...base, kind: 'note', type: b.type, message: str(b.message, 2000), contact: str(b.contact, 120) };

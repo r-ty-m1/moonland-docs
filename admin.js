@@ -1,7 +1,8 @@
-// 說明中心回饋後台：讀取 /api/feedback，整理成統計與意見列表。
-// GitHub Pages 預覽版沒有伺服器，改顯示示範資料，加上這台電腦在說明中心送出的回饋。
+// 說明中心回饋後台：讀取 Google 試算表（config.js 有設網址時）或 /api/feedback，整理成統計與意見列表。
+// 兩者都沒有（GitHub Pages 預覽）時，改顯示示範資料，加上這台電腦在說明中心送出的回饋。
 'use strict';
 
+const GOOGLE_URL = (window.SITE_CONFIG && window.SITE_CONFIG.googleScriptUrl) || '';
 const TYPES = { stuck: '照著做還是卡住', unclear: '看完還是不懂', suggest: '建議改進', other: '其他' };
 const SITE = { '': '整個網站' };
 const SITE_KEY = '_site';   // 篩選選單裡「整個網站」的值（空字串已代表「全部頁面」）
@@ -20,6 +21,7 @@ const filter = { type: '', page: '', q: '' };
 async function load() {
   let token = '';
   try { token = sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e) {}
+  if (GOOGLE_URL) return loadGoogle(token);
   let r;
   try {
     r = await fetch('api/feedback', { headers: token ? { authorization: `Bearer ${token}` } : {}, cache: 'no-store' });
@@ -36,6 +38,26 @@ async function load() {
     try { local = JSON.parse(localStorage.getItem('ml-feedback-preview') || '[]'); } catch (e) {}
     entries = demoEntries().concat(local);
   }
+  entries.sort((a, b) => (a.at < b.at ? -1 : 1));
+  draw();
+}
+
+// 回饋存在 Google 試算表（config.js 的 googleScriptUrl，見 google-apps-script/README.md）
+async function loadGoogle(token) {
+  if (!token) return askToken(false);
+  let data = null;
+  try {
+    // 用 text/plain 送出，Apps Script 才收得到（不會觸發跨網域預檢）
+    const r = await fetch(GOOGLE_URL, { method: 'POST', body: JSON.stringify({ action: 'list', token }) });
+    data = await r.json();
+  } catch (e) { data = null; }
+  if (data && data.error === 'unauthorized') return askToken(true);
+  if (!data || !Array.isArray(data.entries)) {
+    adm.innerHTML = '<p class="adm-err" role="alert">讀不到 Google 試算表，請確認 config.js 的網址正確、Apps Script 已部署成「所有人」可存取。</p>';
+    return;
+  }
+  entries = data.entries;
+  mode = 'google';
   entries.sort((a, b) => (a.at < b.at ? -1 : 1));
   draw();
 }
@@ -157,7 +179,7 @@ function drawNotes() {
     ? `<p class="adm-hint">共 ${list.length} 則，最新的在最上面。</p><ul class="adm-notes">${list.map((n) => `<li>
         <div class="meta"><span class="tag">${esc(TYPES[n.type] || n.type)}</span>
           ${n.page ? `<a href="./#${esc(n.page)}" target="_blank" rel="noopener">${esc(n.pageTitle || n.page)}</a>` : '<span>整個網站</span>'}
-          <time datetime="${esc(n.at)}">${fmtDate(n.at)}</time>${n.demo ? '<span class="demo">示範</span>' : ''}</div>
+          ${n.lang === 'en' ? '<span class="demo">英文版</span>' : ''}<time datetime="${esc(n.at)}">${fmtDate(n.at)}</time>${n.demo ? '<span class="demo">示範</span>' : ''}</div>
         <p>${esc(n.message)}</p>
         ${n.contact ? `<div class="contact">聯絡方式：${esc(n.contact)}</div>` : ''}
       </li>`).join('')}</ul>`
@@ -183,8 +205,8 @@ adm.addEventListener('click', (e) => {
 
 function exportCsv() {
   const cell = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-  const rows = [['時間', '類型', '頁面', '頁面代號', '內容', '聯絡方式']].concat(
-    filteredNotes().map((n) => [fmtDate(n.at), TYPES[n.type] || n.type, n.pageTitle || '整個網站', n.page, n.message, n.contact]),
+  const rows = [['時間', '類型', '頁面', '頁面代號', '內容', '聯絡方式', '語言']].concat(
+    filteredNotes().map((n) => [fmtDate(n.at), TYPES[n.type] || n.type, n.pageTitle || '整個網站', n.page, n.message, n.contact, n.lang === 'en' ? '英文' : '中文']),
   );
   // 開頭加 BOM，Excel 才會用 UTF-8 開啟中文
   const blob = new Blob(['﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });

@@ -14,6 +14,9 @@
 | `style.css` | 配色、字體與排版。最上方 `:root` 是深色配色，下面兩段是淺色配色。字級一律用 `rem`，右上角「字體大小」才能整站一起放大 |
 | `script.js` | `SECTIONS` 是左側目錄與分類結構；其餘是顯示、搜尋、明暗模式等功能 |
 | `data/*.js` | 所有文章內容，依分類分檔 |
+| `data/en/` | 英文版：`ui.js` 是介面文字對照表，其餘檔案是同名分類的英文文章 |
+| `config.js` | 網站設定：回饋要存進 Google 試算表時填 Apps Script 網址 |
+| `google-apps-script/` | 存回饋到 Google 試算表的程式與設定步驟 |
 | `data/media.js` | 媒體編號 → 檔名與寬高比的對照表 |
 | `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
@@ -43,6 +46,15 @@
 ```
 
 2. 在 `script.js` 的 `SECTIONS` 把 `['文章代號', '目錄上顯示的名稱']` 加到想放的分類。
+3. 在 `data/en/` 同名檔案加上英文版（同一個文章代號，寫 `t`、`d`、`body`），並在 `data/en/ui.js` 加上目錄名稱的英文。還沒翻譯的文章，英文版會先顯示中文並加上提示。
+
+## 英文版
+
+- 右上角（手機在目錄最下面）可以切換中文／English，選擇會記在這台裝置上，網址也會加上 `?lang=en` 或 `?lang=zh`，分享連結時對方看到同一種語言。
+- 介面文字在程式裡一律寫中文、外面包 `T()`，英文對照放 `data/en/ui.js`，左邊是中文原文（要一字不差），右邊是英文。
+- 英文文章只寫標題 `t`、摘要 `d`、內文 `body`（目錄名稱太長可加 `n`），等級、分鐘數、模型沿用中文版。圖片編號、站內連結和錨點要和中文版一樣，`node server/test.js` 會檢查。
+- 平台名詞統一：交談 Chat、實驗室 Lab、點數 credits、登月幣 Moon Coins。歌詞範例保留原文。
+- 截圖裡的平台介面仍是中文。
 
 ## 文章標記語法
 
@@ -78,12 +90,19 @@
 
 ## 發布更新時
 
-`index.html` 與 `admin.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261029a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html` 與 `admin.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261029b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
-- 文章底部「這篇有幫助嗎？」和「意見回饋」頁（`#feedback`）的資料送到 `server/server.js` 的 `/api/feedback`，存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。
-- 後台在 `admin.html`。讀取回饋要密碼：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
+文章底部「這篇有幫助嗎？」和「意見回饋」頁（`#feedback`）的資料，依 `config.js` 送到下面其中一個地方：
+
+1. **Google 試算表**（`googleScriptUrl` 有填網址時）：存進公司 Google 帳號雲端硬碟的一份試算表，設定步驟見 [`google-apps-script/README.md`](google-apps-script/README.md)。後台用 Apps Script 指令碼屬性 `ADMIN_TOKEN` 當密碼讀取；也可以直接打開試算表看。
+2. **網站自己的伺服器**（沒填網址、部署在公司內部時）：`server/server.js` 的 `/api/feedback`，存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。
+3. **預覽模式**（兩者都沒有，例如目前的 GitHub Pages）：見下方。
+
+每筆回饋都會記錄是從中文版還是英文版送出；頁面標題一律記中文。
+
+- 後台在 `admin.html`（只有中文）。存在伺服器時，讀取回饋要密碼：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
 - **GitHub Pages 預覽版沒有伺服器**：回饋改存在送出者自己的瀏覽器，後台顯示示範資料加上這台電腦送出的回饋，方便展示流程，但收不到別人的回饋。
 - 在自己電腦試真的流程：`node server/server.js`，打開 http://localhost:8080 送幾則，再開 http://localhost:8080/admin.html。
 
