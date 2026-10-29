@@ -35,7 +35,7 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config)\.js$/, /^\/admin\.(?:css|js)$/, /^\/data\/(?:en\/)?[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?:en\/)?[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
@@ -47,7 +47,7 @@ function loadPage(file) {
   );
   return { html, etag: `"${crypto.createHash('sha256').update(html).digest('hex').slice(0, 16)}"` };
 }
-const PAGES = { '/': loadPage('index.html'), '/index.html': loadPage('index.html'), '/admin.html': loadPage('admin.html') };
+const PAGES = { '/': loadPage('index.html'), '/index.html': loadPage('index.html'), '/admin.html': loadPage('admin.html'), '/edit.html': loadPage('edit.html') };
 
 function send(res, status, body, type) {
   res.writeHead(status, { 'content-type': type || 'text/plain; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });

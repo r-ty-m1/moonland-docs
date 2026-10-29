@@ -12,7 +12,9 @@
 | --- | --- |
 | `index.html` | 頁面骨架，並依序載入下面的檔案 |
 | `style.css` | 配色、字體與排版。最上方 `:root` 是深色配色，下面兩段是淺色配色。字級一律用 `rem`，右上角「字體大小」才能整站一起放大 |
-| `script.js` | `SECTIONS` 是左側目錄與分類結構；其餘是顯示、搜尋、明暗模式等功能 |
+| `data/sections.js` | 左側目錄與分類結構（`window.SECTIONS`） |
+| `markup.js` | 說明中心和編輯後台共用：圖示、`T()`、文章標記語法轉成畫面 |
+| `script.js` | 說明中心的顯示、搜尋、明暗模式、語言切換等功能 |
 | `data/*.js` | 所有文章內容，依分類分檔 |
 | `data/en/` | 英文版：`ui.js` 是介面文字對照表，其餘檔案是同名分類的英文文章 |
 | `config.js` | 網站設定：回饋要存進 Google 試算表時填 Apps Script 網址 |
@@ -23,6 +25,7 @@
 | `assets/` | logo（深色、淺色版）與網站圖示 |
 | `server/` | 公司內部部署用的小型伺服器（含收回饋的 `/api/feedback`）與冒煙測試（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、版本紀錄、編輯者名單 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
@@ -45,7 +48,7 @@
 `},
 ```
 
-2. 在 `script.js` 的 `SECTIONS` 把 `['文章代號', '目錄上顯示的名稱']` 加到想放的分類。
+2. 在 `data/sections.js` 的 `SECTIONS` 把 `['文章代號', '目錄上顯示的名稱']` 加到想放的分類。
 3. 在 `data/en/` 同名檔案加上英文版（同一個文章代號，寫 `t`、`d`、`body`），並在 `data/en/ui.js` 加上目錄名稱的英文。還沒翻譯的文章，英文版會先顯示中文並加上提示。
 
 ## 英文版
@@ -90,7 +93,7 @@
 
 ## 發布更新時
 
-`index.html` 與 `admin.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261029b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -107,6 +110,22 @@
 - 在自己電腦試真的流程：`node server/server.js`，打開 http://localhost:8080 送幾則，再開 http://localhost:8080/admin.html。
 
 部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
+
+## 編輯後台（示範版）
+
+網址是說明中心後面加 `edit.html`（例如 https://r-ty-m1.github.io/moonland-docs/edit.html），給主管看編輯流程用。
+
+- **登入是模擬的**：選一個身分登入（主管理員、編輯者、沒有權限的同事），看不同權限會看到什麼。
+- **修改不會生效**：所有修改只存在這台電腦的瀏覽器（localStorage `ml-editor-demo`），說明中心的內容完全不受影響。頁面上方的「清除示範資料」可以回到說明中心目前的內容。
+- 第一次打開時，從 `data/*.js` 與 `data/sections.js` 複製一份內容來編輯；預覽用 `markup.js`，和說明中心長得一樣。
+- 上傳的圖片會縮到 1600px 寬、轉成 WebP，示範版存在瀏覽器裡（容量有限，大約只放得下十幾張截圖）。
+- 只有中文；英文版暫不編輯。
+
+正式版要做的事（部署到公司內部時）：
+
+1. 改用公司帳號登入：`vibe.yaml` 改成 `auth.mode: oidc`，網站自己處理登入流程；只有 `edit.html` 和儲存的 API 需要登入，訪客照常不用登入。公司平台部署時會自動建立登入設定。
+2. 誰能編輯：伺服器依「員工編號名單」判斷（公司登入只帶員工編號、姓名、email，沒有部門或職稱）。名單存在伺服器，由主管理員在後台維護。
+3. 文章、目錄、版本紀錄、上傳的圖片存在伺服器（`vibe.yaml` 開 persistence，或圖片改用 S3），說明中心改從伺服器讀內容。
 
 ## 部署到公司內部
 

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>編輯後台｜moonland.ai 說明中心</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/favicon.png">
+<script>
+  // 沿用說明中心的明暗模式與字體大小設定
+  try {
+    var t = localStorage.getItem('ml-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    var f = localStorage.getItem('ml-fs');
+    if (f === '1' || f === '2') document.documentElement.dataset.fs = f;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="style.css?v=20261030a">
+<link rel="stylesheet" href="edit.css?v=20261030a">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#pages" aria-label="編輯後台首頁">
+    <img class="logo logo-on-dark" src="assets/logo-white.png?v=20261028c" alt="moonland.ai" width="952" height="118">
+    <img class="logo logo-on-light" src="assets/logo-dark.png?v=20261028c" alt="moonland.ai" width="952" height="118">
+    <span class="brand-sub">編輯後台</span>
+  </a>
+  <div class="ed-who" id="who"></div>
+</header>
+
+<div class="ed-demo" role="note">
+  <b>示範版</b>登入是模擬的；所有修改只存在這台電腦的瀏覽器，<strong>不會改到說明中心</strong>。
+  <button type="button" class="ed-link" id="resetDemo">清除示範資料</button>
+</div>
+
+<main class="ed" id="app" tabindex="-1">
+  <p class="ed-hint">讀取中…</p>
+</main>
+
+<dialog class="ed-dlg" id="linkDlg" aria-labelledby="linkDlgT">
+  <form method="dialog" id="linkForm">
+    <h2 id="linkDlgT">插入連結</h2>
+    <label class="ed-f"><span>連結文字</span><input name="text" maxlength="80" placeholder="不填就用頁面標題"></label>
+    <fieldset class="ed-f ed-radios"><legend>連到哪裡</legend>
+      <label><input type="radio" name="kind" value="page" checked> 說明中心的其他頁面</label>
+      <label><input type="radio" name="kind" value="url"> 外部網址（會開新分頁）</label>
+    </fieldset>
+    <label class="ed-f" data-kind="page"><span>頁面</span><select name="page"></select></label>
+    <label class="ed-f" data-kind="url" hidden><span>網址</span><input name="url" type="url" placeholder="https://"></label>
+    <p class="ed-err" role="alert"></p>
+    <div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">插入</button></div>
+  </form>
+</dialog>
+
+<dialog class="ed-dlg" id="imgDlg" aria-labelledby="imgDlgT">
+  <form method="dialog" id="imgForm">
+    <h2 id="imgDlgT">插入圖片</h2>
+    <fieldset class="ed-f ed-radios"><legend>圖片來源</legend>
+      <label><input type="radio" name="kind" value="upload" checked> 從電腦上傳</label>
+      <label><input type="radio" name="kind" value="old"> 網站上已經有的圖片（輸入編號）</label>
+    </fieldset>
+    <label class="ed-f" data-kind="upload"><span>選擇圖片</span><input name="file" type="file" accept="image/*"></label>
+    <label class="ed-f" data-kind="old" hidden><span>圖片編號</span><input name="num" inputmode="numeric" pattern="\d+" maxlength="5"></label>
+    <div class="ed-thumb" id="imgThumb"></div>
+    <label class="ed-f"><span>圖片說明<small>選填，會顯示在圖片下方</small></span><input name="cap" maxlength="80"></label>
+    <p class="ed-err" role="alert"></p>
+    <div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">插入</button></div>
+  </form>
+</dialog>
+
+<dialog class="ed-dlg ed-dlg-wide" id="histDlg" aria-labelledby="histDlgT">
+  <form method="dialog">
+    <h2 id="histDlgT">版本紀錄</h2>
+    <p class="ed-hint">選一個版本載入到編輯畫面，確認沒問題再按「儲存」，就會還原成那個版本。</p>
+    <ol class="ed-hist" id="histList"></ol>
+    <div class="ed-dlg-acts"><button class="ed-btn" value="cancel">關閉</button></div>
+  </form>
+</dialog>
+
+<p class="ed-toast" id="toast" role="status" aria-live="polite"></p>
+
+<script src="data/media.js?v=20261030a"></script>
+<script src="data/snippets.js?v=20261030a"></script>
+<script src="data/start.js?v=20261030a"></script>
+<script src="data/chat.js?v=20261030a"></script>
+<script src="data/image.js?v=20261030a"></script>
+<script src="data/video.js?v=20261030a"></script>
+<script src="data/lab.js?v=20261030a"></script>
+<script src="data/recipes.js?v=20261030a"></script>
+<script src="data/models.js?v=20261030a"></script>
+<script src="data/team.js?v=20261030a"></script>
+<script src="data/support.js?v=20261030a"></script>
+<script src="data/sections.js?v=20261030a"></script>
+<script src="markup.js?v=20261030a"></script>
+<script src="edit.js?v=20261030a"></script>
+</body>
+</html>

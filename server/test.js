@@ -66,6 +66,8 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal((await part.arrayBuffer()).byteLength, 100);
     assert.equal((await fetch(base + '/data/en/ui.js')).status, 200, '英文版檔案要能讀到');
     assert.equal((await fetch(base + '/config.js')).status, 200, 'config.js 要能讀到');
+    for (const f of ['/markup.js', '/data/sections.js', '/edit.js', '/edit.css']) assert.equal((await fetch(base + f)).status, 200, `${f} 要能讀到`);
+    assert.match(await (await fetch(base + '/edit.html')).text(), /edit\.js\?v=[0-9a-f]{10}"/, 'edit.js 沒有內容雜湊');
     assert.equal((await fetch(base + '/google-apps-script/Code.gs')).status, 404);
     assert.equal((await fetch(base + '/server/server.js')).status, 404);
     assert.equal((await fetch(base + '/assets/../server/server.js')).status, 404);
