@@ -1,0 +1,94 @@
+/* 回饋後台（admin.html）。配色、字體沿用 style.css 的變數；字級一律用 rem */
+
+.adm-back { margin-left: auto; font-size: 0.875rem; color: var(--fg-2); text-decoration: none; white-space: nowrap; }
+.adm-back:hover { color: var(--fg); }
+
+.adm { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+.adm h1 { font: 700 1.875rem/1.3 var(--display); margin: 0; }
+.adm h2 { font-size: 1.125rem; font-weight: 700; margin: 0 0 4px; }
+.adm section { margin-top: 44px; }
+.adm-loading, .adm-empty { color: var(--muted); }
+.adm-hint { margin: 0 0 14px; font-size: 0.8125rem; color: var(--muted); }
+.adm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+section .adm-head { margin-bottom: 10px; }
+.adm-btn {
+  font: inherit; font-size: 0.875rem; cursor: pointer;
+  padding: 6px 14px; border-radius: 10px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg-2);
+}
+.adm-btn:hover { border-color: var(--accent-line); color: var(--fg); }
+
+.adm-banner {
+  margin-bottom: 24px; padding: 12px 16px; font-size: 0.875rem; line-height: 1.7;
+  border: 1px solid var(--warn-line); border-radius: 12px; background: var(--warn-soft); color: var(--warn-ink);
+}
+.adm-banner b { margin-right: 8px; }
+
+/* 數字卡 */
+.adm-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.adm-tile {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+}
+.adm-tile small { font-size: 0.8125rem; color: var(--muted); }
+.adm-tile b { font: 700 1.875rem/1.3 var(--display); color: var(--fg); font-variant-numeric: tabular-nums; }
+.adm-tile b em { font-style: normal; color: var(--muted); font-weight: 400; margin: 0 2px; }
+.adm-tile b.adm-tile-page { font: 500 1rem/1.5 var(--sans); padding: 6px 0 2px; overflow-wrap: anywhere; }
+.adm-tile b a { color: var(--fg); }
+.adm-tile span { font-size: 0.8125rem; color: var(--fg-2); }
+
+/* 表格 */
+.adm-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+.adm-table th, .adm-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.adm-table thead th { font-size: 0.8125rem; font-weight: 500; color: var(--muted); border-bottom-color: var(--line-strong); }
+.adm-table tbody th { font-weight: 500; }
+.adm-table tbody th a { color: var(--fg); }
+.adm-table .num { text-align: right; font: inherit; color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-table thead th:not(:first-child) { text-align: right; }
+.adm-types { max-width: 640px; }
+.adm-types th:first-child { width: 11rem; }
+.adm-types .num { width: 4rem; }
+.bar-cell { width: 60%; }
+.bar { display: block; height: 10px; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--brand-ic); }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 篩選與意見列表 */
+.adm-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.adm-filters label { display: grid; gap: 4px; font-size: 0.8125rem; color: var(--muted); min-width: 0; }
+.adm-filters .grow { flex: 1 1 14rem; }
+.adm-filters select, .adm-filters input, .adm-login input {
+  font: inherit; font-size: 0.9375rem; color: var(--fg); min-width: 0; width: 100%;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+}
+.adm-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.adm-notes li { padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.adm-notes .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.8125rem; color: var(--muted); }
+.adm-notes .meta a { color: var(--fg-2); }
+.adm-notes .demo { font-size: 0.6875rem; padding: 2px 7px; border: 1px dashed var(--line-strong); border-radius: 999px; }
+.adm-notes p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.adm-notes .contact { margin-top: 6px; font-size: 0.8125rem; color: var(--fg-2); overflow-wrap: anywhere; }
+
+/* 輸入後台密碼 */
+.adm-login { max-width: 360px; margin: 10vh auto 0; display: grid; gap: 12px; }
+.adm-login p { margin: 0; color: var(--fg-2); }
+.adm-login .adm-err { color: var(--warn-ink); font-size: 0.875rem; }
+.adm-login button { font: inherit; font-weight: 500; cursor: pointer; padding: 10px; border: 0; border-radius: 10px; background: var(--brand); color: #04140a; }
+
+@media (max-width: 860px) {
+  .adm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .adm { padding: 24px 16px 64px; }
+  .top .brand-sub { display: none; }
+  .adm-tile { padding: 14px; }
+  .adm-tile b { font-size: 1.5rem; }
+  .adm-types th:first-child { width: auto; }
+  .bar-cell { width: 40%; }
+  /* 各頁回饋：一列一張卡片 */
+  .adm-pages thead { display: none; }
+  .adm-pages, .adm-pages tbody, .adm-pages tr { display: block; }
+  .adm-pages tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .adm-pages th, .adm-pages td { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border: 0; }
+  .adm-pages th { padding-bottom: 6px; }
+  .adm-pages td::before { content: attr(data-label); color: var(--muted); font-size: 0.8125rem; }
+}

@@ -18,7 +18,8 @@
 | `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
-| `server/` | 公司內部部署用的小型伺服器與冒煙測試（GitHub Pages 用不到） |
+| `server/` | 公司內部部署用的小型伺服器（含收回饋的 `/api/feedback`）與冒煙測試（GitHub Pages 用不到） |
+| `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
@@ -77,7 +78,14 @@
 
 ## 發布更新時
 
-`index.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261028c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html` 與 `admin.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261029a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+
+## 回饋與後台
+
+- 文章底部「這篇有幫助嗎？」和「意見回饋」頁（`#feedback`）的資料送到 `server/server.js` 的 `/api/feedback`，存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。
+- 後台在 `admin.html`。讀取回饋要密碼：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
+- **GitHub Pages 預覽版沒有伺服器**：回饋改存在送出者自己的瀏覽器，後台顯示示範資料加上這台電腦送出的回饋，方便展示流程，但收不到別人的回饋。
+- 在自己電腦試真的流程：`node server/server.js`，打開 http://localhost:8080 送幾則，再開 http://localhost:8080/admin.html。
 
 部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
 

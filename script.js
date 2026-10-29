@@ -36,6 +36,8 @@ const ICONS = {
   copy: 'M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1',
   check: 'M5 12l5 5l10 -10',
   clock: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 7v5l3 3',
+  message: 'M8 9h8 M8 13h6 M9 18h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-3l-3 3l-3 -3z',
+  up: 'M12 5l0 14 M18 11l-6 -6 M6 11l6 -6',
 };
 const ic = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -96,6 +98,7 @@ const SECTIONS = [
     { id: 'faq', icon: 'help' },
     { id: 'changelog', icon: 'history' },
     { id: 'contact', icon: 'mail' },
+    { id: 'feedback', t: '意見回饋', icon: 'message' },
   ] },
 ];
 
@@ -127,7 +130,7 @@ SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
       ORDER.push(id);
     }));
   } else {
-    const t = (ARTICLES[r.id] && ARTICLES[r.id].t) || r.id;
+    const t = (ARTICLES[r.id] && ARTICLES[r.id].t) || r.t || r.id;
     PAGES[r.id] = { t, n: r.n || t, tag: r.tag, crumb: [sec.label] };
     r.t = t;
     ORDER.push(r.id);
@@ -414,6 +417,27 @@ const VIEWS = {
       ${card('#logo', 'sparkles', 'LOGO 創作', '用對話定義品牌色彩與風格。')}
       ${card('#outfit', 'sparkles', '人物角色換衣', '裁切、下指令，換上指定服裝。')}
     </div>`,
+  feedback: () => {
+    const groups = {};
+    ORDER.filter((k) => ARTICLES[k]).forEach((k) => { const g = PAGES[k].crumb.join(' / '); (groups[g] = groups[g] || []).push(k); });
+    const opts = Object.entries(groups).map(([g, ks]) => `<optgroup label="${esc(g)}">${ks.map((k) => `<option value="${k}"${k === fbFrom ? ' selected' : ''}>${esc(PAGES[k].t)}</option>`).join('')}</optgroup>`).join('');
+    return `${crumb('feedback')}<div class="cat-head"><span class="cat-icon">${ic('message')}</span><h1>意見回饋</h1></div>
+    <p class="lead">照著教學做還是卡住、看完仍然不懂，或有讓說明中心更好的建議，都歡迎告訴我們。帳號、點數等需要即時處理的問題，請改用<a href="#contact">聯絡我們</a>。</p>
+    <form class="fb-form" id="fbForm" novalidate>
+      <fieldset class="fb-field"><legend>回饋類型</legend>
+        <div class="fb-types">${FB_TYPES.map(([v, t, d]) => `<label class="fb-type"><input type="radio" name="type" value="${v}"><span><b>${t}</b><small>${d}</small></span></label>`).join('')}</div>
+      </fieldset>
+      <label class="fb-field"><span class="fb-label">相關頁面</span>
+        <select name="page"><option value="">整個網站／沒有特定頁面</option>${opts}</select></label>
+      <label class="fb-field"><span class="fb-label">內容</span>
+        <textarea name="message" rows="6" maxlength="2000" placeholder="${esc(FB_HINT.other)}"></textarea>
+        <small class="fb-count">0 / 2000</small></label>
+      <label class="fb-field"><span class="fb-label">聯絡方式<small>選填，需要我們回覆時再填</small></span>
+        <input name="contact" maxlength="120" autocomplete="email" placeholder="E-mail 或 LINE ID"></label>
+      <p class="fb-error" role="alert"></p>
+      <button class="fb-submit" type="submit">送出回饋</button>
+    </form>`;
+  },
 };
 
 function pager(id) {
@@ -422,7 +446,49 @@ function pager(id) {
   const p = ORDER[i - 1], n = ORDER[i + 1];
   return `<nav class="pager" aria-label="上一篇與下一篇">${p ? `<a href="#${p}"><small>上一篇</small>${esc(PAGES[p].t)}</a>` : ''}${n ? `<a class="next" href="#${n}"><small>下一篇</small>${esc(PAGES[n].t)}</a>` : ''}</nav>`;
 }
-const feedback = () => `<div class="feedback">這篇有幫助嗎？<button type="button" aria-pressed="false">有幫助</button><button type="button" aria-pressed="false">還需要改進</button></div>`;
+const feedback = () => `<div class="feedback">這篇有幫助嗎？<button type="button" aria-pressed="false" data-vote="up">有幫助</button><button type="button" aria-pressed="false" data-vote="down">還需要改進</button><span class="fb-thanks" role="status"></span></div>`;
+
+// ---------------------------------------------------------
+// 回饋：送到網站伺服器（server/server.js 的 /api/feedback），後台頁 admin.html 查看。
+// GitHub Pages 預覽版沒有伺服器，改存在這台電腦的瀏覽器裡，後台頁也會讀出來。
+// ---------------------------------------------------------
+const FB_TYPES = [
+  ['stuck', '照著做還是卡住', '操作時遇到問題，網站上找不到解法'],
+  ['unclear', '看完還是不懂', '說明不夠清楚，或需要更多例子'],
+  ['suggest', '建議改進', '想新增的主題、內容或功能'],
+  ['other', '其他', '其他想告訴我們的事'],
+];
+const FB_HINT = {
+  stuck: '例如：照「圖片生成影片」的步驟做，第 3 步找不到上傳按鈕，我的畫面和截圖不一樣。',
+  unclear: '例如：看不懂 ControlNet 的權重要怎麼調，可以多舉幾個例子嗎？',
+  suggest: '例如：希望每篇開頭都有一段操作影片。',
+  other: '想說的都可以寫在這裡。',
+};
+const FB_LOCAL = 'ml-feedback-preview';
+let fbFrom = '';   // 從文章底部「還需要改進」過來時，預先選好那一篇
+
+function visitorId() {
+  try {
+    let v = localStorage.getItem('ml-vid');
+    if (!v) { v = Math.random().toString(36).slice(2, 12); localStorage.setItem('ml-vid', v); }
+    return v;
+  } catch (e) { return ''; }
+}
+// 回傳 'server'（存到伺服器）、'local'（預覽版，存在這台電腦）或 'failed'
+async function sendFeedback(entry) {
+  entry = { ...entry, vid: visitorId() };
+  try {
+    const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
+    if (r.ok) return 'server';
+    if (r.status !== 404 && r.status !== 405) return 'failed';   // 有伺服器但拒收（格式錯、太頻繁）
+  } catch (e) { return 'failed'; }
+  try {
+    const list = JSON.parse(localStorage.getItem(FB_LOCAL) || '[]');
+    list.push({ ...entry, id: 'local-' + Date.now(), at: new Date().toISOString() });
+    localStorage.setItem(FB_LOCAL, JSON.stringify(list.slice(-200)));
+    return 'local';
+  } catch (e) { return 'failed'; }
+}
 
 // ---------------------------------------------------------
 // 6. 路由、本頁目錄、互動
@@ -440,7 +506,8 @@ function render() {
   else if (ARTICLES[id]) body = articleView(id);
   else if (CATS[id]) body = catView(id);
   else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">這篇內容整理中。</p>`;
-  view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] ? '' : feedback()));
+  view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' ? '' : feedback()));
+  fbFrom = '';
   document.body.classList.toggle('is-home', id === 'home');
 
   side.querySelectorAll('[data-id]').forEach((a) => (a.dataset.id === id ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
@@ -517,10 +584,17 @@ document.addEventListener('click', async (e) => {
   }
   const fb = e.target.closest('.feedback button');
   if (fb) {
+    if (fb.getAttribute('aria-pressed') === 'true') return;
     fb.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false'));
     fb.setAttribute('aria-pressed', 'true');
+    const id = currentId(), up = fb.dataset.vote === 'up';
+    const msg = fb.parentElement.querySelector('.fb-thanks');
+    msg.innerHTML = up ? '謝謝你的回饋！' : `謝謝！<a href="#feedback" data-fb-from="${id}">告訴我們哪裡需要改進 →</a>`;
+    if (await sendFeedback({ kind: 'vote', page: id, pageTitle: PAGES[id].t, value: fb.dataset.vote }) === 'failed') msg.textContent = '送出失敗，請稍後再試。';
     return;
   }
+  const from = e.target.closest('[data-fb-from]');
+  if (from) { fbFrom = from.dataset.fbFrom; return; }
   const img = e.target.closest('img[data-zoom]');
   if (img) openZoom(img);
 });
@@ -692,6 +766,56 @@ dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   if (e.key === 'Escape') closeDrawer();
+});
+
+// ---------------------------------------------------------
+// 意見回饋表單
+// ---------------------------------------------------------
+view.addEventListener('change', (e) => {
+  const f = e.target.form;
+  if (f && f.id === 'fbForm' && e.target.name === 'type') f.message.placeholder = FB_HINT[e.target.value];
+});
+view.addEventListener('input', (e) => {
+  if (e.target.name === 'message' && e.target.form && e.target.form.id === 'fbForm') {
+    e.target.form.querySelector('.fb-count').textContent = `${e.target.value.length} / 2000`;
+  }
+});
+view.addEventListener('submit', async (e) => {
+  const f = e.target;
+  if (f.id !== 'fbForm') return;
+  e.preventDefault();
+  const err = f.querySelector('.fb-error');
+  const type = f.type.value, message = f.message.value.trim();
+  if (!type) { err.textContent = '請選擇回饋類型。'; f.querySelector('input[name="type"]').focus(); return; }
+  if (!message) { err.textContent = '請寫下回饋內容。'; f.message.focus(); return; }
+  err.textContent = '';
+  const btn = f.querySelector('.fb-submit');
+  btn.disabled = true; btn.textContent = '送出中…';
+  const page = f.page.value;
+  const res = await sendFeedback({ kind: 'note', type, page, pageTitle: page ? PAGES[page].t : '', message, contact: f.contact.value.trim() });
+  if (res === 'failed') {
+    err.textContent = '送出失敗，請稍後再試，或改用「聯絡我們」的管道。';
+    btn.disabled = false; btn.textContent = '送出回饋';
+    return;
+  }
+  f.outerHTML = `<div class="fb-done" role="status" tabindex="-1">${ic('check')}<div><b>已收到你的回饋，謝謝！</b>
+    <p>我們會參考你的意見持續改進說明中心。${f.contact.value.trim() ? '需要回覆時會依你留的聯絡方式聯繫。' : ''}</p>
+    ${res === 'local' ? '<p class="fb-preview">目前是預覽版，回饋只存在這台電腦的瀏覽器，可以到<a href="admin.html">後台頁</a>查看。</p>' : ''}
+    <button type="button" class="fb-again">再寫一則</button></div></div>`;
+  view.querySelector('.fb-done').focus();
+});
+view.addEventListener('click', (e) => { if (e.target.closest('.fb-again')) render(); });
+
+// ---------------------------------------------------------
+// 回到頂端
+// ---------------------------------------------------------
+const toTop = document.getElementById('toTop');
+toTop.innerHTML = ic('up');
+const syncToTop = () => toTop.classList.toggle('show', scrollY > 600);
+addEventListener('scroll', syncToTop, { passive: true });
+toTop.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  view.focus({ preventScroll: true });
 });
 
 // 啟動

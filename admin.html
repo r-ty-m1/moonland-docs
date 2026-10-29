@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>回饋後台｜moonland.ai 說明中心</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/favicon.png">
+<script>
+  // 沿用說明中心的明暗模式與字體大小設定
+  try {
+    var t = localStorage.getItem('ml-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    var f = localStorage.getItem('ml-fs');
+    if (f === '1' || f === '2') document.documentElement.dataset.fs = f;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Zilla+Slab:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css?v=20261029a">
+<link rel="stylesheet" href="admin.css?v=20261029a">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./" aria-label="回到說明中心">
+    <img class="logo logo-on-dark" src="assets/logo-white.png?v=20261028c" alt="moonland.ai" width="952" height="118">
+    <img class="logo logo-on-light" src="assets/logo-dark.png?v=20261028c" alt="moonland.ai" width="952" height="118">
+    <span class="brand-sub">回饋後台</span>
+  </a>
+  <a class="adm-back" href="./">回到說明中心 →</a>
+</header>
+
+<main class="adm" id="adm">
+  <p class="adm-loading">讀取中…</p>
+</main>
+
+<script src="admin.js?v=20261029a"></script>
+</body>
+</html>

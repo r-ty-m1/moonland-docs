@@ -23,7 +23,8 @@ console.log(`✓ 文章引用 ${refs.size} 個媒體，檔案都在`);
 
 // --- 2. 伺服器 ---
 const PORT = 18080 + Math.floor(Math.random() * 1000);
-const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1' }, stdio: 'inherit' });
+const DATA_DIR = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moonland-fb-'));
+const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR, ADMIN_TOKEN: 'test-token' }, stdio: 'inherit' });
 const base = `http://127.0.0.1:${PORT}`;
 
 (async () => {
@@ -48,7 +49,25 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal((await fetch(base + '/server/server.js')).status, 404);
     assert.equal((await fetch(base + '/assets/../server/server.js')).status, 404);
     console.log('✓ 伺服器：健康檢查、首頁雜湊、快取標頭、影片 Range、404 都正常');
+
+    // --- 3. 回饋 ---
+    const admin = await (await fetch(base + '/admin.html')).text();
+    assert.match(admin, /admin\.js\?v=[0-9a-f]{10}"/, 'admin.js 沒有內容雜湊');
+    const post = (body) => fetch(base + '/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await post({ kind: 'vote', page: 'quick-start', pageTitle: '快速入門', value: 'up', vid: 'v1' })).status, 201);
+    assert.equal((await post({ kind: 'note', type: 'unclear', page: '', message: '  看不懂 <b>這段</b>  ', contact: 'a@b.c', extra: 'x' })).status, 201);
+    assert.equal((await post({ kind: 'note', type: 'unclear', message: '   ' })).status, 400, '空白內容應該被拒收');
+    assert.equal((await post({ kind: 'vote', page: '../etc', value: 'up' })).status, 400, '頁面代號不合格應該被拒收');
+    assert.equal((await post({ kind: 'note', type: 'hack', message: 'x' })).status, 400, '未知的類型應該被拒收');
+    assert.equal((await fetch(base + '/api/feedback')).status, 401, '沒有密碼不能讀回饋');
+    assert.equal((await fetch(base + '/api/feedback', { headers: { authorization: 'Bearer wrong' } })).status, 401);
+    const got = await (await fetch(base + '/api/feedback', { headers: { authorization: 'Bearer test-token' } })).json();
+    assert.equal(got.entries.length, 2);
+    assert.equal(got.entries[1].message, '看不懂 <b>這段</b>');
+    assert.equal(got.entries[1].extra, undefined, '不認得的欄位不該存下來');
+    console.log('✓ 回饋：送出、驗證、後台密碼都正常');
   } finally {
     child.kill('SIGTERM');
+    fs.rmSync(DATA_DIR, { recursive: true, force: true });
   }
 })().catch((e) => { console.error(e); child.kill('SIGTERM'); process.exit(1); });

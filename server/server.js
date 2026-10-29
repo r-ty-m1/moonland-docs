@@ -3,6 +3,7 @@
 // - /healthz：健康檢查
 // - 所有檔案都帶 cache-control: no-cache（每次先問伺服器有沒有更新）
 // - index.html 裡的 css / js 網址改成內容雜湊，部署新版時瀏覽器與 Cloudflare 一定抓新檔
+// - /api/feedback：POST 收回饋（任何人）；GET 讀全部回饋（後台用，見 canReadFeedback）
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,6 +12,11 @@ const crypto = require('node:crypto');
 const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, '..'));
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
+// 回饋存成一行一筆的 JSON。部署時要指到會保留的磁碟（vibe.yaml 的 persistence），否則重新部署就不見
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, '.data'));
+const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.jsonl');
+// 讀取回饋的密碼。沒設定時只有本機（127.0.0.1）能讀，方便在自己電腦預覽
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -29,20 +35,90 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/index\.html$/, /^\/style\.css$/, /^\/script\.js$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/script\.js$/, /^\/admin\.(?:css|js)$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
 // 啟動時算一次雜湊；每次部署都是新容器，不需要手動改版本號
-const INDEX_HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(
-  /(src|href)="([\w./-]+\.(?:css|js))(?:\?v=[^"]*)?"/g,
-  (m, attr, file) => `${attr}="${file}?v=${hashOf(file)}"`,
-);
-const INDEX_ETAG = `"${crypto.createHash('sha256').update(INDEX_HTML).digest('hex').slice(0, 16)}"`;
+function loadPage(file) {
+  const html = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(
+    /(src|href)="([\w./-]+\.(?:css|js))(?:\?v=[^"]*)?"/g,
+    (m, attr, f) => `${attr}="${f}?v=${hashOf(f)}"`,
+  );
+  return { html, etag: `"${crypto.createHash('sha256').update(html).digest('hex').slice(0, 16)}"` };
+}
+const PAGES = { '/': loadPage('index.html'), '/index.html': loadPage('index.html'), '/admin.html': loadPage('admin.html') };
 
 function send(res, status, body, type) {
   res.writeHead(status, { 'content-type': type || 'text/plain; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
   res.end(body);
+}
+const sendJson = (res, status, obj) => send(res, status, JSON.stringify(obj), TYPES['.json']);
+
+// ---------- 回饋 ----------
+const NOTE_TYPES = ['stuck', 'unclear', 'suggest', 'other'];
+const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+// 檢查並整理送進來的資料，只留下認得的欄位；不合格回傳 null
+function cleanFeedback(b) {
+  if (!b || typeof b !== 'object') return null;
+  const page = str(b.page, 80);
+  if (page && !/^[\w-]+$/.test(page)) return null;
+  const base = { id: crypto.randomUUID(), at: new Date().toISOString(), page, pageTitle: str(b.pageTitle, 120), vid: str(b.vid, 40) };
+  if (b.kind === 'vote' && page && (b.value === 'up' || b.value === 'down')) return { ...base, kind: 'vote', value: b.value };
+  if (b.kind === 'note' && NOTE_TYPES.includes(b.type) && str(b.message, 2000)) {
+    return { ...base, kind: 'note', type: b.type, message: str(b.message, 2000), contact: str(b.contact, 120) };
+  }
+  return null;
+}
+
+// 簡單的防洗版：同一個來源 10 分鐘內最多 30 筆
+const hits = new Map();
+function tooMany(ip) {
+  const now = Date.now();
+  const h = hits.get(ip);
+  if (!h || h.reset < now) { hits.set(ip, { n: 1, reset: now + 600000 }); return false; }
+  return ++h.n > 30;
+}
+setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (h.reset < now) hits.delete(k); }, 600000).unref();
+
+function canReadFeedback(req) {
+  if (ADMIN_TOKEN) {
+    const got = Buffer.from(req.headers.authorization || '');
+    const want = Buffer.from(`Bearer ${ADMIN_TOKEN}`);
+    return got.length === want.length && crypto.timingSafeEqual(got, want);
+  }
+  return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+}
+
+function postFeedback(req, res) {
+  if (tooMany(req.socket.remoteAddress)) return sendJson(res, 429, { error: '送出太頻繁，請稍後再試' });
+  let body = '';
+  req.setEncoding('utf8');
+  req.on('data', (c) => { body += c; if (body.length > 8192) { sendJson(res, 413, { error: '內容太長' }); req.destroy(); } });
+  req.on('end', () => {
+    if (res.headersSent) return;
+    let entry;
+    try { entry = cleanFeedback(JSON.parse(body)); } catch { entry = null; }
+    if (!entry) return sendJson(res, 400, { error: '資料格式不正確' });
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.appendFileSync(FEEDBACK_FILE, JSON.stringify(entry) + '\n');
+    } catch (e) {
+      console.error('寫入回饋失敗', e.message);
+      return sendJson(res, 503, { error: '暫時無法儲存' });
+    }
+    sendJson(res, 201, { ok: true });
+  });
+}
+
+function getFeedback(req, res) {
+  if (!canReadFeedback(req)) return sendJson(res, 401, { error: '需要後台密碼' });
+  let lines = [];
+  try { lines = fs.readFileSync(FEEDBACK_FILE, 'utf8').split('\n'); } catch {}
+  const entries = [];
+  for (const l of lines) { if (l) try { entries.push(JSON.parse(l)); } catch {} }
+  sendJson(res, 200, { entries });
 }
 
 function serveFile(req, res, rel) {
@@ -82,15 +158,21 @@ function serveFile(req, res, rel) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
   let pathname;
   try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return send(res, 400, 'Bad request'); }
 
+  if (pathname === '/api/feedback') {
+    if (req.method === 'POST') return postFeedback(req, res);
+    if (req.method === 'GET') return getFeedback(req, res);
+    return send(res, 405, 'Method not allowed');
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
   if (pathname === '/healthz') return send(res, 200, 'ok');
-  if (pathname === '/' || pathname === '/index.html') {
-    if (req.headers['if-none-match'] === INDEX_ETAG) { res.writeHead(304, { etag: INDEX_ETAG, 'cache-control': 'no-cache' }); return res.end(); }
-    res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: INDEX_ETAG });
-    return res.end(req.method === 'HEAD' ? undefined : INDEX_HTML);
+  const page = PAGES[pathname];
+  if (page) {
+    if (req.headers['if-none-match'] === page.etag) { res.writeHead(304, { etag: page.etag, 'cache-control': 'no-cache' }); return res.end(); }
+    res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: page.etag });
+    return res.end(req.method === 'HEAD' ? undefined : page.html);
   }
   if (pathname.includes('..') || !PUBLIC.some((re) => re.test(pathname))) return send(res, 404, 'Not found');
   serveFile(req, res, pathname.slice(1));

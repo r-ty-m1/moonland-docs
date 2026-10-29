@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261028c`），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261029a`），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -23,12 +23,14 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - **所有字級用 `rem`**，不要寫 `px`，否則右上角「字體大小」（標準 100%、大 115%、特大 130%）放大不到。
 - 手機（寬度 620px 以下）表格會改成一列一張卡片，靠每個儲存格的 `data-label`；只有圖片的並排會維持兩欄。
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
+- 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）POST 到 `api/feedback`；伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 讀 `api/feedback`，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js` 三處要一致。
 
 ## 部署到公司內部（尚未推送）
 
 網站要放到公司內部的 Gitea 自動部署，部署設定都已備好：`Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml`、`server/server.js`（無相依套件的靜態伺服器）。
 
 - 不需要登入、不存使用者資料（`vibe.yaml` 的 `auth.mode: none`、`persistence.enabled: false`），網址對外公開，使用者已知悉。
+- **回饋要正式上線前還缺兩件事**（2026-10-29 只做到預覽）：一、回饋檔要存在會保留的磁碟，`vibe.yaml` 要開 persistence 並把 `DATA_DIR` 指過去，否則每次部署就清空；二、後台目前只靠 `ADMIN_TOKEN` 密碼（沒設就只有本機能讀），正式版應該改用公司登入限定誰能看。這兩項用 vibe-deploy 的 containerize 和 design-access skill 處理，不要手動改 `ci.yaml`。
 - `ci.yaml` 由公司範本產生，不要手動改；要更新用 vibe-deploy 的 containerize skill。
 - 部署流程用 vibe-deploy 這組 skills（assess-readiness → containerize → deploy-site；推送權限用 gitea-access）。推送需要用使用者的公司帳號登入，所以要在使用者自己的電腦上做。
 - 容器映像還沒實際建置驗證過（開發環境連不到 Docker Hub），第一次推上去由 CI 建置時才會驗證。

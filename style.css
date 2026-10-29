@@ -472,6 +472,65 @@ ol.steps > li::before {
   border: 1px solid var(--line-strong); background: none; color: var(--fg-2);
 }
 .feedback button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-ink); }
+.fb-thanks a { color: var(--accent); }
+
+/* 意見回饋表單 */
+.fb-form { display: grid; gap: 22px; max-width: 40rem; margin-top: 8px; }
+.fb-field { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.fb-field legend, .fb-label { font-weight: 500; color: var(--fg); padding: 0; margin-bottom: 8px; }
+.fb-label { margin-bottom: 0; }
+.fb-label small { font-weight: 400; color: var(--muted); font-size: 0.8125rem; margin-left: 8px; }
+.fb-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fb-type { position: relative; display: block; cursor: pointer; }
+.fb-type input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.fb-type span {
+  display: block; height: 100%; padding: 12px 14px;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface);
+}
+.fb-type b { display: block; font-weight: 500; color: var(--fg); }
+.fb-type small { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 2px; }
+.fb-type:hover span { border-color: var(--accent-line); }
+.fb-type input:checked + span { border-color: var(--accent-line); background: var(--accent-soft); }
+.fb-type input:checked + span b { color: var(--accent-ink); }
+.fb-type input:focus-visible + span { outline: 2px solid var(--brand-ic); outline-offset: 2px; }
+.fb-form select, .fb-form textarea, .fb-form input:not([type="radio"]) {
+  width: 100%; font: inherit; font-size: 1rem; color: var(--fg);
+  padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+}
+.fb-form textarea { resize: vertical; min-height: 8rem; line-height: 1.6; }
+.fb-form select:focus, .fb-form textarea:focus, .fb-form input:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fb-count { justify-self: end; color: var(--muted); font-size: 0.75rem; }
+.fb-error { margin: -8px 0 0; color: var(--warn-ink); font-size: 0.875rem; }
+.fb-error:empty { display: none; }
+.fb-submit, .fb-again {
+  justify-self: start; font: inherit; font-weight: 500; cursor: pointer;
+  padding: 10px 22px; border: 0; border-radius: 10px; background: var(--brand); color: #04140a;
+}
+.fb-submit:disabled { opacity: 0.6; cursor: default; }
+.fb-done {
+  display: flex; gap: 14px; max-width: 40rem; margin-top: 8px; padding: 20px;
+  border: 1px solid var(--accent-line); border-radius: 14px; background: var(--accent-soft);
+}
+.fb-done:focus { outline: none; }
+.fb-done > .ic { flex: none; width: 1.5rem; height: 1.5rem; color: var(--brand-ic); }
+.fb-done b { color: var(--fg); }
+.fb-done p { margin: 6px 0 0; color: var(--fg-2); }
+.fb-done .fb-preview { font-size: 0.875rem; color: var(--muted); }
+.fb-done .fb-again { margin-top: 14px; }
+
+/* 回到頂端 */
+.to-top {
+  position: fixed; right: 24px; bottom: 24px; z-index: 30;
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: var(--surface); color: var(--fg-2); cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity .2s, transform .2s, visibility .2s;
+}
+.to-top.show { opacity: 1; visibility: visible; transform: none; }
+.to-top:hover { color: var(--fg); border-color: var(--accent-line); }
+.to-top .ic { width: 20px; height: 20px; }
 
 details.qa { border: 1px solid var(--line); border-radius: 14px; margin: 10px 0; background: var(--surface); }
 details.qa summary { cursor: pointer; padding: 14px 18px; font-weight: 500; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
@@ -533,6 +592,9 @@ dialog.search::backdrop { background: var(--overlay); }
 }
 @media (max-width: 620px) {
   .grid, .grid.c2 { grid-template-columns: minmax(0, 1fr); }
+  .fb-types { grid-template-columns: minmax(0, 1fr); }
+  .fb-submit { justify-self: stretch; }
+  .to-top { right: 16px; bottom: 16px; }
 }
 @media (max-width: 520px) {
   .logo { height: 18px; }

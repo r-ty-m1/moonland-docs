@@ -18,3 +18,4 @@ compose.yaml
 Dockerfile
 .dockerignore
 README.md
+.data
