@@ -36,6 +36,7 @@ const ICONS = {
   message: 'M8 9h8 M8 13h6 M9 18h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-3l-3 3l-3 -3z',
   up: 'M12 5l0 14 M18 11l-6 -6 M6 11l6 -6',
   globe: 'M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M3.6 9h16.8 M3.6 15h16.8 M11.5 3a17 17 0 0 0 0 18 M12.5 3a17 17 0 0 1 0 18',
+  arrows: 'M8 7l-5 5l5 5 M16 7l5 5l-5 5',
 };
 const ic = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -114,7 +115,36 @@ function media(t) {
   return '';
 }
 
+// 前後比較：:::compare 裡前兩行是 [i 編號 標籤]（左＝修改前、右＝修改後），?? 開頭是可展開的提示詞
+// 框的比例預設跟左圖一樣，也可以寫 :::compare 3:4
+function compare(arg, inner) {
+  const parts = splitAt(inner, (t) => t.startsWith('?? '));
+  const imgs = [];
+  for (const p of parts) if (!p.head) for (const l of p.lines) {
+    const m = l.trim().match(/^\[i\s+(\d+)(?:\s+(.+))?\]$/);
+    if (m) imgs.push({ n: m[1], url: mediaUrl(m[1]), label: m[2] });
+  }
+  if (imgs.length < 2) return `<div class="media-missing">${T('前後比較需要兩張圖片')}</div>`;
+  const [a, b] = imgs;
+  const miss = [a, b].find((x) => !x.url);
+  if (miss) return `<div class="media-missing">${T('找不到媒體 #{n}', { n: miss.n })}</div>`;
+  const r = String(arg).match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  const ar = r ? r[1] / r[2] : mediaRatio(a.n) || 0.75;
+  const la = a.label || 'Before', lb = b.label || 'After';
+  const prompts = parts.filter((p) => p.head).map((p) => {
+    const text = p.lines.map((l) => l.trim()).join('\n').trim();
+    return `<details class="cmp-p"><summary>${inline(p.head.slice(3))}</summary><div class="prompt"><pre>${esc(text)}</pre><button type="button" class="copy" aria-label="${T('複製提示詞')}">${ic('copy')}<span>${T('複製')}</span></button></div></details>`;
+  }).join('');
+  return `<figure class="cmp" style="--ar:${+ar.toFixed(4)}"><div class="cmp-view">`
+    + `<img src="${b.url}" alt="${esc(lb)}" loading="lazy" decoding="async">`
+    + `<img class="cmp-a" src="${a.url}" alt="${esc(la)}" loading="lazy" decoding="async">`
+    + `<span class="cmp-tag l">${esc(la)}</span><span class="cmp-tag r">${esc(lb)}</span>`
+    + `<span class="cmp-line"><span class="cmp-knob" role="slider" tabindex="0" aria-label="${T('拖曳分隔線比較前後')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">${ic('arrows')}</span></span>`
+    + `</div>${prompts}</figure>`;
+}
+
 function container(type, arg, inner) {
+  if (type === 'compare') return compare(arg, inner);
   if (type === 'tip' || type === 'warn' || type === 'note') {
     return `<div class="callout ${type}">${arg ? `<b>${inline(arg)}</b>` : ''}${blocks(inner)}</div>`;
   }
@@ -213,3 +243,38 @@ const plainText = (src) => String(src)
   .replace(/\[(i|v|a|embed)\s[^\]]*\]/g, ' ')
   .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')
   .replace(/[*#>|:@?]/g, ' ');
+
+// ---------------------------------------------------------
+// 4. 前後比較的拖曳：滑鼠點哪裡分隔線就到哪裡；手指左右滑動才會移動（上下滑照常捲頁面）
+//    鍵盤：focus 圓形把手後用方向鍵、Home、End
+// ---------------------------------------------------------
+function setCompare(view, pct) {
+  pct = Math.max(0, Math.min(100, pct));
+  view.style.setProperty('--x', `${pct}%`);
+  view.querySelector('.cmp-knob').setAttribute('aria-valuenow', Math.round(pct));
+}
+const compareAt = (view, e) => { const r = view.getBoundingClientRect(); if (r.width) setCompare(view, ((e.clientX - r.left) / r.width) * 100); };
+document.addEventListener('pointerdown', (e) => {
+  const view = e.target.closest && e.target.closest('.cmp-view');
+  if (!view || e.button > 0) return;
+  if (e.pointerType === 'mouse') { e.preventDefault(); compareAt(view, e); }
+  view.setPointerCapture(e.pointerId);
+  view.classList.add('drag');
+  const move = (ev) => compareAt(view, ev);
+  const end = () => {
+    view.classList.remove('drag');
+    view.removeEventListener('pointermove', move);
+    view.removeEventListener('pointerup', end);
+    view.removeEventListener('pointercancel', end);
+  };
+  view.addEventListener('pointermove', move);
+  view.addEventListener('pointerup', end);
+  view.addEventListener('pointercancel', end);
+});
+document.addEventListener('keydown', (e) => {
+  const knob = e.target.closest && e.target.closest('.cmp-knob');
+  const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5, Home: -100, End: 100 }[e.key];
+  if (!knob || step === undefined) return;
+  e.preventDefault();
+  setCompare(knob.closest('.cmp-view'), +knob.getAttribute('aria-valuenow') + step);
+});

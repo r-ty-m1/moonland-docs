@@ -145,6 +145,8 @@ window.UI_EN = {
   '這篇內容整理中。': 'This page is being written.',
   '這篇還沒有英文版，以下先顯示中文內容。': 'This page has not been translated into English yet. The Chinese version is shown below.',
   '找不到媒體 #{n}': 'Media #{n} not found',
+  '前後比較需要兩張圖片': 'A before-and-after comparison needs two images',
+  '拖曳分隔線比較前後': 'Drag the divider to compare before and after',
   '前後比較': 'Before and after',
   '複製提示詞': 'Copy prompt',
   '複製': 'Copy',

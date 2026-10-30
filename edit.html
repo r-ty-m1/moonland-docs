@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
-<link rel="stylesheet" href="style.css?v=20261030a">
-<link rel="stylesheet" href="edit.css?v=20261030a">
+<link rel="stylesheet" href="style.css?v=20261030b">
+<link rel="stylesheet" href="edit.css?v=20261030b">
 </head>
 <body>
 <header class="top">
@@ -71,6 +71,33 @@
   </form>
 </dialog>
 
+<dialog class="ed-dlg ed-dlg-wide" id="cmpDlg" aria-labelledby="cmpDlgT">
+  <form method="dialog" id="cmpForm">
+    <h2 id="cmpDlgT">插入前後比較</h2>
+    <p class="ed-hint">讀者可以拖曳中間的分隔線，比較修改前後的差別。兩張圖最好一樣大小。</p>
+    <div class="ed-cmp-pick">
+      <fieldset class="ed-f" data-side="a"><legend>修改前（左邊）</legend>
+        <label class="ed-f"><span>從電腦上傳</span><input name="fileA" type="file" accept="image/*"></label>
+        <label class="ed-f"><span>或輸入網站上已有的圖片編號</span><input name="numA" inputmode="numeric" pattern="\d+" maxlength="5"></label>
+        <label class="ed-f"><span>標籤</span><input name="labelA" maxlength="20" value="Before"></label>
+        <div class="ed-thumb" id="cmpThumbA"></div>
+      </fieldset>
+      <fieldset class="ed-f" data-side="b"><legend>修改後（右邊）</legend>
+        <label class="ed-f"><span>從電腦上傳</span><input name="fileB" type="file" accept="image/*"></label>
+        <label class="ed-f"><span>或輸入網站上已有的圖片編號</span><input name="numB" inputmode="numeric" pattern="\d+" maxlength="5"></label>
+        <label class="ed-f"><span>標籤</span><input name="labelB" maxlength="20" value="After"></label>
+        <div class="ed-thumb" id="cmpThumbB"></div>
+      </fieldset>
+    </div>
+    <label class="ed-f"><span>修改後用的提示詞<small>選填，會顯示成可展開的「Prompt(After)」</small></span><textarea name="promptB" rows="3" maxlength="2000"></textarea></label>
+    <details class="ed-more"><summary>也要顯示修改前的提示詞</summary>
+      <label class="ed-f"><span>修改前的提示詞<small>選填</small></span><textarea name="promptA" rows="3" maxlength="2000"></textarea></label>
+    </details>
+    <p class="ed-err" role="alert"></p>
+    <div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">插入</button></div>
+  </form>
+</dialog>
+
 <dialog class="ed-dlg ed-dlg-wide" id="histDlg" aria-labelledby="histDlgT">
   <form method="dialog">
     <h2 id="histDlgT">版本紀錄</h2>
@@ -82,19 +109,19 @@
 
 <p class="ed-toast" id="toast" role="status" aria-live="polite"></p>
 
-<script src="data/media.js?v=20261030a"></script>
-<script src="data/snippets.js?v=20261030a"></script>
-<script src="data/start.js?v=20261030a"></script>
-<script src="data/chat.js?v=20261030a"></script>
-<script src="data/image.js?v=20261030a"></script>
-<script src="data/video.js?v=20261030a"></script>
-<script src="data/lab.js?v=20261030a"></script>
-<script src="data/recipes.js?v=20261030a"></script>
-<script src="data/models.js?v=20261030a"></script>
-<script src="data/team.js?v=20261030a"></script>
-<script src="data/support.js?v=20261030a"></script>
-<script src="data/sections.js?v=20261030a"></script>
-<script src="markup.js?v=20261030a"></script>
-<script src="edit.js?v=20261030a"></script>
+<script src="data/media.js?v=20261030b"></script>
+<script src="data/snippets.js?v=20261030b"></script>
+<script src="data/start.js?v=20261030b"></script>
+<script src="data/chat.js?v=20261030b"></script>
+<script src="data/image.js?v=20261030b"></script>
+<script src="data/video.js?v=20261030b"></script>
+<script src="data/lab.js?v=20261030b"></script>
+<script src="data/recipes.js?v=20261030b"></script>
+<script src="data/models.js?v=20261030b"></script>
+<script src="data/team.js?v=20261030b"></script>
+<script src="data/support.js?v=20261030b"></script>
+<script src="data/sections.js?v=20261030b"></script>
+<script src="markup.js?v=20261030b"></script>
+<script src="edit.js?v=20261030b"></script>
 </body>
 </html>

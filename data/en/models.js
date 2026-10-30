@@ -1,5 +1,5 @@
 // 學習資源：模型指南（英文版）
-// 前後比較工具（[embed ...]）的網址與中文版相同；測試用的歌詞保留日文、中文原文
+// 測試用的歌詞保留日文、中文原文
 (window.ARTICLES_EN = window.ARTICLES_EN || {}) && Object.assign(window.ARTICLES_EN, {
 
 'models': {
@@ -253,11 +253,26 @@ People who only want to change some elements, colors or details without changing
 Drag the divider in the middle to compare before and after:
 
 :::row
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2FHEAD%2Fcomparison-images%2Fbefore-1792147606192-fcgm8.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F042a66a7f13c0ee6b1dffda4cc909109c81f92ed%2Fcomparison-images%2FFibo20_A01-1792650234739-m1qfk.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E7%87%88%E7%B1%A0%E6%94%B9%E6%88%90%E5%8D%97%E7%93%9C%E7%87%88%EF%BC%8C%E9%81%A0%E6%99%AF%E7%9A%84%E9%B3%A5%E5%B1%85%E6%94%B9%E6%88%90%E8%90%AC%E8%81%96%E7%AF%80%E9%A2%A8%E6%A0%BC%E7%9A%84%E5%93%A5%E5%BE%B7%E5%BC%8F%E5%A4%A7%E9%96%80%EF%BC%8C%E5%85%A9%E5%81%B4%E7%9A%84%E5%BB%BA%E7%AF%89%E6%94%B9%E6%88%90%E6%AD%90%E6%B4%B2%E4%B8%AD%E5%8F%A4%E6%99%82%E4%BB%A3%E7%9A%84%E5%BB%BA%E7%AF%89%E9%A2%A8%E6%A0%BC&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 585 Before]
+[i 588 After]
+?? Prompt(After)
+Change the lanterns into jack-o’-lanterns, turn the torii gate in the distance into a Halloween-style Gothic gate, and change the buildings on both sides to medieval European architecture
+:::
 |||
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2FHEAD%2Fcomparison-images%2Fmoonland---hlbtx2-1792147520441-k9zim.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F8fa56e3ea47c1a1471b16d027942dca830480ee6%2Fcomparison-images%2FFibo20_A02-1792650892824-zq2jw.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E5%A5%B3%E6%80%A7%E6%94%B9%E7%82%BA20%E6%AD%B2%E5%B7%A6%E5%8F%B3%E7%9A%84%E6%86%82%E9%AC%B1%E7%9A%84%E7%9F%AD%E9%AB%AE%E7%94%B7%E6%80%A7%EF%BC%8C%E7%A9%BF%E8%91%97%E7%9F%AD%E7%89%88%E6%B7%B1%E8%97%8D%E8%89%B2%E9%A2%A8%E8%A1%A3&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 586 Before]
+[i 589 After]
+?? Prompt(After)
+Change the woman into a melancholy short-haired man in his early twenties, wearing a short dark blue trench coat
+:::
 |||
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2FHEAD%2Fcomparison-images%2Fmoonland---pyxec4-1792147666640-4rtjv.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F50bca6a29b1b03baba10cd7f949aba85cd5baa24%2Fcomparison-images%2FFibo20_A03-1792651050848-lxjc6.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E8%99%8E%E6%96%91%E8%B2%93%E6%94%B9%E6%88%90%E8%A4%90%E8%89%B2%E7%9A%84%E6%9F%B4%E7%8A%AC&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 587 Before]
+[i 590 After]
+?? Prompt(After)
+Change the tabby cat into a brown Shiba Inu
+:::
 :::
 
 ## FLUX.3 Image Klein {#h-flux3}
@@ -387,11 +402,26 @@ People who want to modify characters, scenes or design assets based on existing 
 | Qwen Image Edit | Editing existing images | Changing backgrounds, altering objects, adjusting poses, fixing text |
 
 :::row
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2Ff759a512c27ba6f48399dee4aac61a820bacd1ed%2Fcomparison-images%2Fmoonland---hlbtx2-1792147520441-k9zim.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2Fbaaed73efec5991bab8e5981879a79bd9ad05614%2Fcomparison-images%2Fmoonland---jzaaza-1792147522824-sg4y3.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E5%A5%B3%E6%80%A7%E6%94%B9%E7%82%BA20%E6%AD%B2%E5%B7%A6%E5%8F%B3%E7%9A%84%E6%86%82%E9%AC%B1%E7%9A%84%E7%9F%AD%E9%AB%AE%E7%94%B7%E6%80%A7%EF%BC%8C%E7%A9%BF%E8%91%97%E7%9F%AD%E7%89%88%E6%B7%B1%E8%97%8D%E8%89%B2%E9%A2%A8%E8%A1%A3&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 586 Before]
+[i 592 After]
+?? Prompt(After)
+Change the woman into a melancholy short-haired man in his early twenties, wearing a short dark blue trench coat
+:::
 |||
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F43bdd0637f7274acfd300a01c63af5d4e871ce8f%2Fcomparison-images%2Fbefore-1792147606192-fcgm8.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F044992eb8f8b4d1563164306153c7aec48f3be42%2Fcomparison-images%2Fafter-1792147608315-05685.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E7%87%88%E7%B1%A0%E6%94%B9%E6%88%90%E5%8D%97%E7%93%9C%E7%87%88%EF%BC%8C%E9%81%A0%E6%99%AF%E7%9A%84%E9%B3%A5%E5%B1%85%E6%94%B9%E6%88%90%E8%90%AC%E8%81%96%E7%AF%80%E9%A2%A8%E6%A0%BC%E7%9A%84%E5%93%A5%E5%BE%B7%E5%BC%8F%E5%A4%A7%E9%96%80%EF%BC%8C%E5%85%A9%E5%81%B4%E7%9A%84%E5%BB%BA%E7%AF%89%E6%94%B9%E6%88%90%E6%AD%90%E6%B4%B2%E4%B8%AD%E5%8F%A4%E6%99%82%E4%BB%A3%E7%9A%84%E5%BB%BA%E7%AF%89%E9%A2%A8%E6%A0%BC&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 585 Before]
+[i 591 After]
+?? Prompt(After)
+Change the lanterns into jack-o’-lanterns, turn the torii gate in the distance into a Halloween-style Gothic gate, and change the buildings on both sides to medieval European architecture
+:::
 |||
-[embed https://r-ty-m1.github.io/Image_Compare/?view=1&r=3%3A4&a=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2Fbca3b4880ee23d98adac747243791778efb25692%2Fcomparison-images%2Fmoonland---pyxec4-1792147666640-4rtjv.jpeg&b=https%3A%2F%2Fraw.githubusercontent.com%2Fr-ty-m1%2FImage_Compare%2F9a84d3f6a2f0c5a6f140177673c20ec0f5c8c8f9%2Fcomparison-images%2Fmoonland---agj8dr-1792147668576-5okvf.jpeg&la=Before&lb=After&pta=Prompt%28Before%29&ptb=Prompt%28After%29&pb=%E6%8A%8A%E8%99%8E%E6%96%91%E8%B2%93%E6%94%B9%E6%88%90%E8%A4%90%E8%89%B2%E7%9A%84%E6%9F%B4%E7%8A%AC&labels=1&showA=0&showB=1&edit=0]
+:::compare
+[i 587 Before]
+[i 593 After]
+?? Prompt(After)
+Change the tabby cat into a brown Shiba Inu
+:::
 :::
 
 ## Anima {#h-anima}

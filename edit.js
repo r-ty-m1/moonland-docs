@@ -23,6 +23,7 @@ Object.assign(ICONS, {
   table: 'M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z M3 10h18 M10 3v18',
   prompt: 'M5 7l5 5l-5 5 M12 19l7 0',
   columns: 'M4 4h6v16h-6z M14 4h6v16h-6z',
+  compare: 'M12 3v18 M8 5h-3a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h3 M16 5h3a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-3',
   folder: 'M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2',
   file: 'M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
   lock: 'M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 M8 11v-4a4 4 0 1 1 8 0v4',
@@ -287,7 +288,7 @@ function whereOptions(d) {
 const TOOLS = [
   ['heading', '小標題', 'heading'], ['bold', '粗體', 'bold'], ['link', '連結', 'link'], ['list', '清單', 'list'],
   ['steps', '步驟', 'steps'], ['tip', '提示框', 'bulb'], ['warn', '注意框', 'alert'], ['table', '表格', 'table'],
-  ['prompt', '提示詞', 'prompt'], ['image', '圖片', 'image'], ['row', '並排', 'columns'], ['help', '寫法說明', 'help'],
+  ['prompt', '提示詞', 'prompt'], ['image', '圖片', 'image'], ['compare', '前後比較', 'compare'], ['row', '並排', 'columns'], ['help', '寫法說明', 'help'],
 ];
 function viewEdit() {
   const d = draft;
@@ -347,6 +348,7 @@ function cheatSheet() {
     ['> 提示詞', '可以一鍵複製的提示詞框'],
     ['[i 編號 說明]', '圖片；v 是影片、a 是音訊'],
     [':::row … ||| … :::', '並排，用 ||| 分欄'],
+    [':::compare … :::', '前後比較；兩行 [i 編號 標籤]，?? 開頭是可展開的提示詞'],
   ];
   return `<table><tbody>${rows.map(([a, b]) => `<tr><th><code>${esc(a)}</code></th><td>${esc(b)}</td></tr>`).join('')}</tbody></table>`;
 }
@@ -507,6 +509,7 @@ function tool(k) {
   if (k === 'bold') return wrapSel('**', '粗體文字');
   if (k === 'link') return openLink();
   if (k === 'image') return openImage();
+  if (k === 'compare') return openCompare();
   if (k === 'help') { const c = document.getElementById('cheat'); c.hidden = !c.hidden; return; }
   insertBlock(...SNIPS[k]);
 }
@@ -600,6 +603,68 @@ imgForm.addEventListener('submit', (e) => {
   e.preventDefault();
   imgDlg.close();
   insertBlock(`[i ${n}${cap ? ` ${cap}` : ''}]`);
+});
+
+// 前後比較對話框：左右各選一張（上傳或填編號），插入 :::compare 區塊
+const cmpDlg = document.getElementById('cmpDlg');
+const cmpForm = document.getElementById('cmpForm');
+const cmpPending = { A: null, B: null };
+function openCompare() {
+  cmpForm.reset();
+  cmpPending.A = cmpPending.B = null;
+  document.getElementById('cmpThumbA').innerHTML = document.getElementById('cmpThumbB').innerHTML = '';
+  cmpForm.querySelector('.ed-err').textContent = '';
+  cmpDlg.showModal();
+}
+const isImageNum = (n) => MEDIA[n] && /\.(webp|png|jpe?g|gif)$|^data:/.test(MEDIA[n][0]);
+cmpForm.addEventListener('change', async (e) => {
+  const m = e.target.name.match(/^file([AB])$/);
+  if (!m || !e.target.files[0]) return;
+  const s = m[1];
+  const err = cmpForm.querySelector('.ed-err');
+  err.textContent = '';
+  cmpForm.elements[`num${s}`].value = '';
+  try { cmpPending[s] = await shrink(e.target.files[0]); document.getElementById(`cmpThumb${s}`).innerHTML = `<img src="${cmpPending[s][0]}" alt="">`; }
+  catch (x) { cmpPending[s] = null; err.textContent = '讀不到這張圖片，請換一張試試。'; }
+});
+cmpForm.addEventListener('input', (e) => {
+  const m = e.target.name.match(/^num([AB])$/);
+  if (!m) return;
+  const s = m[1], n = e.target.value.trim();
+  cmpPending[s] = null;
+  cmpForm.elements[`file${s}`].value = '';
+  document.getElementById(`cmpThumb${s}`).innerHTML = isImageNum(n) ? `<img src="${mediaUrl(n)}" alt="">` : n ? '<p class="ed-hint">找不到這個編號的圖片。</p>' : '';
+});
+cmpForm.addEventListener('submit', (e) => {
+  if (e.submitter && e.submitter.value === 'cancel') return;
+  e.preventDefault();
+  const f = cmpForm.elements;
+  const err = cmpForm.querySelector('.ed-err');
+  const side = { A: '修改前', B: '修改後' };
+  for (const s of ['A', 'B']) {
+    if (!cmpPending[s] && !isImageNum(f[`num${s}`].value.trim())) { err.textContent = `請選擇${side[s]}的圖片（上傳或填編號）。`; return; }
+  }
+  // 兩張都檢查過才存上傳的圖，避免只存一半
+  const nums = {}, added = [];
+  for (const s of ['A', 'B']) {
+    if (cmpPending[s]) { const n = String(S.nextMedia++); S.uploads[n] = MEDIA[n] = cmpPending[s]; nums[s] = n; added.push(n); }
+    else nums[s] = f[`num${s}`].value.trim();
+  }
+  if (added.length && !persist()) {
+    added.forEach((n) => { delete S.uploads[n]; delete MEDIA[n]; S.nextMedia--; });
+    err.textContent = '瀏覽器空間不夠，示範版放不下這些圖片。';
+    return;
+  }
+  const label = (s) => f[`label${s}`].value.trim().replace(/[\[\]]/g, '') || (s === 'A' ? 'Before' : 'After');
+  const lines = [':::compare', `[i ${nums.A} ${label('A')}]`, `[i ${nums.B} ${label('B')}]`];
+  for (const s of ['A', 'B']) {
+    const p = f[`prompt${s}`].value.trim();
+    // 提示詞某一行若以 ::: 或 ?? 開頭會被當成區塊語法，換成全形符號
+    if (p) lines.push(`?? Prompt(${label(s)})`, p.replace(/^(\s*):::/gm, '$1：：：').replace(/^(\s*)\?\? /gm, '$1？？ '));
+  }
+  lines.push(':::');
+  cmpDlg.close();
+  insertBlock(lines.join('\n'));
 });
 
 // ---------------------------------------------------------
