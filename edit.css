@@ -300,3 +300,15 @@ button.ed-m:hover, button.ed-m:focus-visible { border-color: var(--brand-ic); ou
   .ed-mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .ed-dlg-pick { padding: 16px; }
 }
+
+/* 使用說明 */
+.ed-help { display: grid; gap: 10px; margin-top: 16px; }
+.ed-help-sec { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ed-help-sec > summary { cursor: pointer; padding: 12px 16px; font-weight: 700; color: var(--fg); list-style: none; display: flex; align-items: center; gap: 8px; }
+.ed-help-sec > summary::-webkit-details-marker { display: none; }
+.ed-help-sec > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+.ed-help-sec[open] > summary::before { transform: rotate(90deg); }
+.ed-help-sec > div { padding: 0 16px 14px; font-size: 0.9375rem; line-height: 1.8; color: var(--fg-2); }
+.ed-help-sec ul, .ed-help-sec ol { margin: 0; padding-left: 1.3em; }
+.ed-help-sec p { margin: .6em 0; }
+.ed-help-sec .ed-cheat { margin: .4em 0; overflow-x: auto; }

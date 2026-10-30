@@ -2,7 +2,7 @@
 
 網址：https://r-ty-m1.github.io/moonland-docs/
 
-純靜態網站，不需要安裝或建置。推到 `main` 後，GitHub Pages 約 1～2 分鐘自動更新。
+純靜態網站，不需要安裝或建置。接手維護請先讀 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md)；編輯者的操作說明在編輯後台的「使用說明」分頁。推到 `main` 後，GitHub Pages 約 1～2 分鐘自動更新。
 
 所有圖片、影片、音訊都放在網站自己的 `assets/media/`，不再依賴 Notion。
 
@@ -25,8 +25,9 @@
 | `assets/` | logo（深色、淺色版）與網站圖示 |
 | `server/` | 公司內部部署用的小型伺服器（含收回饋的 `/api/feedback`）與冒煙測試（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
-| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、編輯者名單 |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、編輯者名單、給同事看的「使用說明」 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
+| `docs/MAINTENANCE.md` | 維護手冊：給網站負責人與平台組，含發布與回復、問題排查、上線前清單 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
 
@@ -133,7 +134,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030d`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 

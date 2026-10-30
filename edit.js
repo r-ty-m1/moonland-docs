@@ -3,7 +3,7 @@
 // - 登入是模擬的。正式版改成公司帳號登入，由伺服器依「員工編號名單」判斷誰能編輯
 // - 所有修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo），不會改到說明中心
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#editors 編輯者名單
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
 Object.assign(ICONS, {
@@ -145,6 +145,7 @@ function toast(msg) {
 function tabs(cur) {
   const items = [['pages', '頁面'], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`]];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
+  items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
 }
 function paintWho() {
@@ -783,6 +784,62 @@ document.addEventListener('input', (e) => { if (e.target.dataset.mf) filterMedia
 document.addEventListener('change', (e) => { if (e.target.dataset.mf) filterMedia(e.target.closest('.ed-media')); });
 
 // ---------------------------------------------------------
+// 6c. 使用說明：給編輯者的操作手冊（工程師用的維護手冊在 docs/MAINTENANCE.md）
+// ---------------------------------------------------------
+function viewHelp() {
+  const sec = (title, body, open) => `<details class="ed-help-sec"${open ? ' open' : ''}><summary>${title}</summary><div>${body}</div></details>`;
+  return `${tabs('help')}<div class="ed-head"><div><h1>使用說明</h1><p class="ed-hint">編輯說明中心需要知道的事。點標題展開。</p></div></div>
+    <div class="ed-note"><b>目前是示範版</b>登入是模擬的，修改只存在這台電腦的瀏覽器，不會改到說明中心。下面標「正式版」的地方，是之後上線後的做法。</div>
+    <div class="ed-help">
+    ${sec('1. 登入與權限', `<ul>
+      <li>用<b>公司帳號</b>登入，不用另外記密碼（正式版）。</li>
+      <li>登入後，要在「編輯者名單」上才能編輯。不在名單上的人會看到「沒有編輯權限」，請找主管理員把你的員工編號加進去。</li>
+      <li><b>編輯者</b>可以新增、修改、刪除與排序頁面；<b>主管理員</b>另外可以管理編輯者名單。</li>
+      <li>用完記得按右上角的登出。</li></ul>`, true)}
+    ${sec('2. 頁面與目錄', `<ul>
+      <li>「頁面」分頁就是說明中心左側目錄的樣子，由上到下照順序排。</li>
+      <li>點頁面名稱開始編輯；用 ↑ ↓ 調整順序；垃圾桶是刪除。</li>
+      <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類裡還有頁面時不能刪除，要先把頁面搬走或刪除。</li>
+      <li>要換位置：進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
+      <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li></ul>`)}
+    ${sec('3. 編輯一篇文章', `<ol>
+      <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
+      <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
+      <li>右邊（手機上切到「預覽」）就是讀者會看到的樣子。</li>
+      <li>按<b>儲存</b>（或 Ctrl+S）。還沒儲存就離開，會先問你。</li></ol>
+      <p>不確定格式怎麼寫，按工具列最後的「寫法說明」，或看下面的速查表：</p>
+      <div class="ed-cheat">${cheatSheet()}</div>
+      <p>小提醒：連到別的頁面請用「連結」按鈕挑選，不要自己打網址；改了頁面的「網址代號」，其他頁面的連結會自動跟著改。</p>`)}
+    ${sec('4. 圖片', `<ul>
+      <li><b>插入圖片</b>：工具列「圖片」→ 從電腦上傳，或「從圖庫挑選」網站上已經有的圖。</li>
+      <li>上傳的圖會自動縮小、轉成網頁用的格式，並自動取好檔名、給一個編號，<b>不用自己改檔名</b>（正式版）。</li>
+      <li>截圖請盡量只截需要的部分，讀者在手機上才看得清楚；不要放有個人資料、密碼或公司機密的畫面。</li>
+      <li>「圖片說明」會顯示在圖片下方，也能讓圖庫搜尋得到。</li>
+      <li>文章裡圖片寫成 <code>[i 123 說明]</code>，123 是圖片編號；同一張圖可以用在很多篇。</li></ul>`)}
+    ${sec('5. 前後比較', `<ul>
+      <li>工具列「前後比較」：左邊放修改前、右邊放修改後，讀者可以拖曳中間的分隔線比較。</li>
+      <li>兩張圖最好一樣大小。可以填修改後用的提示詞，讀者能展開、複製。</li></ul>`)}
+    ${sec('6. 圖庫：找圖', `<ul>
+      <li>「圖庫」分頁列出網站所有圖片、影片和音訊，依網站區域分類。</li>
+      <li>可以用編號、頁面名稱、段落標題或圖片說明搜尋，也能篩選「沒有頁面使用」的圖。</li>
+      <li>每張都寫著用在哪一頁，點頁名就能去編輯那頁；按「複製」再貼到文章裡就會顯示。</li>
+      <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；正式版上傳時會自動照規則命名。</li></ul>`)}
+    ${sec('7. 改錯了怎麼辦', `<ul>
+      <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
+      <li><b>最近刪除</b>：刪掉的頁面會先放這裡，按「還原」放回原位。</li>
+      <li><b>修改紀錄</b>：誰在什麼時候改了哪一頁。</li></ul>`)}
+    ${sec('8. 編輯者名單（主管理員）', `<ul>
+      <li>輸入同事的<b>員工編號</b>和姓名、選權限，按「加入名單」。</li>
+      <li>公司帳號不會告訴網站部門或職稱，所以誰能編輯要在這裡手動維護。</li>
+      <li>同事離職或調職，記得移除。不能移除或降級自己，避免沒有人能管理名單。</li></ul>`)}
+    ${sec('9. 遇到問題找誰', `<ul>
+      <li>內容怎麼寫、誰能編輯：找網站負責人或主管理員。</li>
+      <li>網站打不開、圖片全部不見、登入失敗：找平台組，並告訴他們網站網址和發生時間。工程師用的維護手冊在程式碼的 <code>docs/MAINTENANCE.md</code>。</li>
+      <li>讀者的意見回饋在「回饋後台」（<a href="admin.html">admin.html</a>）。</li></ul>`)}
+    </div>`;
+}
+
+// ---------------------------------------------------------
 // 7. 修改紀錄、最近刪除、編輯者名單
 // ---------------------------------------------------------
 function viewLog() {
@@ -853,7 +910,7 @@ function render(keepDraft) {
     return;
   }
   draft = null;
-  app.innerHTML = ({ media: viewMedia, log: viewLog, trash: viewTrash, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = ({ media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   document.title = '編輯後台｜moonland.ai 說明中心';
 }
