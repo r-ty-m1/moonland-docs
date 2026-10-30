@@ -16,38 +16,31 @@
     if (f === '1' || f === '2') document.documentElement.dataset.fs = f;
     if (localStorage.getItem('ml-nav') === '1') document.documentElement.classList.add('nav-collapsed');
   } catch (e) {}
-  // 語言：網址的 ?lang=en／?lang=zh 優先，其次是上次的選擇
-  try {
-    var l = new URLSearchParams(location.search).get('lang');
-    if (l === 'en' || l === 'zh') localStorage.setItem('ml-lang', l); else l = localStorage.getItem('ml-lang');
-    if (l === 'en') document.documentElement.lang = 'en';
-  } catch (e) {}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
-<link rel="stylesheet" href="style.css?v=20261030d">
+<link rel="stylesheet" href="style.css?v=20261030e">
 </head>
 <body>
-<a class="skip" href="#view" data-t>跳到主要內容</a>
+<a class="skip" href="#view">跳到主要內容</a>
 
 <header class="top">
   <button class="icon-btn nav-btn" id="navBtn" type="button" aria-controls="side" aria-expanded="true" aria-label="收合目錄"></button>
   <a class="brand" href="#home" aria-label="moonland.ai 說明中心首頁">
     <img class="logo logo-on-dark" src="assets/logo-white.png?v=20261028c" alt="moonland.ai" width="952" height="118">
     <img class="logo logo-on-light" src="assets/logo-dark.png?v=20261028c" alt="moonland.ai" width="952" height="118">
-    <span class="brand-sub" data-t>說明中心</span>
+    <span class="brand-sub">說明中心</span>
   </a>
   <button class="search-pill" id="searchBtn" type="button" aria-label="搜尋">
-    <span data-icon="search"></span><span class="sp-text" data-t>搜尋教學、模型、問題…</span><kbd>Ctrl K</kbd>
+    <span data-icon="search"></span><span class="sp-text">搜尋教學、模型、問題…</span><kbd>Ctrl K</kbd>
   </button>
   <nav class="top-links" aria-label="外部連結">
-    <a href="https://moonland.ai/pricing?direct" target="_blank" rel="noopener" data-t>價目表</a>
-    <a href="#feedback" data-t>意見回饋</a>
-    <a href="#contact" data-t>聯絡我們</a>
+    <a href="https://moonland.ai/pricing?direct" target="_blank" rel="noopener">價目表</a>
+    <a href="#feedback">意見回饋</a>
+    <a href="#contact">聯絡我們</a>
   </nav>
   <button class="icon-btn" id="fsBtn" type="button" aria-label="字體大小" title="字體大小" aria-haspopup="dialog" aria-expanded="false"><span class="fs-btn-txt">A<small>A</small></span></button>
-  <button class="icon-btn lang-btn d-only" id="langBtn" type="button"></button>
   <button class="icon-btn" id="themeBtn" type="button"></button>
 </header>
 
@@ -67,37 +60,27 @@
     <button class="icon-btn sm" id="dlgClose" type="button" aria-label="關閉搜尋" data-icon="x"></button>
   </div>
   <div id="results" role="listbox" aria-label="搜尋結果"></div>
-  <div class="search-foot"><span data-t>↑ ↓ 選擇</span><span data-t>Enter 開啟</span><span data-t>Esc 關閉</span></div>
+  <div class="search-foot"><span>↑ ↓ 選擇</span><span>Enter 開啟</span><span>Esc 關閉</span></div>
 </dialog>
 
 <button class="to-top" id="toTop" type="button" aria-label="回到頂端" title="回到頂端"></button>
 
 <dialog class="zoom" id="zoom" aria-label="放大檢視"><img alt=""></dialog>
 
-<script src="config.js?v=20261030d"></script>
-<script src="data/media.js?v=20261030d"></script>
-<script src="data/snippets.js?v=20261030d"></script>
-<script src="data/start.js?v=20261030d"></script>
-<script src="data/chat.js?v=20261030d"></script>
-<script src="data/image.js?v=20261030d"></script>
-<script src="data/video.js?v=20261030d"></script>
-<script src="data/lab.js?v=20261030d"></script>
-<script src="data/recipes.js?v=20261030d"></script>
-<script src="data/models.js?v=20261030d"></script>
-<script src="data/team.js?v=20261030d"></script>
-<script src="data/support.js?v=20261030d"></script>
-<script src="data/sections.js?v=20261030d"></script>
-<script src="data/en/ui.js?v=20261030d"></script>
-<script src="data/en/start.js?v=20261030d"></script>
-<script src="data/en/chat.js?v=20261030d"></script>
-<script src="data/en/image.js?v=20261030d"></script>
-<script src="data/en/video.js?v=20261030d"></script>
-<script src="data/en/lab.js?v=20261030d"></script>
-<script src="data/en/recipes.js?v=20261030d"></script>
-<script src="data/en/models.js?v=20261030d"></script>
-<script src="data/en/team.js?v=20261030d"></script>
-<script src="data/en/support.js?v=20261030d"></script>
-<script src="markup.js?v=20261030d"></script>
-<script src="script.js?v=20261030d"></script>
+<script src="config.js?v=20261030e"></script>
+<script src="data/media.js?v=20261030e"></script>
+<script src="data/snippets.js?v=20261030e"></script>
+<script src="data/start.js?v=20261030e"></script>
+<script src="data/chat.js?v=20261030e"></script>
+<script src="data/image.js?v=20261030e"></script>
+<script src="data/video.js?v=20261030e"></script>
+<script src="data/lab.js?v=20261030e"></script>
+<script src="data/recipes.js?v=20261030e"></script>
+<script src="data/models.js?v=20261030e"></script>
+<script src="data/team.js?v=20261030e"></script>
+<script src="data/support.js?v=20261030e"></script>
+<script src="data/sections.js?v=20261030e"></script>
+<script src="markup.js?v=20261030e"></script>
+<script src="script.js?v=20261030e"></script>
 </body>
 </html>

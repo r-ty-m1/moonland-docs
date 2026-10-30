@@ -23,25 +23,7 @@ const ALIASES = {
   'a-1': 'admin-1', 'a-2': 'admin-2', 'a-3': 'admin-3', 'a-4': 'admin-4', 'a-5': 'admin-5', 'a-6': 'admin-6',
 };
 
-// 英文版：目錄名稱換成英文；文章用 data/en/*.js 的標題、摘要與內文蓋過中文（等級、分鐘數等沿用中文版）
-// 還沒翻譯的文章維持中文，頁面上會提示
-const ZH_ARTICLES = window.ARTICLES || {};
-const EN_ARTICLES = window.ARTICLES_EN || {};
-const ARTICLES = LANG === 'en'
-  ? Object.fromEntries(Object.entries(ZH_ARTICLES).map(([k, a]) => [k, EN_ARTICLES[k] ? { ...a, ...EN_ARTICLES[k] } : { ...a, untranslated: true }]))
-  : ZH_ARTICLES;
-if (LANG === 'en') {
-  SECTIONS.forEach((sec) => {
-    sec.label = T(sec.label);
-    sec.rows.forEach((r) => {
-      ['t', 'd', 'n', 'tag'].forEach((k) => { if (r[k]) r[k] = T(r[k]); });
-      (r.groups || []).forEach((g) => {
-        g.g = T(g.g);
-        g.items.forEach((it) => { it[1] = T(it[1]); if (it[2]) it[2] = T(it[2]); });
-      });
-    });
-  });
-}
+const ARTICLES = window.ARTICLES || {};
 
 // 由 SECTIONS 建立頁面索引
 const PAGES = { home: { t: T('首頁'), crumb: [] } };
@@ -95,8 +77,6 @@ function navRow(r) {
 side.innerHTML =
   `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">${T('首頁')}</span></a>` +
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
-  // 手機上頂部列放不下語言按鈕，改放在目錄裡
-  `<button class="nav-row lang-row" type="button" data-switch-lang lang="${LANG === 'en' ? 'zh-Hant' : 'en'}">${ic('globe')}<span class="lbl">${LANG === 'en' ? '中文' : 'English'}</span></button>` +
   `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonshine.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
 
 function setOpen(cat, open) {
@@ -145,8 +125,7 @@ function articleView(id) {
   const head = c
     ? `<div class="cat-head"><span class="cat-icon">${ic(c.icon)}</span><h1>${esc(a.t)}</h1></div>`
     : `<h1>${esc(a.t)}</h1>`;
-  const notYet = a.untranslated ? `<div class="callout note">${T('這篇還沒有英文版，以下先顯示中文內容。')}</div>` : '';
-  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}${notYet}
+  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}
     <div class="prose">${renderMarkup(a.body)}</div>
     ${c ? articleList(c) : ''}`;
 }
@@ -250,8 +229,7 @@ function visitorId() {
 // 回傳 'server'（存到 Google 試算表或伺服器）、'local'（預覽版，存在這台電腦）或 'failed'
 // 頁面標題一律送中文版的，後台才不會同一篇出現中英兩種名稱
 async function sendFeedback(entry) {
-  const zhTitle = entry.page ? (ZH_ARTICLES[entry.page] && ZH_ARTICLES[entry.page].t) || entry.pageTitle : '';
-  entry = { ...entry, pageTitle: zhTitle, vid: visitorId(), lang: LANG };
+  entry = { ...entry, vid: visitorId() };
   const google = window.SITE_CONFIG && window.SITE_CONFIG.googleScriptUrl;
   if (google) {
     try {
@@ -309,7 +287,7 @@ function render() {
   }
 
   buildToc();
-  document.title = (id === 'home' ? '' : PAGES[id].t + (LANG === 'en' ? ' | ' : '｜')) + T('moonland.ai 說明中心');
+  document.title = (id === 'home' ? '' : PAGES[id].t + '｜') + T('moonland.ai 說明中心');
   window.scrollTo(0, 0);
   closeDrawer();
 }
@@ -600,34 +578,6 @@ toTop.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   view.focus({ preventScroll: true });
 });
-
-// ---------------------------------------------------------
-// 語言切換：記在這台裝置上，並把 ?lang= 寫進網址（複製網址給別人也是同一種語言），再重新載入
-// ---------------------------------------------------------
-const langBtn = document.getElementById('langBtn');
-langBtn.textContent = LANG === 'en' ? '中文' : 'EN';
-langBtn.lang = LANG === 'en' ? 'zh-Hant' : 'en';
-langBtn.title = LANG === 'en' ? '切換為中文' : 'Switch to English';
-langBtn.setAttribute('aria-label', langBtn.title);
-langBtn.dataset.switchLang = '';
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('[data-switch-lang]')) return;
-  const next = LANG === 'en' ? 'zh' : 'en';
-  try { localStorage.setItem('ml-lang', next); } catch (err) {}
-  const u = new URL(location.href);
-  u.searchParams.set('lang', next);
-  location.href = u.href;
-});
-
-// index.html 裡寫死的文字：有 data-t 的換內文，aria-label／title／placeholder 有對照就換
-if (LANG === 'en') {
-  document.querySelectorAll('[data-t]').forEach((el) => { el.innerHTML = T(el.innerHTML.trim()); });
-  document.querySelectorAll('[aria-label], [title], [placeholder]').forEach((el) => ['aria-label', 'title', 'placeholder'].forEach((at) => {
-    if (el.hasAttribute(at)) el.setAttribute(at, T(el.getAttribute(at)));
-  }));
-  const md = document.querySelector('meta[name="description"]');
-  if (md) md.content = T(md.content);
-}
 
 // 啟動
 document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', ic(el.dataset.icon)));

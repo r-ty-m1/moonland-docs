@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261030d`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261030e`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -24,7 +24,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 手機（寬度 620px 以下）表格會改成一列一張卡片，靠每個儲存格的 `data-label`；只有圖片的並排會維持兩欄。
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。`config.js` 的 `googleScriptUrl` 有值就 POST 到 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）；沒值就 POST 到 `api/feedback`，伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
-- 中英文：`<html lang>` 由 `index.html` 開頭依 `?lang=` 或 localStorage `ml-lang` 設定，切換時重新載入。介面文字寫中文包 `T()`，英文對照在 `data/en/ui.js`（key 要和中文一字不差）；英文文章在 `data/en/*.js`（`window.ARTICLES_EN`，只覆蓋 `t`、`d`、`body`、可選的目錄短名 `n`）。改中文文章時，同一篇的英文版也要一起改；`server/test.js` 會檢查每篇都有英文版、媒體與連結一致。英文版字型改用系統西文字型（中文字型的引號是全形）。後台只有中文。
+- 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
 - 編輯後台 `edit.html`（2026-10-30 示範版，給主管審核用）：模擬登入（主管理員／編輯者／沒有權限）、新增修改刪除排序頁面與分類、上傳圖片、圖庫（依區域篩選、搜尋、從圖庫挑圖）、版本紀錄與還原、最近刪除、修改紀錄、編輯者名單。**修改只存在瀏覽器 localStorage `ml-editor-demo`，不會生效**，這是使用者要求的。正式版方向：公司帳號登入（auth.mode: oidc，只擋編輯頁）＋員工編號白名單（公司登入沒有部門資訊）＋伺服器存內容；使用者不懂後端，也沒有公司登入資訊（平台部署時自動設定）。正式網站之後由其他職員編輯，GitHub Pages 只是預覽。英文版暫不編輯。
 

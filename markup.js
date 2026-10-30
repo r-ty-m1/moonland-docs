@@ -42,14 +42,11 @@ const ic = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-h
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------------------------------------------------------
-// 0. 語言：中文（預設）／英文，index.html 開頭依 ?lang= 或上次的選擇設定 <html lang>
-//    介面文字一律寫中文、外面包 T()；英文對照在 data/en/ui.js，英文文章在 data/en/*.js
-//    T('約 {n} 分鐘', { n: 5 })：大括號裡的名稱會換成對應的值
+// 0. 介面文字：T('約 {n} 分鐘', { n: 5 }) 會把大括號換成對應的值
+//    英文版已在 2026-10-30 移除（舊版在 git tag english-version）。介面文字仍包在 T() 裡，日後要加回其他語言只要改這裡
 // ---------------------------------------------------------
-const LANG = document.documentElement.lang === 'en' ? 'en' : 'zh';
-const UI_EN = window.UI_EN || {};
 function T(s, vars) {
-  let r = (LANG === 'en' && s && UI_EN[s]) || s;
+  let r = s;
   if (vars) r = r.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   return r;
 }
