@@ -22,6 +22,16 @@ const missing = [...refs].filter((n) => !MEDIA[n] || !fs.existsSync(path.join(RO
 assert.deepEqual(missing, [], `找不到媒體：${missing.join(', ')}`);
 console.log(`✓ 文章引用 ${refs.size} 個媒體，檔案都在`);
 
+// --- 1a. 媒體檔名都照規則（區域資料夾/文章代號-序號），而且資料夾裡沒有對照表以外的檔案 ---
+const NAME = /^(?:(?:start|chat|image|video|lab|recipes|models|team|support)\/[a-z0-9]+(?:-[a-z0-9]+)*-\d{2,3}|unused\/[\w-]+)\.(?:webp|mp4|mp3)$/;
+const badName = [...new Set(Object.values(MEDIA).map((e) => e[0]))].filter((f) => !NAME.test(f));
+assert.deepEqual(badName, [], `這些媒體檔名不符合命名規則：${badName.join(', ')}`);
+const listed = new Set(Object.values(MEDIA).map((e) => e[0]));
+const onDisk = fs.readdirSync(path.join(ROOT, 'assets/media'), { recursive: true }).map((f) => f.replace(/\\/g, '/')).filter((f) => /\.\w+$/.test(f));
+const stray = onDisk.filter((f) => !listed.has(f));
+assert.deepEqual(stray, [], `assets/media 裡有對照表沒有的檔案：${stray.join(', ')}`);
+console.log(`✓ ${listed.size} 個媒體檔名都符合命名規則`);
+
 // --- 1b. 英文版：每篇中文文章都有英文版，且引用的媒體、站內連結、錨點都和中文版一樣 ---
 global.SNIP = {};
 for (const file of dataFiles('data')) require(file);

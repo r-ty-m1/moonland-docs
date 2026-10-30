@@ -3,7 +3,7 @@
 // - 登入是模擬的。正式版改成公司帳號登入，由伺服器依「員工編號名單」判斷誰能編輯
 // - 所有修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo），不會改到說明中心
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#log 修改紀錄、#trash 最近刪除、#editors 編輯者名單
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#editors 編輯者名單
 // =========================================================
 
 Object.assign(ICONS, {
@@ -143,7 +143,7 @@ function toast(msg) {
   toast.timer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 function tabs(cur) {
-  const items = [['pages', '頁面'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`]];
+  const items = [['pages', '頁面'], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`]];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
 }
@@ -668,6 +668,121 @@ cmpForm.addEventListener('submit', (e) => {
 });
 
 // ---------------------------------------------------------
+// 6b. 圖庫：說明中心用到的所有媒體，依區域（assets/media 的資料夾）分類，可搜尋、複製；編輯時可直接挑圖
+// ---------------------------------------------------------
+const AREAS = { start: '開始使用', chat: '交談', image: '圖片生成', video: '影片生成', lab: '實驗室', recipes: '應用範例', models: '模型指南', team: '團隊管理', support: '支援', unused: '暫時沒用到', upload: '示範上傳' };
+const KINDS = { image: ['圖片', 'i'], video: ['影片', 'v'], audio: ['音訊', 'a'] };
+const kindOf = (f) => (/\.mp4$/i.test(f) ? 'video' : /\.mp3$/i.test(f) ? 'audio' : 'image');
+// 每個編號：檔名、區域、類型，以及用在哪些頁面的哪個段落（從目前的頁面內容即時算出）
+function mediaIndex() {
+  const uses = {};
+  for (const [id, p] of Object.entries(S.pages)) {
+    if (p.system || !p.body) continue;
+    let h = '';
+    for (const line of p.body.split('\n')) {
+      const hm = line.trim().match(/^#{2,4}\s+(.+?)(?:\s+\{#[\w-]+\})?$/);
+      if (hm) { h = hm[1].replace(/\*\*/g, ''); continue; }
+      for (const m of line.matchAll(/\[(?:i|v|a)\s+(\d+)(?:\s+([^\]]+))?\]/g)) {
+        const list = uses[m[1]] = uses[m[1]] || [];
+        if (!list.some((u) => u.id === id)) list.push({ id, t: p.t, h, c: m[2] || '' });
+      }
+    }
+  }
+  const order = Object.keys(AREAS);
+  return Object.keys(MEDIA).map((n) => {
+    const f = MEDIA[n][0];
+    const up = /^data:/.test(f);
+    return { n, f: up ? '' : f, area: up ? 'upload' : f.split('/')[0], kind: up ? 'image' : kindOf(f), uses: uses[n] || [] };
+  }).sort((a, b) => order.indexOf(a.area) - order.indexOf(b.area) || a.f.localeCompare(b.f) || a.n - b.n);
+}
+function mediaFilters(list, pick) {
+  const count = (a) => list.filter((m) => m.area === a).length;
+  return `<div class="ed-mfilter">
+    <label class="ed-msearch"><span class="vh">搜尋</span><input type="search" data-mf="q" placeholder="搜尋編號、檔名、頁面、段落或圖片說明"></label>
+    <label><span class="vh">區域</span><select data-mf="area"><option value="">全部區域（${list.length}）</option>${Object.keys(AREAS).filter(count).map((a) => `<option value="${a}">${AREAS[a]}（${count(a)}）</option>`).join('')}<option value="none">沒有頁面使用</option></select></label>
+    ${pick ? '' : `<label><span class="vh">類型</span><select data-mf="kind"><option value="">全部類型</option>${Object.entries(KINDS).map(([k, [t]]) => `<option value="${k}">${t}</option>`).join('')}</select></label>`}
+    <span class="ed-hint" data-mf-count aria-live="polite"></span>
+  </div>`;
+}
+function mediaCard(m, pick) {
+  const url = mediaUrl(m.n);
+  const thumb = m.kind === 'image' ? `<img src="${url}" alt="" loading="lazy" decoding="async">`
+    : m.kind === 'video' ? `<video data-src="${url}" muted playsinline preload="none"></video><span class="ed-m-kind">${ic('video')}影片</span>`
+    : `<span class="ed-m-kind">${ic('music')}音訊</span>`;
+  const where = m.uses.length
+    ? m.uses.map((u) => `${pick ? esc(u.t) : `<a href="#edit/${u.id}">${esc(u.t)}</a>`}${u.h ? ` › ${esc(u.h)}` : ''}`).join('<br>')
+    : '沒有頁面使用';
+  const q = [m.n, `#${m.n}`, m.f, ...m.uses.map((u) => `${u.t} ${u.h} ${u.c}`)].join(' ').toLowerCase();
+  const data = `data-area="${m.area}" data-kind="${m.kind}" data-used="${m.uses.length ? 1 : 0}" data-q="${esc(q)}"`;
+  const info = `<b>#${m.n}</b><small class="ed-m-file">${m.f ? esc(m.f) : '示範上傳（正式版會依規則自動命名）'}</small><small>${where}</small>`;
+  if (pick) return `<button type="button" class="ed-m" data-pick="${m.n}" ${data}><span class="ed-m-thumb">${thumb}</span><span class="ed-m-info">${info}</span></button>`;
+  return `<div class="ed-m" ${data}><div class="ed-m-thumb">${thumb}</div><div class="ed-m-info">${info}
+    <button type="button" class="ed-btn sm" data-act="copy-media" data-n="${m.n}" data-k="${KINDS[m.kind][1]}">${ic('copy')}複製</button></div></div>`;
+}
+function filterMedia(root) {
+  const v = (k) => { const el = root.querySelector(`[data-mf="${k}"]`); return el ? el.value.trim().toLowerCase() : ''; };
+  const q = v('q'), area = v('area'), kind = v('kind');
+  let shown = 0;
+  root.querySelectorAll('.ed-m').forEach((c) => {
+    const ok = (!q || c.dataset.q.includes(q)) && (!kind || c.dataset.kind === kind)
+      && (!area || (area === 'none' ? c.dataset.used === '0' : c.dataset.area === area));
+    c.hidden = !ok;
+    if (ok) shown++;
+  });
+  root.querySelector('[data-mf-count]').textContent = `顯示 ${shown} 個`;
+}
+// 影片捲到畫面附近才開始讀第一格畫面，避免一次載入幾十支影片
+const videoWatcher = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => {
+  if (!e.isIntersecting) return;
+  e.target.preload = 'metadata';
+  e.target.src = `${e.target.dataset.src}#t=0.5`;
+  videoWatcher.unobserve(e.target);
+}), { rootMargin: '300px' }) : null;
+function wakeMedia(root) {
+  filterMedia(root);
+  root.querySelectorAll('video[data-src]').forEach((v) => (videoWatcher ? videoWatcher.observe(v) : (v.src = v.dataset.src)));
+}
+function viewMedia() {
+  const list = mediaIndex();
+  return `${tabs('media')}<div class="ed-head"><div><h1>圖庫</h1><p class="ed-hint">說明中心用到的所有圖片、影片和音訊，依網站的區域分類。文章裡用編號引用：按「複製」再貼到文章裡就會顯示。</p></div></div>
+    <details class="ed-more ed-rules"><summary>檔案命名規則</summary>
+      <p>每個檔案放在「區域資料夾」裡，檔名是<b>文章代號-序號</b>，例如 <code>image/img-basics-03.webp</code> 就是「圖片生成」區、img-basics 這篇的第 3 張。</p>
+      <ul><li>區域資料夾：${Object.entries(AREAS).filter(([k]) => k !== 'upload').map(([k, t]) => `<code>${k}</code> ${t}`).join('、')}</li>
+        <li>只用英文小寫、數字和 -，不用空白和中文；新圖接在那篇最大的序號後面。</li>
+        <li>圖片轉成 WebP、寬度不超過 1600px；影片用 MP4、音訊用 MP3。</li>
+        <li>正式版上傳時會依這個規則自動命名，不用自己取檔名。</li></ul>
+    </details>
+    <div class="ed-media">${mediaFilters(list)}<div class="ed-mgrid">${list.map((m) => mediaCard(m)).join('')}</div></div>`;
+}
+async function copyMedia(b) {
+  const code = `[${b.dataset.k} ${b.dataset.n}]`;
+  try { await navigator.clipboard.writeText(code); toast(`已複製 ${code}，貼到文章裡就會顯示。`); }
+  catch (x) { prompt('複製下面這段，貼到文章裡：', code); }
+}
+
+// 從圖庫挑圖：插入圖片、前後比較的對話框裡按「從圖庫挑選」
+const pickDlg = document.getElementById('pickDlg');
+const pickBody = document.getElementById('pickBody');
+let pickTarget = null;
+function openPicker(input) {
+  pickTarget = input;
+  const list = mediaIndex().filter((m) => m.kind === 'image');
+  pickBody.innerHTML = `${mediaFilters(list, true)}<div class="ed-mgrid">${list.map((m) => mediaCard(m, true)).join('')}</div>`;
+  wakeMedia(pickBody);
+  pickDlg.showModal();
+  pickBody.querySelector('[data-mf="q"]').focus();
+}
+pickBody.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-pick]');
+  if (!c || !pickTarget) return;
+  pickTarget.value = c.dataset.pick;
+  pickTarget.dispatchEvent(new Event('input', { bubbles: true }));
+  pickDlg.close();
+});
+document.addEventListener('input', (e) => { if (e.target.dataset.mf) filterMedia(e.target.closest('.ed-media')); });
+document.addEventListener('change', (e) => { if (e.target.dataset.mf) filterMedia(e.target.closest('.ed-media')); });
+
+// ---------------------------------------------------------
 // 7. 修改紀錄、最近刪除、編輯者名單
 // ---------------------------------------------------------
 function viewLog() {
@@ -738,7 +853,8 @@ function render(keepDraft) {
     return;
   }
   draft = null;
-  app.innerHTML = ({ log: viewLog, trash: viewTrash, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = ({ media: viewMedia, log: viewLog, trash: viewTrash, editors: viewEditors }[route] || viewPages)();
+  if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   document.title = '編輯後台｜moonland.ai 說明中心';
 }
 
@@ -780,6 +896,7 @@ document.addEventListener('click', (e) => {
     } else if (a === 'up' || a === 'down') swap(b.dataset.key, +b.dataset.i, a === 'up' ? -1 : 1);
     else if (a === 'del') removePage(b.dataset.id);
     else if (a === 'restore') restore(+b.dataset.i);
+    else if (a === 'copy-media') copyMedia(b);
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
       const v = (prompt('大分類的新名稱：', sec.label) || '').trim();
@@ -809,6 +926,8 @@ document.addEventListener('click', (e) => {
     }
     return;
   }
+  const pf = e.target.closest('[data-pick-for]');
+  if (pf) { openPicker(pf.form.elements[pf.dataset.pickFor]); return; }
   const t = e.target.closest('[data-tool]');
   if (t) { tool(t.dataset.tool); return; }
   const p = e.target.closest('[data-pane-to]');

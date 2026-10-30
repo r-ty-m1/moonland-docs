@@ -257,3 +257,46 @@ a.ed-name:hover { background: var(--hover); }
   .ed-table td:first-child { white-space: normal; }
   .ed-hist li { flex-wrap: wrap; }
 }
+
+/* 圖庫 */
+.ed-rules { margin-bottom: 16px; font-size: 0.875rem; color: var(--fg-2); }
+.ed-rules p, .ed-rules ul { margin: 0; line-height: 1.8; }
+.ed-rules ul { padding-left: 1.2em; }
+.ed-mfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 14px; }
+.ed-mfilter label { min-width: 0; }
+.ed-mfilter .ed-msearch { flex: 1 1 240px; }
+.ed-mfilter input, .ed-mfilter select {
+  font: inherit; font-size: 0.9375rem; color: var(--fg); width: 100%; box-sizing: border-box;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+}
+.ed-mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 12px; }
+.ed-m {
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden; text-align: left;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); font: inherit;
+}
+.ed-m[hidden] { display: none; }
+button.ed-m { padding: 0; cursor: pointer; }
+button.ed-m:hover, button.ed-m:focus-visible { border-color: var(--brand-ic); outline: 2px solid var(--accent-line); outline-offset: 0; }
+.ed-m-thumb { position: relative; display: grid; place-items: center; aspect-ratio: 4 / 3; background: var(--shot); border-bottom: 1px solid var(--line); }
+.ed-m-thumb img, .ed-m-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ed-m-kind {
+  position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(12, 13, 15, .7); color: #f4f4f6; font-size: 0.75rem;
+}
+.ed-m-thumb video + .ed-m-kind { position: absolute; left: 6px; bottom: 6px; }
+.ed-m-kind .ic { width: 14px; height: 14px; }
+.ed-m-info { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; font-size: 0.8125rem; line-height: 1.5; color: var(--fg-2); overflow-wrap: anywhere; }
+.ed-m-info b { color: var(--fg); font-size: 0.875rem; }
+.ed-m-info .ed-m-file { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+.ed-m-info .ed-btn { align-self: flex-start; margin-top: 6px; }
+.ed-btn.sm { padding: 3px 10px; font-size: 0.8125rem; }
+.ed-btn.sm .ic { width: 14px; height: 14px; }
+.ed-pick { justify-self: start; }
+.ed-dlg-pick { width: min(960px, calc(100vw - 32px)); height: calc(100vh - 32px); }
+.ed-dlg-pick form { display: block; }
+.ed-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.ed-pick-head h2 { margin: 0; }
+@media (max-width: 620px) {
+  .ed-mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ed-dlg-pick { padding: 16px; }
+}

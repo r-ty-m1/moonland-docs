@@ -20,12 +20,12 @@
 | `config.js` | 網站設定：回饋要存進 Google 試算表時填 Apps Script 網址 |
 | `google-apps-script/` | 存回饋到 Google 試算表的程式與設定步驟 |
 | `data/media.js` | 媒體編號 → 檔名與寬高比的對照表 |
-| `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3） |
+| `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3），依區域分資料夾（見下方「圖片與影片」） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
 | `server/` | 公司內部部署用的小型伺服器（含收回饋的 `/api/feedback`）與冒煙測試（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
-| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、版本紀錄、編輯者名單 |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、編輯者名單 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
@@ -95,17 +95,45 @@
 
 ## 圖片與影片
 
-新增一張圖：
+### 分類與命名規則
 
-1. 轉成 WebP、寬度不超過 1600px（影片用 H.264 的 MP4，最長邊不超過 1280px），放進 `assets/media/`。
-2. 在 `data/media.js` 用一個沒用過的編號加一筆：`600:["600.webp",1.5]`，第二個數字是寬 ÷ 高，讓圖片載入前先保留位置，頁內跳轉才不會跑掉。
+文章裡一律用**編號**引用（`[i 123]`），編號一旦用了就不要改。檔案依網站區域放在 `assets/media/` 的資料夾裡，檔名是「文章代號-序號」：
+
+```
+assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
+例：assets/media/image/img-basics-03.webp　→　「圖片生成」區、img-basics 這篇的第 3 張
+```
+
+| 資料夾 | 區域 |
+| --- | --- |
+| `start` | 開始使用 |
+| `chat` | 交談 |
+| `image` | 圖片生成 |
+| `video` | 影片生成 |
+| `lab` | 實驗室 |
+| `recipes` | 應用範例 |
+| `models` | 模型指南 |
+| `team` | 團隊管理 |
+| `support` | 支援 |
+| `unused` | 暫時沒有文章用到的檔案 |
+
+- 檔名只用英文小寫、數字和 `-`，不用空白和中文。
+- 序號兩位數（01、02…），新圖接在那篇目前最大的序號後面；之後調整文章順序不必改檔名。
+- 圖片轉成 WebP、寬度不超過 1600px；影片用 H.264 的 MP4，最長邊不超過 1280px；音訊用 MP3。
+- 找圖：編輯後台的「圖庫」可以依區域、類型篩選，用編號、檔名、頁面、段落標題或圖片說明搜尋；插入圖片和前後比較的對話框也能直接「從圖庫挑選」。
+- 正式版的編輯後台上傳圖片時，會依這個規則自動命名、自動給編號。
+
+### 手動新增一張圖
+
+1. 依上面的規則命名，例如 `image/img-basics-12.webp`，放進 `assets/media/image/`。
+2. 在 `data/media.js` 用一個沒用過的編號加一筆：`600:["image/img-basics-12.webp",1.5]`，第二個數字是寬 ÷ 高，讓圖片載入前先保留位置，頁內跳轉才不會跑掉。
 3. 文章裡寫 `[i 600 說明文字]`。
 
-`node server/test.js` 會檢查每個文章引用的編號都有對照、檔案都存在。
+`node server/test.js` 會檢查每個文章引用的編號都有對照、檔案都存在、檔名符合命名規則，而且資料夾裡沒有對照表以外的檔案。
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
