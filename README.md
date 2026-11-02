@@ -14,7 +14,8 @@
 | `style.css` | 配色、字體與排版。最上方 `:root` 是深色配色，下面兩段是淺色配色。字級一律用 `rem`，右上角「字體大小」才能整站一起放大 |
 | `data/sections.js` | 左側目錄與分類結構（`window.SECTIONS`） |
 | `markup.js` | 說明中心和編輯後台共用：圖示、`T()`、文章標記語法轉成畫面 |
-| `script.js` | 說明中心的顯示、搜尋、明暗模式、語言切換等功能 |
+| `script.js` | 說明中心的顯示、搜尋、明暗模式、字體大小等功能 |
+| `model.js` | 編輯後台和伺服器共用：兩種內容格式互相轉換、檢查缺圖與壞連結、決定上傳圖片的區域資料夾 |
 | `data/*.js` | 所有文章內容，依分類分檔 |
 | `config.js` | 網站設定：回饋要存進 Google 試算表時填 Apps Script 網址 |
 | `google-apps-script/` | 存回饋到 Google 試算表的程式與設定步驟 |
@@ -22,15 +23,17 @@
 | `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3），依區域分資料夾（見下方「圖片與影片」） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
-| `server/` | 公司內部部署用的小型伺服器（含收回饋的 `/api/feedback`）與冒煙測試（GitHub Pages 用不到） |
+| `server/` | 公司內部部署用的小型伺服器（`server.js`：檔案、回饋；`editor.js`：編輯後台的公司帳號登入、內容存放、上傳、備份；`owners.json`：主管理員的員工編號）與自動測試 `test.js`（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
-| `edit.html`、`edit.js`、`edit.css` | 編輯後台（示範版）：模擬登入、新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、編輯者名單、給同事看的「使用說明」 |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 | `docs/MAINTENANCE.md` | 維護手冊：給網站負責人與平台組，含發布與回復、問題排查、上線前清單 |
 
 完整的 Starlight 版本保留在 `starlight` 分支。
 
 ## 新增或修改文章
+
+> **公司網站上線後，文章改在編輯後台修改，不要改 `data/*.js`。** 伺服器第一次啟動時把 `data/*.js` 複製一份存起來，之後說明中心只讀伺服器存的內容（見下方〈編輯後台〉）。下面是預覽版（GitHub Pages）的改法。
 
 1. 在對應的 `data/*.js` 新增一篇：
 
@@ -128,7 +131,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261030e`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261102a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -146,24 +149,34 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
 
-## 編輯後台（示範版）
+## 編輯後台
 
-網址是說明中心後面加 `edit.html`（例如 https://r-ty-m1.github.io/moonland-docs/edit.html），給主管看編輯流程用。
+網址是說明中心後面加 `edit.html`。同一份程式，依有沒有伺服器分成兩種：伺服器回應 `/api/me` 就是正式版，否則是示範版。
+
+### 正式版（公司網站）
+
+- **公司帳號登入**：`vibe.yaml` 的 `auth.mode: oidc`，網站自己當 OIDC client（`server/editor.js`，授權碼流程＋PKCE，請求 `employee_number`）。平台部署時自動注入 `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`。只有編輯後台要登入，說明中心照常不用。登出只登出本站，公司帳號維持登入。
+- **誰能編輯**：`server/owners.json` 的員工編號永遠是主管理員（不能在後台移除，改了要重新部署）；其他人由主管理員在「編輯者名單」新增。權限判斷都在伺服器。
+- **內容存在伺服器**：`DATA_DIR`（部署時是 `/app/storage`，`vibe.yaml` 的 persistence）裡的 `content.json`。第一次啟動時從 `data/*.js` 複製；之後說明中心讀伺服器產生的 `/content.js`（`index.html` 裡 `<!-- content -->` 那段會被換掉），存檔後立刻生效。
+- **上傳圖片**：瀏覽器先縮到 1600px 寬、轉成 WebP，伺服器依命名規則取檔名（`區域/文章代號-序號.webp`）、給新編號，存在 `DATA_DIR/media/`，網址和程式附的圖片一樣是 `assets/media/...`。目前只能傳圖片。
+- **儲存前檢查**：儲存單頁時檢查缺圖與壞連結（`model.js`），「檢查與備份」分頁可以檢查全站。
+- **兩人同時修改**：每次存檔都帶版本號，版本不對伺服器回 409，後台會載入最新內容、請使用者再做一次（正在編輯的文字會保留）。
+- **備份**：「檢查與備份」分頁下載整個網站（內容＋上傳的圖片）的 JSON 檔；主管理員可以用它還原。persistence 不是備份。
+- **本機試正式版**：`DEV_LOGIN=1 EDITOR_OWNERS=T0001 node server/server.js`，打開 http://localhost:8080/edit.html，用員工編號 T0001 登入（假登入，有 OIDC 設定時自動關閉）。內容存在 `.data/`，刪掉就回到 `data/*.js` 的內容。
+
+### 示範版（GitHub Pages）
+
+給主管看編輯流程用。
 
 - **登入是模擬的**：選一個身分登入（主管理員、編輯者、沒有權限的同事），看不同權限會看到什麼。
 - **修改不會生效**：所有修改只存在這台電腦的瀏覽器（localStorage `ml-editor-demo`），說明中心的內容完全不受影響。頁面上方的「清除示範資料」可以回到說明中心目前的內容。
 - 第一次打開時，從 `data/*.js` 與 `data/sections.js` 複製一份內容來編輯；預覽用 `markup.js`，和說明中心長得一樣。
 - 上傳的圖片會縮到 1600px 寬、轉成 WebP，示範版存在瀏覽器裡（容量有限，大約只放得下十幾張截圖）。
 
-正式版要做的事（部署到公司內部時）：
-
-1. 改用公司帳號登入：`vibe.yaml` 改成 `auth.mode: oidc`，網站自己處理登入流程；只有 `edit.html` 和儲存的 API 需要登入，訪客照常不用登入。公司平台部署時會自動建立登入設定。
-2. 誰能編輯：伺服器依「員工編號名單」判斷（公司登入只帶員工編號、姓名、email，沒有部門或職稱）。名單存在伺服器，由主管理員在後台維護。
-3. 文章、目錄、版本紀錄、上傳的圖片存在伺服器（`vibe.yaml` 開 persistence，或圖片改用 S3），說明中心改從伺服器讀內容。
-
 ## 部署到公司內部
 
 - 本機測試：`docker compose up --build`，打開 http://localhost:8080
 - 測試：`node server/test.js`（不需要安裝任何套件）
-- 網站不需要登入（`vibe.yaml` 的 `auth.mode: none`），網址對外公開。
+- 說明中心不需要登入、網址對外公開；只有編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`）。
+- 內容、上傳的圖片、回饋存在 persistence 磁碟（`vibe.yaml` 的 `mount_path: /app/storage`，`Dockerfile` 的 `DATA_DIR`）。不能掛在 `/app/data`，那是程式附的文章資料夾。
 - 推到公司 Gitea 的預設分支後，CI 會自動測試、建置並部署。

@@ -3,7 +3,12 @@ container:
   port: 8080
 healthcheck:
   path: /healthz
+# 編輯後台的內容、上傳的圖片、回饋存在這裡（Dockerfile 的 DATA_DIR）。
+# 不能用 /app/data：那是程式附的文章資料夾，掛上去會蓋掉
 persistence:
-  enabled: false
+  enabled: true
+  mount_path: /app/storage
+# 只有編輯後台要登入，說明中心不用（網站自己處理公司帳號登入，見 server/editor.js）
 auth:
-  mode: none
+  mode: oidc
+  callback_path: /api/auth/callback/authentik

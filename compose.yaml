@@ -1,6 +1,12 @@
 # 只供本機測試：docker compose up --build，再打開 http://localhost:8080
+# 本機沒有公司帳號登入，DEV_LOGIN=1 讓編輯後台改用「輸入員工編號」的假登入；EDITOR_OWNERS 是測試用的主管理員
 services:
   web:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      DEV_LOGIN: "1"
+      EDITOR_OWNERS: "T0001"
+    volumes:
+      - ./.data:/app/storage

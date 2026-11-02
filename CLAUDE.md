@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261030e`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261102a`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -26,17 +26,17 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。`config.js` 的 `googleScriptUrl` 有值就 POST 到 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）；沒值就 POST 到 `api/feedback`，伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
-- 編輯後台 `edit.html`（2026-10-30 示範版，給主管審核用）：模擬登入（主管理員／編輯者／沒有權限）、新增修改刪除排序頁面與分類、上傳圖片、圖庫（依區域篩選、搜尋、從圖庫挑圖）、版本紀錄與還原、最近刪除、修改紀錄、編輯者名單。**修改只存在瀏覽器 localStorage `ml-editor-demo`，不會生效**，這是使用者要求的。正式版方向：公司帳號登入（auth.mode: oidc，只擋編輯頁）＋員工編號白名單（公司登入沒有部門資訊）＋伺服器存內容；使用者不懂後端，也沒有公司登入資訊（平台部署時自動設定）。正式網站之後由其他職員編輯，GitHub Pages 只是預覽。英文版暫不編輯。
+- 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
 
 ## 部署到公司內部（尚未推送）
 
 網站要放到公司內部的 Gitea 自動部署，部署設定都已備好：`Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml`、`server/server.js`（無相依套件的靜態伺服器）。
 
-- 不需要登入、不存使用者資料（`vibe.yaml` 的 `auth.mode: none`、`persistence.enabled: false`），網址對外公開，使用者已知悉。
-- 回饋改存 Google 試算表後（使用者 2026-10-29 的方向），下面這兩件事就不需要了，只要 `config.js` 填好網址。
-- **若回饋改回存公司伺服器，正式上線前還缺兩件事**（2026-10-29 只做到預覽）：一、回饋檔要存在會保留的磁碟，`vibe.yaml` 要開 persistence 並把 `DATA_DIR` 指過去，否則每次部署就清空；二、後台目前只靠 `ADMIN_TOKEN` 密碼（沒設就只有本機能讀），正式版應該改用公司登入限定誰能看。這兩項用 vibe-deploy 的 containerize 和 design-access skill 處理，不要手動改 `ci.yaml`。
+- 說明中心不用登入、網址對外公開；編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`、`callback_path: /api/auth/callback/authentik`）。內容、上傳、回饋存在 persistence（`mount_path: /app/storage`，Dockerfile 的 `DATA_DIR`；不能用 `/app/data`，那是程式附的文章資料夾）。圖片目前存 persistence，沒用 S3。
+- 回饋若存公司伺服器（`config.js` 沒填 Google 網址），persistence 已開；但回饋後台仍只靠 `ADMIN_TOKEN` 密碼，要改成公司登入可沿用 `server/editor.js` 的登入。
 - `ci.yaml` 由公司範本產生，不要手動改；要更新用 vibe-deploy 的 containerize skill。
 - 部署流程用 vibe-deploy 這組 skills（assess-readiness → containerize → deploy-site；推送權限用 gitea-access）。推送需要用使用者的公司帳號登入，所以要在使用者自己的電腦上做。
+- `server/owners.json` 的 `owners` 目前是空的，上線前要填網站負責人的員工編號，否則沒有人能進後台管理名單。
 - 容器映像還沒實際建置驗證過（開發環境連不到 Docker Hub），第一次推上去由 CI 建置時才會驗證。
 - **使用者目前只要預覽給主管看，還沒要求推到公司 Gitea。** 沒有明確要求不要推。
 

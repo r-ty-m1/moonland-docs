@@ -1,9 +1,9 @@
 // =========================================================
-// 編輯後台（edit.html，示範版）
-// - 登入是模擬的。正式版改成公司帳號登入，由伺服器依「員工編號名單」判斷誰能編輯
-// - 所有修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo），不會改到說明中心
-// - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#editors 編輯者名單、#help 使用說明
+// 編輯後台（edit.html）
+// - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
+// - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
+// - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
 Object.assign(ICONS, {
@@ -44,34 +44,15 @@ const fmt = (iso) => {
 };
 
 // ---------------------------------------------------------
-// 1. 資料：第一次開啟時，從說明中心目前的內容（data/*.js、data/sections.js）複製一份
+// 1. 資料：格式見 model.js
 //    sections：[{ label, rows: [{ id, groups?: [{ g, items: [頁面代號] }] }] }]
 //    pages：{ 代號: { t 標題, n 目錄名稱, d 摘要, tag, icon, level, minutes, models, tool, body, system? } }
+//    正式版從伺服器讀（boot），示範版第一次開啟時從說明中心目前的內容（data/*.js）複製一份
 // ---------------------------------------------------------
+let LIVE = null;   // 正式版：{ login: 'oidc'|'dev'|'none', user, role }；示範版是 null
 function initialState() {
-  const A = window.ARTICLES || {};
-  const pages = {};
-  const extra = (a) => ({ level: a.level || '', minutes: a.minutes || '', models: (a.models || []).join(', '), tool: a.tool || '', body: (a.body || '').replace(/^\n+/, '') });
-  const sections = window.SECTIONS.map((sec) => ({
-    label: sec.label,
-    rows: sec.rows.map((r) => {
-      const a = A[r.id] || {};
-      if (r.groups) {
-        pages[r.id] = { t: r.t || a.t || r.id, n: '', d: r.d || a.d || '', tag: r.tag || '', icon: r.icon, ...extra(a) };
-        return { id: r.id, groups: r.groups.map((g) => ({ g: g.g, items: g.items.map(([id, n, tag]) => {
-          const b = A[id] || {};
-          pages[id] = { t: b.t || n, n: n === b.t ? '' : n, d: b.d || '', tag: tag || '', icon: '', ...extra(b) };
-          return id;
-        }) })) };
-      }
-      pages[r.id] = A[r.id]
-        ? { t: a.t, n: r.n || a.n || '', d: a.d || '', tag: r.tag || '', icon: r.icon, ...extra(a) }
-        : { t: r.t || r.id, icon: r.icon, system: true };
-      return { id: r.id };
-    }),
-  }));
   return {
-    v: 1, sections, pages, history: {}, log: [], trash: [], uploads: {}, nextMedia: 9001,
+    v: 1, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS), history: {}, log: [], trash: [], uploads: {}, nextMedia: 9001,
     editors: [
       { no: 'A0001', name: '王小明', role: 'owner', at: now() },
       { no: 'A0002', name: '林小華', role: 'editor', at: now() },
@@ -80,18 +61,55 @@ function initialState() {
 }
 
 let S = null;
-try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
-if (!S || S.v !== 1) S = initialState();
-Object.assign(MEDIA, S.uploads);
-
-function persist() {
-  try { localStorage.setItem(STORE, JSON.stringify(S)); return true; }
-  catch (e) { toast('這台電腦的瀏覽器空間不夠，剛才的修改沒有存起來。示範版容量有限，請少放幾張大圖。'); return false; }
+let me = null;
+function loadDemo() {
+  try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
+  if (!S || S.v !== 1) S = initialState();
+  Object.assign(MEDIA, S.uploads);
+  try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
 }
 
-let me = null;
-try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
-const myRole = () => { const e = me && S.editors.find((x) => x.no === me.no); return e ? e.role : null; };
+// 正式版的讀寫都帶 x-ml-editor 標頭（伺服器用它擋掉別的網站偽造的請求）
+const api = (url, opt = {}) => fetch(url, { cache: 'no-store', ...opt, headers: { 'x-ml-editor': '1', ...(opt.headers || {}) } });
+async function loadLive() {
+  const r = await api('api/editor/state');
+  if (!r.ok) throw new Error(`state ${r.status}`);
+  S = await r.json();
+  Object.assign(MEDIA, S.uploads);
+}
+
+// 存檔。示範版存在瀏覽器；正式版送到伺服器，一次只送一個，回傳 Promise<是否成功>
+let saveChain = Promise.resolve(true);
+function persist() {
+  if (!LIVE) {
+    try { localStorage.setItem(STORE, JSON.stringify(S)); return true; }
+    catch (e) { toast('這台電腦的瀏覽器空間不夠，剛才的修改沒有存起來。示範版容量有限，請少放幾張大圖。'); return false; }
+  }
+  saveChain = saveChain.then(async () => {
+    let msg;
+    try {
+      const r = await api('api/editor/state', { method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rev: S.rev, sections: S.sections, pages: S.pages, history: S.history, log: S.log, trash: S.trash, editors: S.editors }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { S.rev = j.rev; S.editors = j.editors; return true; }
+      msg = r.status === 409 ? '其他人剛剛也改了內容，已載入最新的版本；你剛才的動作沒有存到，請再做一次。'
+        : r.status === 401 ? '登入已經過期，請重新整理頁面再登入一次。'
+        : `沒有存成功：${j.error || '伺服器出了問題'}`;
+    } catch (e) { msg = '連不到伺服器，剛才的修改沒有存起來。請確認網路後再試一次。'; }
+    // 沒存成功：重新讀伺服器的內容，畫面才不會顯示沒存到的修改（正在編輯的內容會保留）
+    try { await loadLive(); } catch (e) {}
+    render(!!draft);
+    toast(msg);
+    return false;
+  });
+  return saveChain;
+}
+
+const myRole = () => {
+  if (LIVE) return LIVE.role;
+  const e = me && S.editors.find((x) => x.no === me.no);
+  return e ? e.role : null;
+};
 function addLog(action, id, title) {
   S.log.unshift({ at: now(), by: me.name, action, id, t: title });
   S.log.length = Math.min(S.log.length, 300);
@@ -143,7 +161,7 @@ function toast(msg) {
   toast.timer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 function tabs(cur) {
-  const items = [['pages', '頁面'], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`]];
+  const items = [['pages', '頁面'], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -157,9 +175,21 @@ function paintWho() {
 }
 
 // ---------------------------------------------------------
-// 4. 登入（模擬）
+// 4. 登入：正式版用公司帳號（伺服器處理），示範版是模擬的
 // ---------------------------------------------------------
 function viewLogin() {
+  if (LIVE) {
+    const next = encodeURIComponent(location.pathname + location.hash);
+    return `<div class="ed-login">
+      <span class="ed-login-ic">${ic('lock')}</span>
+      <h1>登入編輯後台</h1>
+      ${LIVE.login === 'none'
+        ? '<div class="ed-note"><b>還沒接上公司帳號登入</b>網站要部署到公司平台、開啟公司帳號登入後才能編輯。請聯絡網站負責人或平台組。</div>'
+        : `<p>用<b>公司帳號</b>登入，不用另外記密碼。</p>
+          ${LIVE.login === 'dev' ? '<div class="ed-note"><b>本機測試模式</b>這台伺服器還沒接公司帳號，登入時直接輸入員工編號。</div>' : ''}
+          <p><a class="ed-btn ed-primary" href="api/auth/login?next=${next}">用公司帳號登入</a></p>`}
+    </div>`;
+  }
   const people = [...S.editors, ...(S.editors.some((e) => e.no === OUTSIDER.no) ? [] : [{ ...OUTSIDER, role: null }])];
   const desc = { owner: '可以編輯頁面，也能決定誰是編輯者', editor: '可以新增、修改、刪除與排序頁面', null: '公司同事，但不在編輯者名單上' };
   return `<div class="ed-login">
@@ -178,7 +208,7 @@ function viewDenied() {
     <h1>你目前沒有編輯權限</h1>
     <p>${esc(me.name)}，你已經用公司帳號登入（員工編號 ${esc(me.no)}），但不在編輯者名單上。</p>
     <p>需要編輯說明中心的話，請主管理員把你的員工編號加進「編輯者名單」。</p>
-    <p><a href="./">回到說明中心 →</a>　<button type="button" class="ed-link" data-act="logout">換個身分登入</button></p>
+    <p><a href="./">回到說明中心 →</a>　<button type="button" class="ed-link" data-act="logout">${LIVE ? '登出' : '換個身分登入'}</button></p>
   </div>`;
 }
 
@@ -223,14 +253,14 @@ function catLi(r, key, i, len) {
 function viewPages() {
   const changed = Object.keys(S.history).filter((k) => S.pages[k] && S.history[k].length).length;
   return `${tabs('pages')}
-    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；用箭頭調整在左側目錄裡的順序。標示「已修改」「新頁面」的是這台電腦上的示範修改。</p></div></div>
+    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；用箭頭調整在左側目錄裡的順序。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
     ${S.sections.map((sec, si) => `<section class="ed-sec" aria-labelledby="sec${si}">
       <div class="ed-sec-head"><h2 id="sec${si}">${esc(sec.label)}</h2>
         <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button></div>
       <ul class="ed-list">${sec.rows.map((r, i) => (r.groups ? catLi(r, `s${si}`, i, sec.rows.length) : itemLi(r.id, `s${si}`, i, sec.rows.length))).join('')}</ul>
       <div class="ed-adds"><a class="ed-add" href="#new/s${si}">${ic('plus')}新增頁面</a><button type="button" class="ed-add" data-act="add-cat" data-si="${si}">${ic('folder')}新增分類</button></div>
     </section>`).join('')}
-    <p class="ed-hint ed-count">${changed ? `目前有 ${changed} 頁在這台電腦上改過。` : ''}</p>`;
+    <p class="ed-hint ed-count">${changed ? `目前有 ${changed} 頁${LIVE ? '在後台改過' : '在這台電腦上改過'}。` : ''}</p>`;
 }
 
 function swap(key, i, d) {
@@ -403,15 +433,20 @@ function readForm(f) {
 }
 const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'body'];
 
-function savePage(f) {
+let saving = false;
+async function savePage(f) {
+  if (saving) return;
   readForm(f);
   const d = draft;
   const err = document.getElementById('formErr');
   d.t = d.t.trim(); d.id = d.id.trim();
   if (!d.t) { err.textContent = '請填寫標題。'; f.elements.t.focus(); return; }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.id)) { err.textContent = '網址代號只能用英文小寫、數字和 -。'; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
-  if (d.id !== d.origId && (S.pages[d.id] || ['home', 'pages'].includes(d.id))) { err.textContent = `網址代號「${d.id}」已經有其他頁面在用了。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
+  if (d.id !== d.origId && (S.pages[d.id] || ['home', 'pages', 'feedback'].includes(d.id))) { err.textContent = `網址代號「${d.id}」已經有其他頁面在用了。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
   err.textContent = '';
+  // 儲存前檢查：找不到的圖片、連到不存在頁面的連結。可以照樣儲存，但先提醒
+  const problems = Model.checkBody(d.body, d.id, { ...S.pages, [d.id]: d }, MEDIA);
+  if (problems.length && !confirm(`這頁有些地方要確認：\n・${problems.join('\n・')}\n\n讀者會看到空白的圖片或點不開的連結。還是要儲存嗎？`)) return;
 
   const page = {};
   FIELDS.forEach((k) => { page[k] = typeof d[k] === 'string' ? d[k].trim() : d[k]; });
@@ -448,9 +483,12 @@ function savePage(f) {
   S.history[d.id].unshift({ at: now(), by: me.name, page: clone(page) });
   S.history[d.id].length = Math.min(S.history[d.id].length, 30);
   addLog(action, d.id, page.t);
-  if (!persist()) return;
+  saving = true;
+  const ok = await persist();
+  saving = false;
+  if (!ok) return;
   setDirty(false);
-  toast(`已儲存「${page.t}」（示範：只存在這台電腦）`);
+  toast(LIVE ? `已儲存「${page.t}」，說明中心已經更新。` : `已儲存「${page.t}」（示範：只存在這台電腦）`);
   if (d.isNew || d.id !== d.origId) { skipGuard = true; location.hash = `#edit/${d.id}`; }
   else { draft = startDraft(d.id); }
 }
@@ -585,12 +623,38 @@ imgForm.elements.num.addEventListener('input', () => {
   const n = imgForm.elements.num.value.trim();
   document.getElementById('imgThumb').innerHTML = MEDIA[n] && /\.(webp|png|jpe?g|gif)$|^data:/.test(MEDIA[n][0]) ? `<img src="${mediaUrl(n)}" alt="">` : n ? '<p class="ed-hint">找不到這個編號的圖片。</p>' : '';
 });
-imgForm.addEventListener('submit', (e) => {
+// 正式版上傳：伺服器依「區域／文章代號-序號」命名、給編號，回傳編號
+async function uploadImage([dataUrl, ratio]) {
+  const d = draft;
+  const pageId = (document.getElementById('pageForm').elements.slug.value.trim() || d.id);
+  let area;
+  if (!d.isNew) area = Model.areaFor(d.origId, S.sections, MEDIA);
+  else {
+    const [, si, rowId] = d.where.match(/^s(\d+)$/) || [];
+    const c = d.where.match(/^c:([\w-]+):/);
+    area = c ? Model.areaOfPlace(S.sections.findIndex((s) => s.rows.some((r) => r.id === c[1])), c[1]) : Model.areaOfPlace(+si, rowId);
+  }
+  const blob = await (await fetch(dataUrl)).blob();
+  const r = await api(`api/editor/media?page=${encodeURIComponent(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pageId) ? pageId : d.id)}&area=${area}&ratio=${ratio}`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || '上傳失敗');
+  MEDIA[j.n] = [j.path, j.ratio];
+  S.uploads[j.n] = MEDIA[j.n];
+  return j.n;
+}
+
+imgForm.addEventListener('submit', async (e) => {
   if (e.submitter && e.submitter.value === 'cancel') return;
   const f = imgForm;
   const err = f.querySelector('.ed-err');
   let n;
-  if (f.elements.kind.value === 'upload') {
+  if (f.elements.kind.value === 'upload' && LIVE) {
+    e.preventDefault();
+    if (!pendingImg) { err.textContent = '請先選擇一張圖片。'; return; }
+    err.textContent = '上傳中…';
+    try { n = await uploadImage(pendingImg); } catch (x) { err.textContent = `${x.message}，請再試一次。`; return; }
+    err.textContent = '';
+  } else if (f.elements.kind.value === 'upload') {
     if (!pendingImg) { e.preventDefault(); err.textContent = '請先選擇一張圖片。'; return; }
     n = String(S.nextMedia++);
     S.uploads[n] = pendingImg;
@@ -636,7 +700,7 @@ cmpForm.addEventListener('input', (e) => {
   cmpForm.elements[`file${s}`].value = '';
   document.getElementById(`cmpThumb${s}`).innerHTML = isImageNum(n) ? `<img src="${mediaUrl(n)}" alt="">` : n ? '<p class="ed-hint">找不到這個編號的圖片。</p>' : '';
 });
-cmpForm.addEventListener('submit', (e) => {
+cmpForm.addEventListener('submit', async (e) => {
   if (e.submitter && e.submitter.value === 'cancel') return;
   e.preventDefault();
   const f = cmpForm.elements;
@@ -648,7 +712,12 @@ cmpForm.addEventListener('submit', (e) => {
   // 兩張都檢查過才存上傳的圖，避免只存一半
   const nums = {}, added = [];
   for (const s of ['A', 'B']) {
-    if (cmpPending[s]) { const n = String(S.nextMedia++); S.uploads[n] = MEDIA[n] = cmpPending[s]; nums[s] = n; added.push(n); }
+    if (cmpPending[s] && LIVE) {
+      err.textContent = '上傳中…';
+      try { nums[s] = await uploadImage(cmpPending[s]); cmpPending[s] = null; f[`num${s}`].value = nums[s]; }
+      catch (x) { err.textContent = `${side[s]}的圖片${x.message}，請再試一次。`; return; }
+      err.textContent = '';
+    } else if (cmpPending[s]) { const n = String(S.nextMedia++); S.uploads[n] = MEDIA[n] = cmpPending[s]; nums[s] = n; added.push(n); }
     else nums[s] = f[`num${s}`].value.trim();
   }
   if (added.length && !persist()) {
@@ -789,10 +858,10 @@ document.addEventListener('change', (e) => { if (e.target.dataset.mf) filterMedi
 function viewHelp() {
   const sec = (title, body, open) => `<details class="ed-help-sec"${open ? ' open' : ''}><summary>${title}</summary><div>${body}</div></details>`;
   return `${tabs('help')}<div class="ed-head"><div><h1>使用說明</h1><p class="ed-hint">編輯說明中心需要知道的事。點標題展開。</p></div></div>
-    <div class="ed-note"><b>目前是示範版</b>登入是模擬的，修改只存在這台電腦的瀏覽器，不會改到說明中心。下面標「正式版」的地方，是之後上線後的做法。</div>
+    ${LIVE ? '' : '<div class="ed-note"><b>目前是示範版</b>登入是模擬的，修改只存在這台電腦的瀏覽器，不會改到說明中心。下面標「正式版」的地方，是之後上線後的做法。</div>'}
     <div class="ed-help">
     ${sec('1. 登入與權限', `<ul>
-      <li>用<b>公司帳號</b>登入，不用另外記密碼（正式版）。</li>
+      <li>用<b>公司帳號</b>登入，不用另外記密碼${LIVE ? '' : '（正式版）'}。</li>
       <li>登入後，要在「編輯者名單」上才能編輯。不在名單上的人會看到「沒有編輯權限」，請找主管理員把你的員工編號加進去。</li>
       <li><b>編輯者</b>可以新增、修改、刪除與排序頁面；<b>主管理員</b>另外可以管理編輯者名單。</li>
       <li>用完記得按右上角的登出。</li></ul>`, true)}
@@ -806,13 +875,15 @@ function viewHelp() {
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
       <li>右邊（手機上切到「預覽」）就是讀者會看到的樣子。</li>
-      <li>按<b>儲存</b>（或 Ctrl+S）。還沒儲存就離開，會先問你。</li></ol>
+      <li>按<b>儲存</b>（或 Ctrl+S），說明中心馬上就會更新。還沒儲存就離開，會先問你。</li>
+      <li>儲存時會自動檢查有沒有找不到的圖片、點不開的連結，有的話會先提醒你。</li></ol>
       <p>不確定格式怎麼寫，按工具列最後的「寫法說明」，或看下面的速查表：</p>
       <div class="ed-cheat">${cheatSheet()}</div>
       <p>小提醒：連到別的頁面請用「連結」按鈕挑選，不要自己打網址；改了頁面的「網址代號」，其他頁面的連結會自動跟著改。</p>`)}
     ${sec('4. 圖片', `<ul>
       <li><b>插入圖片</b>：工具列「圖片」→ 從電腦上傳，或「從圖庫挑選」網站上已經有的圖。</li>
-      <li>上傳的圖會自動縮小、轉成網頁用的格式，並自動取好檔名、給一個編號，<b>不用自己改檔名</b>（正式版）。</li>
+      <li>上傳的圖會自動縮小、轉成網頁用的格式，並自動取好檔名、給一個編號，<b>不用自己改檔名</b>${LIVE ? '' : '（正式版）'}。</li>
+      <li>目前只能上傳圖片。影片、音訊請交給網站負責人。</li>
       <li>截圖請盡量只截需要的部分，讀者在手機上才看得清楚；不要放有個人資料、密碼或公司機密的畫面。</li>
       <li>「圖片說明」會顯示在圖片下方，也能讓圖庫搜尋得到。</li>
       <li>文章裡圖片寫成 <code>[i 123 說明]</code>，123 是圖片編號；同一張圖可以用在很多篇。</li></ul>`)}
@@ -823,15 +894,18 @@ function viewHelp() {
       <li>「圖庫」分頁列出網站所有圖片、影片和音訊，依網站區域分類。</li>
       <li>可以用編號、頁面名稱、段落標題或圖片說明搜尋，也能篩選「沒有頁面使用」的圖。</li>
       <li>每張都寫著用在哪一頁，點頁名就能去編輯那頁；按「複製」再貼到文章裡就會顯示。</li>
-      <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；正式版上傳時會自動照規則命名。</li></ul>`)}
+      <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；上傳時會自動照規則命名。</li></ul>`)}
     ${sec('7. 改錯了怎麼辦', `<ul>
       <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
       <li><b>最近刪除</b>：刪掉的頁面會先放這裡，按「還原」放回原位。</li>
-      <li><b>修改紀錄</b>：誰在什麼時候改了哪一頁。</li></ul>`)}
+      <li><b>修改紀錄</b>：誰在什麼時候改了哪一頁。</li>
+      <li><b>檢查與備份</b>：一次檢查全站的圖片和連結；下載整個網站的備份檔。網站的儲存空間不是備份，建議每個月、或大改之前下載一次，存到公司雲端硬碟。主管理員可以用備份檔還原整個網站。</li>
+      <li>兩個人同時改內容時，後存的人會看到「其他人剛剛也改了內容」，畫面會換成最新版本；正在編輯的文字還在，再按一次儲存就好。</li></ul>`)}
     ${sec('8. 編輯者名單（主管理員）', `<ul>
       <li>輸入同事的<b>員工編號</b>和姓名、選權限，按「加入名單」。</li>
       <li>公司帳號不會告訴網站部門或職稱，所以誰能編輯要在這裡手動維護。</li>
-      <li>同事離職或調職，記得移除。不能移除或降級自己，避免沒有人能管理名單。</li></ul>`)}
+      <li>同事離職或調職，記得移除。不能移除或降級自己，避免沒有人能管理名單。</li>
+      <li>標「網站設定」的主管理員寫在網站程式裡（<code>server/owners.json</code>），要變更請找平台組。</li></ul>`)}
     ${sec('9. 遇到問題找誰', `<ul>
       <li>內容怎麼寫、誰能編輯：找網站負責人或主管理員。</li>
       <li>網站打不開、圖片全部不見、登入失敗：找平台組，並告訴他們網站網址和發生時間。工程師用的維護手冊在程式碼的 <code>docs/MAINTENANCE.md</code>。</li>
@@ -843,7 +917,7 @@ function viewHelp() {
 // 7. 修改紀錄、最近刪除、編輯者名單
 // ---------------------------------------------------------
 function viewLog() {
-  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁。正式版會記在伺服器上，所有編輯者都看得到。</p></div></div>
+  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>
     ${S.log.length ? `<div class="ed-tbl"><table class="ed-table"><thead><tr><th>時間</th><th>誰</th><th>做了什麼</th><th>頁面</th></tr></thead><tbody>
       ${S.log.map((x) => `<tr><td data-label="時間">${fmt(x.at)}</td><td data-label="誰">${esc(x.by)}</td><td data-label="做了什麼">${esc(x.action)}</td>
         <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
@@ -867,15 +941,52 @@ function restore(i) {
   toast(`已還原「${x.page.t}」，放在「${l.label}」的最後面。`);
   render();
 }
+// 檢查與備份：全站檢查缺圖、壞連結；正式版可以下載備份、主管理員可以從備份還原
+function viewTools() {
+  const problems = Model.checkAll(S.pages, MEDIA);
+  return `${tabs('tools')}<div class="ed-head"><div><h1>檢查與備份</h1></div></div>
+    <section class="ed-sec"><div class="ed-sec-head"><h2>全站檢查</h2></div>
+      <p class="ed-hint">檢查每一頁有沒有找不到的圖片、點不開的站內連結。儲存單頁時也會自動檢查。</p>
+      ${problems.length ? `<ul class="ed-list">${problems.map((x) => `<li class="ed-item"><a class="ed-name" href="#edit/${x.id}">${ic('alert')}<span><b>${esc(x.t)}</b>${x.problems.map((p) => `<small>${esc(p)}</small>`).join('')}</span></a></li>`).join('')}</ul>`
+        : `<p class="ed-ok">${ic('check')}全部 ${Object.values(S.pages).filter((p) => !p.system).length} 頁都沒有問題。</p>`}
+    </section>
+    <section class="ed-sec"><div class="ed-sec-head"><h2>備份</h2></div>
+      ${LIVE ? `<p class="ed-hint">把所有頁面、目錄、版本紀錄、編輯者名單和後台上傳的圖片，下載成一個檔案。<b>網站的儲存空間不是備份</b>，建議每個月、或大改之前下載一次，存到公司的雲端硬碟。</p>
+        <p><a class="ed-btn" href="api/editor/backup" download>${ic('down')}下載備份檔</a></p>
+        ${myRole() === 'owner' ? `<form class="ed-addform" id="restoreForm" novalidate>
+          <h2>從備份還原（主管理員）</h2>
+          <p class="ed-hint">會用備份檔的內容<b>整個取代</b>目前的網站內容。還原前建議先下載一份目前的備份。</p>
+          <label class="ed-f"><span>備份檔（.json）</span><input type="file" name="file" accept=".json,application/json" required></label>
+          <p class="ed-err" role="alert"></p>
+          <button class="ed-btn" type="submit">${ic('restore')}還原</button></form>` : ''}`
+        : '<p class="ed-hint">示範版的修改只存在這台電腦，沒有備份功能。正式版可以在這裡下載整個網站的備份檔。</p>'}
+    </section>`;
+}
+async function restoreBackup(f) {
+  const err = f.querySelector('.ed-err');
+  const file = f.elements.file.files[0];
+  if (!file) { err.textContent = '請先選擇備份檔。'; return; }
+  if (!confirm(`確定要用「${file.name}」取代目前整個網站的內容嗎？`)) return;
+  err.textContent = '還原中…';
+  try {
+    const r = await api('api/editor/restore', { method: 'POST', headers: { 'content-type': 'application/json' }, body: file });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || '還原失敗');
+    await loadLive();
+    toast('已從備份還原，說明中心已經更新。');
+    location.hash = '#pages';
+  } catch (x) { err.textContent = x.message; }
+}
+
 function viewEditors() {
   if (myRole() !== 'owner') return `${tabs('pages')}<p class="ed-hint">只有主管理員可以管理編輯者名單。</p>`;
   return `${tabs('editors')}<div class="ed-head"><div><h1>編輯者名單</h1></div></div>
-    <div class="ed-note"><b>這份名單決定誰能編輯</b>正式版裡，同事用公司帳號登入後，系統會拿到他的員工編號；在這份名單上的人才能進入後台。公司帳號不會告訴網站部門或職稱，所以名單要由主管理員在這裡維護。</div>
+    <div class="ed-note"><b>這份名單決定誰能編輯</b>${LIVE ? '' : '正式版裡，'}同事用公司帳號登入後，系統會拿到他的員工編號；在這份名單上的人才能進入後台。公司帳號不會告訴網站部門或職稱，所以名單要由主管理員在這裡維護。標「網站設定」的主管理員寫在網站程式裡，不能在這裡移除。</div>
     <div class="ed-tbl"><table class="ed-table"><thead><tr><th>姓名</th><th>員工編號</th><th>權限</th><th>加入時間</th><th><span class="vh">動作</span></th></tr></thead><tbody>
-      ${S.editors.map((e, i) => `<tr><td data-label="姓名">${esc(e.name)}${e.no === me.no ? '<span class="chip">你</span>' : ''}</td><td data-label="員工編號">${esc(e.no)}</td>
-        <td data-label="權限"><select data-act="role" data-i="${i}" aria-label="${esc(e.name)} 的權限"${e.no === me.no ? ' disabled' : ''}>${Object.entries(ROLES).map(([k, t]) => `<option value="${k}"${k === e.role ? ' selected' : ''}>${t}</option>`).join('')}</select></td>
+      ${S.editors.map((e, i) => `<tr><td data-label="姓名">${esc(e.name)}${e.no === me.no ? '<span class="chip">你</span>' : ''}${e.fixed ? '<span class="chip">網站設定</span>' : ''}</td><td data-label="員工編號">${esc(e.no)}</td>
+        <td data-label="權限"><select data-act="role" data-i="${i}" aria-label="${esc(e.name)} 的權限"${e.no === me.no || e.fixed ? ' disabled' : ''}>${Object.entries(ROLES).map(([k, t]) => `<option value="${k}"${k === e.role ? ' selected' : ''}>${t}</option>`).join('')}</select></td>
         <td data-label="加入時間">${fmt(e.at)}</td>
-        <td><button type="button" class="ed-btn" data-act="rm-editor" data-i="${i}"${e.no === me.no ? ' disabled title="不能移除自己"' : ''}>移除</button></td></tr>`).join('')}
+        <td><button type="button" class="ed-btn" data-act="rm-editor" data-i="${i}"${e.no === me.no ? ' disabled title="不能移除自己"' : e.fixed ? ' disabled title="網站設定裡的主管理員，要請平台組修改 server/owners.json"' : ''}>移除</button></td></tr>`).join('')}
     </tbody></table></div>
     <form class="ed-addform" id="addEditor" novalidate>
       <h2>新增編輯者</h2>
@@ -910,7 +1021,7 @@ function render(keepDraft) {
     return;
   }
   draft = null;
-  app.innerHTML = ({ media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = ({ media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   document.title = '編輯後台｜moonland.ai 說明中心';
 }
@@ -945,6 +1056,11 @@ document.addEventListener('click', (e) => {
     } else if (a === 'logout') {
       if (dirty && !confirm('這頁還有沒儲存的修改，確定要登出嗎？')) return;
       setDirty(false);
+      if (LIVE) {
+        // 只登出本站；公司帳號（SSO）維持登入
+        api('api/auth/logout', { method: 'POST' }).finally(() => { location.href = location.pathname; });
+        return;
+      }
       me = null;
       try { localStorage.removeItem(WHO); } catch (x) {}
       history.replaceState(null, '', location.pathname);
@@ -1019,6 +1135,7 @@ app.addEventListener('submit', (e) => {
   e.preventDefault();
   const f = e.target;
   if (f.id === 'pageForm') { savePage(f); return; }
+  if (f.id === 'restoreForm') { restoreBackup(f); return; }
   if (f.id === 'addEditor') {
     const el = f.elements;
     const no = el.no.value.trim().toUpperCase(), name = el.name.value.trim();
@@ -1029,7 +1146,7 @@ app.addEventListener('submit', (e) => {
     S.editors.push({ no, name, role: el.role.value, at: now() });
     addLog(`新增${ROLES[el.role.value]} ${name}（${no}）`, '', '編輯者名單');
     persist();
-    toast(`已把 ${name} 加入名單。登出後可以用他的身分登入試試。`);
+    toast(LIVE ? `已把 ${name} 加入名單，他用公司帳號登入後就能編輯。` : `已把 ${name} 加入名單。登出後可以用他的身分登入試試。`);
     render();
   }
 });
@@ -1042,10 +1159,36 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('resetDemo').addEventListener('click', () => {
+  if (LIVE) return;
   if (!confirm('要清除這台電腦上所有示範修改、回到說明中心目前的內容嗎？')) return;
   dirty = false;
   try { localStorage.removeItem(STORE); localStorage.removeItem(WHO); } catch (x) {}
   location.href = location.pathname;
 });
 
-render();
+// ---------------------------------------------------------
+// 10. 啟動：伺服器回應 /api/me 就是正式版，否則（GitHub Pages）是示範版
+// ---------------------------------------------------------
+async function boot() {
+  try {
+    const r = await fetch('api/me', { cache: 'no-store' });
+    if (r.ok && (r.headers.get('content-type') || '').includes('json')) LIVE = await r.json();
+  } catch (e) {}
+  document.body.classList.toggle('is-live', !!LIVE);
+  if (!LIVE) loadDemo();
+  else {
+    me = LIVE.user;
+    S = { sections: [], pages: {}, history: {}, log: [], trash: [], editors: [], uploads: {} };
+    if (me && LIVE.role) {
+      try { await loadLive(); }
+      catch (e) { app.innerHTML = '<p class="ed-hint">讀不到網站內容，請重新整理頁面；一直失敗請聯絡平台組。</p>'; return; }
+    }
+  }
+  render();
+}
+// 切回這個分頁時，順便讀一次最新內容（別人可能剛改過）；編輯到一半時不讀
+document.addEventListener('visibilitychange', async () => {
+  if (!LIVE || !LIVE.role || document.hidden || draft || dirty) return;
+  try { await loadLive(); render(); } catch (e) {}
+});
+boot();

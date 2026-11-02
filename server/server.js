@@ -4,6 +4,7 @@
 // - 所有檔案都帶 cache-control: no-cache（每次先問伺服器有沒有更新）
 // - index.html 裡的 css / js 網址改成內容雜湊，部署新版時瀏覽器與 Cloudflare 一定抓新檔
 // - /api/feedback：POST 收回饋（任何人）；GET 讀全部回饋（後台用，見 canReadFeedback）
+// - 編輯後台（公司帳號登入、內容存放、上傳）在 server/editor.js；說明中心的內容從 /content.js 讀
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,16 +36,17 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
 // 啟動時算一次雜湊；每次部署都是新容器，不需要手動改版本號
+// <!-- content --> 到 <!-- /content --> 之間的 data/*.js 換成伺服器產生的 content.js（編輯後台存的內容）
 function loadPage(file) {
   const html = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(
     /(src|href)="([\w./-]+\.(?:css|js))(?:\?v=[^"]*)?"/g,
     (m, attr, f) => `${attr}="${f}?v=${hashOf(f)}"`,
-  );
+  ).replace(/<!-- content -->[\s\S]*?<!-- \/content -->/, '<script src="content.js"></script>');
   return { html, etag: `"${crypto.createHash('sha256').update(html).digest('hex').slice(0, 16)}"` };
 }
 const PAGES = { '/': loadPage('index.html'), '/index.html': loadPage('index.html'), '/admin.html': loadPage('admin.html'), '/edit.html': loadPage('edit.html') };
@@ -122,8 +124,9 @@ function getFeedback(req, res) {
 }
 
 function serveFile(req, res, rel) {
-  const file = path.join(ROOT, rel);
-  if (!file.startsWith(ROOT + path.sep)) return send(res, 404, 'Not found');
+  // 後台上傳的圖片存在 DATA_DIR/media，網址和程式附的圖片一樣是 assets/media/...
+  const file = (rel.startsWith('assets/media/') && editor.uploadedFile(rel.slice(13))) || path.join(ROOT, rel);
+  if (!file.startsWith(ROOT + path.sep) && !file.startsWith(DATA_DIR + path.sep)) return send(res, 404, 'Not found');
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return send(res, 404, 'Not found');
     const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
@@ -157,9 +160,12 @@ function serveFile(req, res, rel) {
   });
 }
 
-const server = http.createServer((req, res) => {
-  let pathname;
-  try { pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return send(res, 400, 'Bad request'); }
+const editor = require('./editor.js')({ ROOT, DATA_DIR, send, sendJson });
+
+const server = http.createServer(async (req, res) => {
+  let pathname, url;
+  try { url = new URL(req.url, 'http://x'); pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Bad request'); }
+  if (await editor.handle(req, res, pathname, url)) return;
 
   if (pathname === '/api/feedback') {
     if (req.method === 'POST') return postFeedback(req, res);

@@ -312,3 +312,9 @@ button.ed-m:hover, button.ed-m:focus-visible { border-color: var(--brand-ic); ou
 .ed-help-sec ul, .ed-help-sec ol { margin: 0; padding-left: 1.3em; }
 .ed-help-sec p { margin: .6em 0; }
 .ed-help-sec .ed-cheat { margin: .4em 0; overflow-x: auto; }
+
+/* 正式版（公司網站）不顯示示範版的提示 */
+.is-live .ed-demo { display: none; }
+.ed-ok { display: flex; align-items: center; gap: 8px; color: var(--ok, inherit); }
+.ed-ok .ic { flex: none; }
+a.ed-btn { text-decoration: none; }
