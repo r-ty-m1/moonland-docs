@@ -36,7 +36,7 @@ window.SECTIONS = [
   { label: '學習資源', rows: [
     { id: 'recipes', t: '應用範例', icon: 'sparkles',
       d: '跟著做就能完成的主題教學：從一個具體成品出發，帶你走完整個流程。',
-      groups: [{ g: '', items: [['chat-recipes', '「交談」應用大全'], ['pvc', 'PVC 公仔風格'], ['logo', 'LOGO 創作'], ['outfit', '人物角色換衣'], ['face-swap', '名畫換臉']] }] },
+      groups: [{ g: '', items: [['chat-recipes', '「交談」應用大全'], ['pvc', 'PVC 公仔風格'], ['logo', 'LOGO 創作'], ['outfit', '人物角色換衣'], ['face-swap', '名畫換臉'], ['storyboard', '分鏡 → 影片', '新']] }] },
     { id: 'models', t: '模型指南', icon: 'layers',
       groups: [
         { g: '先看這篇', items: [['m-choose', '模型怎麼選', '新手']] },
