@@ -67,7 +67,8 @@ function cleanFeedback(b) {
   const page = str(b.page, 80);
   if (page && !/^[\w-]+$/.test(page)) return null;
   const base = { id: crypto.randomUUID(), at: new Date().toISOString(), page, pageTitle: str(b.pageTitle, 120), vid: str(b.vid, 40), lang: b.lang === 'en' ? 'en' : 'zh' };
-  if (b.kind === 'vote' && page && (b.value === 'up' || b.value === 'down')) return { ...base, kind: 'vote', value: b.value };
+  // value 'none'：訪客再點一次取消投票
+  if (b.kind === 'vote' && page && ['up', 'down', 'none'].includes(b.value)) return { ...base, kind: 'vote', value: b.value };
   if (b.kind === 'note' && NOTE_TYPES.includes(b.type) && str(b.message, 2000)) {
     return { ...base, kind: 'note', type: b.type, message: str(b.message, 2000), contact: str(b.contact, 120) };
   }

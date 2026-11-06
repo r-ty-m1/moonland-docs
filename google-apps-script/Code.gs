@@ -2,7 +2,7 @@
 // 安裝步驟見同資料夾的 README.md。改了這個檔案要在 Apps Script 重新「部署 → 管理部署作業 → 編輯 → 新版本」。
 //
 // 說明中心送來兩種資料（POST，內容是 JSON）：
-//   { kind: 'vote', page, pageTitle, value: 'up'|'down', vid, lang }
+//   { kind: 'vote', page, pageTitle, value: 'up'|'down'|'none', vid, lang }（none＝取消投票）
 //   { kind: 'note', type, page, pageTitle, message, contact, vid, lang }
 // 後台讀取：POST { action: 'list', token }，token 要等於指令碼屬性 ADMIN_TOKEN。
 
@@ -56,7 +56,8 @@ function clean(b) {
     id: Utilities.getUuid(), at: new Date().toISOString(), page: page,
     pageTitle: str(b.pageTitle, 120), vid: str(b.vid, 40), lang: b.lang === 'en' ? 'en' : 'zh',
   };
-  if (b.kind === 'vote' && page && (b.value === 'up' || b.value === 'down')) {
+  // value 'none'：訪客再點一次取消投票
+  if (b.kind === 'vote' && page && (b.value === 'up' || b.value === 'down' || b.value === 'none')) {
     base.kind = 'vote'; base.value = b.value;
     return base;
   }

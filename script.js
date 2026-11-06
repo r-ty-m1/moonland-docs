@@ -347,13 +347,14 @@ document.addEventListener('click', async (e) => {
   }
   const fb = e.target.closest('.feedback button');
   if (fb) {
-    if (fb.getAttribute('aria-pressed') === 'true') return;
+    // 再點一次已選的按鈕＝取消；送出 value: 'none'，後台只算每個人最後一次，取消後就不計票
+    const undo = fb.getAttribute('aria-pressed') === 'true';
     fb.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false'));
-    fb.setAttribute('aria-pressed', 'true');
+    if (!undo) fb.setAttribute('aria-pressed', 'true');
     const id = currentId(), up = fb.dataset.vote === 'up';
     const msg = fb.parentElement.querySelector('.fb-thanks');
-    msg.innerHTML = up ? T('謝謝你的回饋！') : `${T('謝謝！')}<a href="#feedback" data-fb-from="${id}">${T('告訴我們哪裡需要改進 →')}</a>`;
-    if (await sendFeedback({ kind: 'vote', page: id, pageTitle: PAGES[id].t, value: fb.dataset.vote }) === 'failed') msg.textContent = T('送出失敗，請稍後再試。');
+    msg.innerHTML = undo ? T('已取消') : up ? T('謝謝你的回饋！') : `${T('謝謝！')}<a href="#feedback" data-fb-from="${id}">${T('告訴我們哪裡需要改進 →')}</a>`;
+    if (await sendFeedback({ kind: 'vote', page: id, pageTitle: PAGES[id].t, value: undo ? 'none' : fb.dataset.vote }) === 'failed') msg.textContent = T('送出失敗，請稍後再試。');
     return;
   }
   const from = e.target.closest('[data-fb-from]');

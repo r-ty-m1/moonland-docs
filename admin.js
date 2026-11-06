@@ -82,10 +82,10 @@ function askToken(wrong) {
 // ---------- 統計 ----------
 function stats() {
   const notes = entries.filter((e) => e.kind === 'note');
-  // 同一個人對同一篇改過票時，只算最後一次
+  // 同一個人對同一篇改過票時，只算最後一次；最後一次是取消（none）就不計
   const latest = new Map();
   entries.filter((e) => e.kind === 'vote').forEach((v) => latest.set(`${v.vid || v.id}|${v.page}`, v));
-  const votes = [...latest.values()];
+  const votes = [...latest.values()].filter((v) => v.value === 'up' || v.value === 'down');
   const pages = new Map();
   const row = (id, title) => {
     if (!pages.has(id)) pages.set(id, { id, title: title || SITE[id] || id, up: 0, down: 0, notes: 0 });
