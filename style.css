@@ -5,16 +5,16 @@
    ========================================================= */
 
 :root {
-  /* 深色（預設） */
-  --bg: #0a0d0b;
-  --surface: #0f1311;
-  --raised: #151a17;
-  --hover: #19201c;
-  --line: #222a26;
-  --line-strong: #303a35;
-  --fg: #e9efeb;
-  --fg-2: #b8c3bd;
-  --muted: #7d8983;
+  /* 深色（預設）：底色照平台（2026-11-06）：內容區 #09090b、版頭與側欄 #18181b、選取 #27272a */
+  --bg: #09090b;
+  --surface: #18181b;
+  --raised: #1f1f23;
+  --hover: #27272a;
+  --line: #27272a;
+  --line-strong: #3a3a3f;
+  --fg: #ececee;
+  --fg-2: #bcbcc3;
+  --muted: #8b8b94;
   --brand: #00ff6a;            /* logo 的綠 */
   --brand-ic: #00ff6a;         /* 圖示、標記、強調字 */
   --accent: #46f791;           /* 連結 */
@@ -28,7 +28,7 @@
   --coin-soft: rgba(146, 108, 255, 0.18);
   --coin-ink: #c7b4ff;
   --coin-line: rgba(160, 125, 255, 0.5);
-  --shot: #121815;
+  --shot: #141416;
   --overlay: rgba(0, 0, 0, 0.6);
   --logo-on-dark: inline-block;
   --logo-on-light: none;
@@ -152,7 +152,7 @@ kbd { font-family: var(--mono); font-size: 0.6875rem; }
 .icon-btn.sm { width: 32px; height: 32px; }
 .nav-btn .m-only { display: none; }
 
-.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg); margin-left: 4px; }
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg); margin-left: 4px; flex: none; }  /* 不被擠小，空間不夠時改由搜尋框縮短 */
 .logo { height: 21px; width: auto; object-fit: contain; object-position: left center; }  /* 窄螢幕被擠時等比縮小，不壓扁 */
 .logo-on-dark { display: var(--logo-on-dark); }
 .logo-on-light { display: var(--logo-on-light); }
@@ -163,7 +163,7 @@ kbd { font-family: var(--mono); font-size: 0.6875rem; }
 }
 
 .search-pill {
-  flex: 0 1 440px; margin-inline: auto;
+  flex: 0 1 440px; min-width: 0; margin-inline: auto;
   display: flex; align-items: center; gap: 10px;
   height: 40px; padding: 0 10px 0 14px;
   border: 1px solid var(--line); border-radius: 12px;
@@ -173,9 +173,10 @@ kbd { font-family: var(--mono); font-size: 0.6875rem; }
 .search-pill:hover { border-color: var(--line-strong); color: var(--fg-2); }
 .search-pill .sp-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-pill kbd { border: 1px solid var(--line-strong); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+@media (max-width: 1080px) { .search-pill kbd { display: none; } }  /* 版頭變窄時讓位給搜尋文字 */
 [data-icon] { display: inline-grid; place-items: center; }
 
-.top-links { display: flex; gap: 18px; font-size: 0.875rem; margin-right: 4px; }
+.top-links { display: flex; gap: 18px; font-size: 0.875rem; margin-right: 4px; flex: none; }
 .top-links a { color: var(--fg-2); text-decoration: none; white-space: nowrap; }
 .top-links a:hover { color: var(--fg); }
 
