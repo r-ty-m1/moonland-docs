@@ -18,11 +18,12 @@
   --fg-2: #d4d4d8;             /* 平台 chart-1，介於主文字與灰字之間 */
   --muted: #9f9fa9;
   --brand: #00ff6a;            /* logo 的綠（logo 圖檔的顏色，不改） */
-  --brand-ic: #2bfd82;         /* 圖示、標記、強調字：平台 primary */
-  --accent: #2bfd82;           /* 連結：平台 primary */
-  --accent-ink: #9dfcc5;       /* 綠底上的文字 */
-  --accent-soft: rgba(43, 253, 130, 0.1);
-  --accent-line: rgba(43, 253, 130, 0.35);
+  /* 文字用的綠：平台 primary #2bfd82 在黑底上太亮、讀起來吃力（使用者 2026-11-06），改用同色系較柔和的綠 */
+  --brand-ic: #4ade80;         /* 圖示、標記、強調字 */
+  --accent: #4ade80;           /* 連結 */
+  --accent-ink: #86efac;       /* 綠底上的文字 */
+  --accent-soft: rgba(74, 222, 128, 0.1);
+  --accent-line: rgba(74, 222, 128, 0.35);
   --warn-soft: rgba(255, 185, 0, 0.12);   /* 平台 warning #ffb900 */
   --warn-ink: #ffc933;
   --warn-line: rgba(255, 185, 0, 0.4);
@@ -350,9 +351,9 @@ a.nav-row[aria-current="page"] .ic, .cat-row.cur .cat-link .ic, .cat-row.in .cat
 /* 付費（登月幣）：紫色，比一般標籤醒目 */
 .chip.paid, .tag.paid { border: 1px solid var(--coin-line); background: var(--coin-soft); color: var(--coin-ink); font-weight: 700; }
 .sub-label.paid { color: var(--coin-ink); font-weight: 700; }
-/* {{最常用}}：放在標題或表格的模型名稱後面 */
-.chip.pick { margin-left: 6px; padding: 1px 8px; vertical-align: 0.15em; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-ink); font-size: 0.75rem; font-weight: 700; line-height: 1.5; letter-spacing: 0; white-space: nowrap; }
-.chip.pick::before { content: "★ "; }
+/* {{最常用}}：放在標題或表格的模型名稱後面；低調的小字，不用底色和外框 */
+.chip.pick { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.75rem; font-weight: 500; line-height: 1; letter-spacing: 0; white-space: nowrap; vertical-align: 0.1em; }
+.chip.pick::before { content: "★"; margin-right: 2px; color: var(--brand-ic); }
 
 .callout {
   margin: 1.4em 0; padding: 14px 18px;

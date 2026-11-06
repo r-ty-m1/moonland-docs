@@ -89,7 +89,14 @@ function setOpen(cat, open) {
 }
 side.addEventListener('click', (e) => {
   const b = e.target.closest('.cat-toggle');
-  if (b) { const c = b.closest('.nav-cat'); setOpen(c, !c.classList.contains('open')); }
+  if (b) { const c = b.closest('.nav-cat'); setOpen(c, !c.classList.contains('open')); return; }
+  // 整條分類列（圖示、文字）也能收合：已展開時點一下就收起來，不換頁；
+  // 收起後又點同一個分類（網址沒變，不會重新整理頁面），直接展開
+  const link = e.target.closest('.cat-link');
+  if (!link) return;
+  const c = link.closest('.nav-cat');
+  if (c.classList.contains('open')) { e.preventDefault(); setOpen(c, false); }
+  else if (location.hash === link.getAttribute('href')) { e.preventDefault(); setOpen(c, true); }
 });
 
 // ---------------------------------------------------------

@@ -447,7 +447,7 @@ ControlNet 會把參考圖轉成特定格式的**控制草圖**，和提示詞�
 
 :::steps
 @ 選擇模型
-找到「ACE Step 1.5 XL」。其他模型的差異請看[音樂模型比較](#m-music)。
+找到「ACE Step 1.5 XL」。其他模型的差異請看[點數音樂模型](#m-music)。
 [i 104]
 
 @ 填寫歌詞
@@ -1102,7 +1102,7 @@ MiniMax H3 的兩個登月幣版本，都能用多種參考素材（圖片、影
 | MiniMax H3 Max | 強化版，支援同步聲音 |
 | MiniMax H3 Max Turbo | 高速版，費用約一半；已補上「參考」素材用途，功能和 Max 一樣齊全 |
 
-參考素材的用法和點數版的 MiniMax H3 相同，請看[影片模型比較](#m-video)。
+參考素材的用法和點數版的 MiniMax H3 相同，請看[點數影片模型](#m-video)。
 
 ## Topaz Starlight（Precise 2.6／Mini） {#h-topaz-starlight}
 
@@ -1138,7 +1138,7 @@ Topaz Labs 的影片**放大與修復**工具，**不能生成新影片**，只�
 | --- | --- | --- | --- |
 | [ElevenLabs Music v2.5](#h-elevenlabs) | ElevenLabs | 用一般的話描述曲風、歌詞，生成完整的歌曲或純音樂 | 20 |
 
-想先用點數試試，請看[音樂生成](#music)和[音樂模型比較](#m-music)。
+想先用點數試試，請看[音樂生成](#music)和[點數音樂模型](#m-music)。
 ### ElevenLabs Music v2.5 {#h-elevenlabs}
 
 用一般的話描述曲風、情緒、樂器，就能生成**完整的歌曲或純音樂**。

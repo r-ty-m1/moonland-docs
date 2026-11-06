@@ -40,7 +40,7 @@ window.SECTIONS = [
     { id: 'models', t: '模型指南', icon: 'layers',
       groups: [
         { g: '先看這篇', items: [['m-choose', '模型怎麼選', '新手']] },
-        { g: '點數模型', items: [['m-image', '圖片模型一覽'], ['m-video', '影片模型比較'], ['m-music', '音樂模型比較']] },
+        { g: '點數模型', items: [['m-image', '點數圖片模型'], ['m-video', '點數影片模型'], ['m-music', '點數音樂模型']] },
         { g: '登月幣模型', items: [['credit-image', '登月幣圖片模型', '付費'], ['credit-video', '登月幣影片模型', '付費'], ['credit-music-3d', '登月幣音樂與 3D', '付費']] },
       ] },
   ] },
