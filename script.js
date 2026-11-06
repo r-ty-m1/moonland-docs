@@ -54,7 +54,9 @@ const root = document.documentElement;
 const side = document.getElementById('side');
 const view = document.getElementById('view');
 const toc = document.getElementById('toc');
-const tagHtml = (tag) => (tag ? `<span class="tag">${esc(tag)}</span>` : '');
+// 「付費」用金色，和一般標籤（新手等）分開
+const PAID = '付費';
+const tagHtml = (tag) => (tag ? `<span class="tag${tag === PAID ? ' paid' : ''}">${esc(tag)}</span>` : '');
 
 function navRow(r) {
   if (!r.groups) {
@@ -62,7 +64,7 @@ function navRow(r) {
   }
   const many = r.groups.length > 1;
   const kids = r.groups.map((g) =>
-    (many && g.g ? `<div class="sub-label">${esc(g.g)}</div>` : '') +
+    (many && g.g ? `<div class="sub-label${g.items.some((x) => x[2] === PAID) ? ' paid' : ''}">${esc(g.g)}</div>` : '') +
     g.items.map(([id, n, tag]) => `<a class="nav-child" href="#${id}" data-id="${id}"><span>${esc(n)}</span>${tagHtml(tag)}</a>`).join('')
   ).join('');
   return `<div class="nav-cat" data-cat="${r.id}">
@@ -112,10 +114,10 @@ function metaHtml(a) {
 }
 
 function articleList(c) {
-  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || T('這個分類的文章'))}</h2><div class="list">` +
+  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || T('這個分類的文章'))}${g.items.some((x) => x[2] === PAID) ? ` <span class="chip paid">${PAID}</span>` : ''}</h2><div class="list">` +
     g.items.map(([aid, n, tag]) => {
       const a = ARTICLES[aid] || {};
-      return `<a class="list-row" href="#${aid}"><span class="list-t"><b>${esc(a.t || n)}</b>${a.d ? `<small>${esc(a.d)}</small>` : ''}</span>${tag ? `<span class="chip brand">${esc(tag)}</span>` : ''}${ic('chev', 'ic chev')}</a>`;
+      return `<a class="list-row" href="#${aid}"><span class="list-t"><b>${esc(a.t || n)}</b>${a.d ? `<small>${esc(a.d)}</small>` : ''}</span>${tag ? `<span class="chip ${tag === PAID ? 'paid' : 'brand'}">${esc(tag)}</span>` : ''}${ic('chev', 'ic chev')}</a>`;
     }).join('') + `</div>`).join('');
 }
 

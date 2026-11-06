@@ -22,10 +22,11 @@
 | `data/media.js` | 媒體編號 → 檔名與寬高比的對照表 |
 | `assets/media/` | 所有圖片（WebP）、影片（MP4）、音訊（MP3），依區域分資料夾（見下方「圖片與影片」） |
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
+| `data/drafts.js` | 還沒公開的草稿（`window.DRAFTS`）。只有編輯後台載入，說明中心看不到；格式和文章一樣，另外用 `in`、`after` 指定位置 |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
 | `server/` | 公司內部部署用的小型伺服器（`server.js`：檔案、回饋；`editor.js`：編輯後台的公司帳號登入、內容存放、上傳、備份；`owners.json`：主管理員的員工編號）與自動測試 `test.js`（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
-| `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改／刪除／排序頁面、上傳圖片、圖庫、版本紀錄、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改／刪除／排序頁面、上傳圖片、草稿箱、圖庫、版本紀錄、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 | `docs/MAINTENANCE.md` | 維護手冊：給網站負責人與平台組，含發布與回復、問題排查、上線前清單 |
 
@@ -131,7 +132,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261102a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261106b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -159,6 +160,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 - **誰能編輯**：`server/owners.json` 的員工編號永遠是主管理員（不能在後台移除，改了要重新部署）；其他人由主管理員在「編輯者名單」新增。權限判斷都在伺服器。
 - **內容存在伺服器**：`DATA_DIR`（部署時是 `/app/storage`，`vibe.yaml` 的 persistence）裡的 `content.json`。第一次啟動時從 `data/*.js` 複製；之後說明中心讀伺服器產生的 `/content.js`（`index.html` 裡 `<!-- content -->` 那段會被換掉），存檔後立刻生效。
 - **上傳圖片**：瀏覽器先縮到 1600px 寬、轉成 WebP，伺服器依命名規則取檔名（`區域/文章代號-序號.webp`）、給新編號，存在 `DATA_DIR/media/`，網址和程式附的圖片一樣是 `assets/media/...`。目前只能傳圖片。
+- **草稿**：頁面勾選「草稿，先不公開」就只在後台看得到（`draft: true`，`model.js` 的 `toSite` 會跳過），全部列在「草稿箱」分頁。公開的頁面連到草稿，儲存時會提醒。
 - **儲存前檢查**：儲存單頁時檢查缺圖與壞連結（`model.js`），「檢查與備份」分頁可以檢查全站。
 - **兩人同時修改**：每次存檔都帶版本號，版本不對伺服器回 409，後台會載入最新內容、請使用者再做一次（正在編輯的文字會保留）。
 - **備份**：「檢查與備份」分頁下載整個網站（內容＋上傳的圖片）的 JSON 檔；主管理員可以用它還原。persistence 不是備份。

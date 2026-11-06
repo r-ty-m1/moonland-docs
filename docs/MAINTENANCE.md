@@ -44,7 +44,7 @@ server/server.js（Node 22，只用內建模組）
         │
         ▼
      DATA_DIR（部署時 /app/storage，vibe.yaml 的 persistence）
-        ├─ content.json     目錄、頁面、版本紀錄、修改紀錄、最近刪除、編輯者名單
+        ├─ content.json     目錄、頁面（含草稿）、版本紀錄、修改紀錄、最近刪除、編輯者名單
         ├─ media.json       後台上傳的圖片對照表；檔案在 media/<區域>/<文章代號>-<序號>.webp
         ├─ session-secret   登入 cookie 的簽章金鑰（自動產生，刪掉會讓所有人登出）
         └─ feedback.jsonl   回饋（沒用 Google 試算表時）
@@ -52,6 +52,7 @@ server/server.js（Node 22，只用內建模組）
 
 ### 內容以伺服器為準（重要）
 - 伺服器**第一次啟動**（`DATA_DIR` 裡沒有 `content.json`）時，把程式附的 `data/*.js` 複製成 `content.json`。之後說明中心只讀 `content.json`。
+- 草稿（後台勾選「草稿，先不公開」的頁面）也存在 `content.json`，說明中心看不到。程式附的初始草稿在 `data/drafts.js`，伺服器不對外提供這個檔案。
 - 所以上線後**改 `data/*.js` 不會影響公司網站**，內容一律在編輯後台改。`data/*.js` 只是初始內容，也是 GitHub Pages 預覽版的內容。
 - 要讓公司網站整個回到 `data/*.js` 的內容：先在後台下載備份，再請平台組刪掉 `DATA_DIR/content.json` 並重啟容器。
 

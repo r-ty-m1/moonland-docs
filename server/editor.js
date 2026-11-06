@@ -42,14 +42,14 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
     const order = ['media.js', 'snippets.js', ...files.filter((f) => !['media.js', 'snippets.js', 'sections.js'].includes(f)).sort(), 'sections.js'];
     for (const f of order) if (files.includes(f)) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
-    return { MEDIA: ctx.MEDIA || {}, ARTICLES: ctx.ARTICLES || {}, SECTIONS: ctx.SECTIONS || [] };
+    return { MEDIA: ctx.MEDIA || {}, ARTICLES: ctx.ARTICLES || {}, SECTIONS: ctx.SECTIONS || [], DRAFTS: ctx.DRAFTS || {} };
   }
   const site = loadSiteData();
   const BASE_MEDIA = site.MEDIA;
 
   let C = readJson('content.json');
   if (!C || !Array.isArray(C.sections)) {
-    C = { rev: 1, savedAt: new Date().toISOString(), ...Model.fromSite(site.ARTICLES, site.SECTIONS), history: {}, log: [], trash: [], editors: [] };
+    C = { rev: 1, savedAt: new Date().toISOString(), ...Model.fromSite(site.ARTICLES, site.SECTIONS, site.DRAFTS), history: {}, log: [], trash: [], editors: [] };
     writeJson('content.json', C);
   }
   let uploads = readJson('media.json') || {};

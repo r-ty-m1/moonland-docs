@@ -124,7 +124,8 @@ const base = `http://127.0.0.1:${PORT}`;
 
     const st = await (await owner('/api/editor/state')).json();
     assert.ok(st.editors.some((e) => e.no === 'T0001' && e.fixed), '主管理員登入後要出現在名單上');
-    const put = (who, body, headers = {}) => who('/api/editor/state', { method: 'PUT', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    assert.equal((await fetch(base + '/data/drafts.js')).status, 404, '草稿檔不對外提供');
+    const put =(who, body, headers = {}) => who('/api/editor/state', { method: 'PUT', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
     const doc = (s, extra) => ({ rev: s.rev, sections: s.sections, pages: s.pages, history: s.history, log: s.log, trash: s.trash, editors: s.editors, ...extra });
     assert.equal((await put(owner, doc(st), { 'x-ml-editor': '' })).status, 403, '沒有後台標頭的寫入要被拒絕');
     assert.equal((await put(owner, doc(st, { rev: st.rev - 1 }))).status, 409, '版本不對要回 409');
@@ -132,11 +133,14 @@ const base = `http://127.0.0.1:${PORT}`;
     broken[0].rows.push({ id: 'no-such-page' });
     assert.equal((await put(owner, doc(st, { sections: broken }))).status, 400, '目錄指到不存在的頁面要被拒絕');
     st.pages['quick-start'].t = '測試標題 ABC';
+    st.pages.gallery.draft = true;   // 草稿：後台看得到，說明中心看不到
     st.editors.push({ no: 'T0002', name: '測試編輯', role: 'editor', at: new Date().toISOString() });
     const saved = await put(owner, doc(st));
     assert.equal(saved.status, 200);
     st.rev = (await saved.json()).rev;
-    assert.match(await (await fetch(base + '/content.js')).text(), /測試標題 ABC/, '存檔後 content.js 要馬上更新');
+    const pub = await (await fetch(base + '/content.js')).text();
+    assert.match(pub, /測試標題 ABC/, '存檔後 content.js 要馬上更新');
+    assert.ok(!pub.includes('"gallery"'), '草稿不該出現在說明中心');
 
     // 編輯者不能改名單
     const editor = as(await login('T0002', '測試編輯'));

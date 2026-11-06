@@ -7,11 +7,13 @@
 //   SECTIONS：[{ label, rows: [{ id, icon, n?, tag? } | { id, t, icon, d?, tag?, groups: [{ g, items: [[代號, 目錄名稱, 標籤?]] }] }] }]
 // 編輯後台存的形狀：
 //   sections：[{ label, rows: [{ id, groups?: [{ g, items: [代號] }] }] }]
-//   pages：{ 代號: { t, n, d, tag, icon, level, minutes, models（逗號分隔）, tool, body, system?, isNew? } }
+//   pages：{ 代號: { t, n, d, tag, icon, level, minutes, models（逗號分隔）, tool, body, system?, isNew?, draft? } }
+// 草稿（draft: true）留在目錄裡原本的位置，但說明中心看不到（toSite 會跳過）
+// 程式附的草稿在 data/drafts.js（DRAFTS），只有編輯後台載入
 // =========================================================
 (function (root) {
   // 說明中心 → 編輯後台
-  function fromSite(A, SECTIONS) {
+  function fromSite(A, SECTIONS, DRAFTS) {
     const pages = {};
     const extra = (a) => ({ level: a.level || '', minutes: a.minutes ? String(a.minutes) : '', models: (a.models || []).join(', '), tool: a.tool || '', body: (a.body || '').replace(/^\n+/, '') });
     const sections = SECTIONS.map((sec) => ({
@@ -32,6 +34,18 @@
         return { id: r.id };
       }),
     }));
+    // 草稿：in 是分類代號（放進那個分類的第一組）或 s0、s1…（直接列在第幾個大分類）；after 是放在哪一頁後面
+    for (const [id, a] of Object.entries(DRAFTS || {})) {
+      if (pages[id]) continue;
+      pages[id] = { t: a.t || id, n: a.n || '', d: a.d || '', tag: a.tag || '', icon: a.icon || '', ...extra(a), draft: true };
+      const top = /^s(\d+)$/.exec(a.in || '');
+      const cat = !top && sections.flatMap((s) => s.rows).find((r) => r.id === a.in && r.groups);
+      const arr = cat ? cat.groups[0].items : (sections[top ? +top[1] : sections.length - 1] || sections[0]).rows;
+      const at = arr.findIndex((x) => (typeof x === 'string' ? x : x.id) === a.after);
+      const item = cat ? id : { id };
+      if (at >= 0) arr.splice(at + 1, 0, item); else arr.push(item);
+      if (!cat) pages[id].icon = pages[id].icon || 'file';
+    }
     return { sections, pages };
   }
 
@@ -49,19 +63,20 @@
       a.body = `\n${p.body || ''}\n`;
       return a;
     };
+    const live = (id) => pages[id] && !pages[id].draft;
     const SECTIONS = sections.map((sec) => ({
       label: sec.label,
-      rows: sec.rows.map((r) => {
-        const p = pages[r.id] || { t: r.id };
+      rows: sec.rows.filter((r) => live(r.id)).map((r) => {
+        const p = pages[r.id];
         if (r.groups) {
           const row = { id: r.id, t: p.t, icon: p.icon || 'folder' };
           if (p.d) row.d = p.d;
           if (p.tag) row.tag = p.tag;
-          row.groups = r.groups.map((g) => ({ g: g.g, items: g.items.filter((id) => pages[id]).map((id) => {
+          row.groups = r.groups.map((g) => ({ g: g.g, items: g.items.filter(live).map((id) => {
             const q = pages[id];
             ARTICLES[id] = article(q);
             return q.tag ? [id, q.n || q.t, q.tag] : [id, q.n || q.t];
-          }) }));
+          }) })).filter((g, i, all) => g.items.length || (i === 0 && all.every((x) => !x.items.length)));
           // 分類頁本身有內文（例如「模型指南」）才算一篇文章
           if (p.body) ARTICLES[r.id] = article(p);
           return row;
@@ -83,8 +98,12 @@
     body = String(body || '');
     const media = [...new Set([...body.matchAll(/\[(?:i|v|a)\s+(\d+)/g)].map((m) => m[1]).filter((n) => !MEDIA[n]))];
     if (media.length) out.push(`找不到媒體編號 ${media.join('、')}`);
-    const links = [...new Set([...body.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]).filter((k) => (k.startsWith('h-') ? !body.includes(`{#${k}}`) : !(k === 'home' || k === id || pages[k]))))];
+    const ids = [...new Set([...body.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]))];
+    const links = ids.filter((k) => (k.startsWith('h-') ? !body.includes(`{#${k}}`) : !(k === 'home' || k === id || pages[k])));
     if (links.length) out.push(`這些連結找不到目標：${links.map((k) => `#${k}`).join('、')}`);
+    // 公開的頁面連到草稿，讀者會點到找不到的頁面
+    const drafts = pages[id] && pages[id].draft ? [] : ids.filter((k) => k !== id && pages[k] && pages[k].draft);
+    if (drafts.length) out.push(`這些連結指到還沒公開的草稿：${drafts.map((k) => `#${k}`).join('、')}`);
     return out;
   }
 

@@ -547,5 +547,6 @@ window.MEDIA = {
 590:["models/m-image-32.webp",0.7671],
 591:["models/m-image-59.webp",0.7671],
 592:["models/m-image-58.webp",0.7671],
-593:["models/m-image-60.webp",0.7671]
+593:["models/m-image-60.webp",0.7671],
+594:["lab/credit-tools-01.webp",0.9584],
 };

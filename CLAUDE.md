@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261102a`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261106b`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -26,7 +26,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。`config.js` 的 `googleScriptUrl` 有值就 POST 到 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）；沒值就 POST 到 `api/feedback`，伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
-- 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
+- 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份；草稿（`draft: true`）只在後台「草稿箱」看得到，`toSite` 會跳過，初始草稿在 `data/drafts.js`（index.html 不載入、伺服器不對外提供）。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
 
 ## 部署到公司內部（尚未推送）
 
@@ -51,6 +51,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - Notion 之後會關閉。所有媒體已搬進網站，文章不再連 Notion。Notion 原始檔（三個 zip 和 manifest）在使用者電腦的「下載」資料夾，預計搬到 `F:\RD\Moonland\moonland-media` 保存。
 - 前後比較（2026-10-30 起）改用網站內建的 `:::compare` 區塊（`markup.js` 的 `compare()`，拖曳程式也在 `markup.js`），圖片編號 585–593（`models/m-image-*`）。原本嵌入的外部工具 `Image_Compare`（使用者另一個 GitHub 公開專案，用 GitHub Token 從瀏覽器上傳圖片）已不再使用，使用者認為不安全；不要再嵌入它。編輯後台有「前後比較」按鈕可插入。
 - 「登月幣工具」頁在 Notion 原稿是空的，內容待使用者補。
+- **登月幣模型**（2026-11-06 使用者確認）：GPT Image、Kling、Seedance、MiniMax H3 Max／Max Turbo、FLUX 3 Image（FLUX.3 Image Klein 才是點數版；MiniMax H3 與 H3 Turbo 是點數版）等用登月幣計費，**不能寫進點數模型的頁面**（圖片模型一覽、影片模型比較、模型指南）。2026-11-06 使用者同意：模型介紹都在「學習資源 › 模型指南」，用小標分「先看這篇／點數模型／登月幣模型」；登月幣頁的目錄項目帶標籤「付費」（`script.js` 的 `PAID`，顯示成金色 `.tag.paid`／`.chip.paid`，所在小標也變金色）；登月幣頁 `credit-image`、`credit-video`、`credit-music-3d`（文章在 `data/lab.js`）放在付費小標下，`credit-tools` 登月幣怎麼用放在「開始使用」的「點數與登月幣」後面。創作工具裡不再有登月幣分類。使用者不要放草稿箱，但要補完圖片才推送。模型清單是使用者從平台「選擇生成工具」（篩選月亮圖示）複製的 HTML 整理而來；月亮數字＝每張／每次大約花幾枚登月幣。點數模型的預估點數也照平台清單補在各總覽表。免費帳號每日 1,000 點；登月幣 1 元 = 1 枚、最少 1,000、無期限、每次加值附一年進階權益；價目表 https://moonland.ai/pricing。
 - 多圖編輯的張數上限，Notion 原稿有 3 張和 9 張兩種說法，網站目前寫 9 張，待使用者確認。
 - 手機上看截圖裡的介面文字會很小，只能點圖放大；若要改善，需要重新截放大局部的圖。
 - 網站有加 `noindex`，不讓搜尋引擎收錄。

@@ -36,7 +36,7 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?!drafts\.js$)[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 

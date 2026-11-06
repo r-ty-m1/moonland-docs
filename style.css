@@ -333,6 +333,9 @@ a.nav-row[aria-current="page"] .ic, .cat-row.cur .cat-link .ic, .cat-row.in .cat
 }
 .chip.brand { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); }
 .chip.todo { border-color: transparent; background: var(--warn-soft); color: var(--warn-ink); }
+/* 付費（登月幣）：金色，比一般標籤醒目 */
+.chip.paid, .tag.paid { border: 1px solid var(--warn-line); background: var(--warn-soft); color: var(--warn-ink); font-weight: 700; }
+.sub-label.paid { color: var(--warn-ink); font-weight: 700; }
 
 .callout {
   margin: 1.4em 0; padding: 14px 18px;

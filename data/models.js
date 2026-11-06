@@ -7,15 +7,20 @@
   body: `
 同樣的提示詞，換一個模型結果可能完全不同。先用下表找到適合的模型，再點進各篇看實際比較。
 
+:::note 下面都是用點數的模型
+每天免費的點數就能用。用登月幣的付費模型（例如 GPT Image、Kling、Seedance）請看[登月幣圖片模型](#credit-image)、[登月幣影片模型](#credit-video)、[登月幣音樂與 3D](#credit-music-3d)；點數和登月幣的差別請看[點數與登月幣](#credits)。
+:::
+
 ## 圖片
 
 | 我想要… | 建議模型 |
 | --- | --- |
 | 寫實照片、產品圖、廣告視覺 | FLUX.2、Krea 2、FLUX.1 |
+| 電影感、自然光影的寫實畫面 | P-H3-Image、Krea 2 |
 | 中文理解好、人物自然 | Z-Image |
 | 海報、LOGO、圖片裡要有文字 | Ideogram 4、Qwen Image |
 | 修改既有圖片 | Fibo 2.0、Qwen Image Edit、FLUX.2 [Klein] |
-| 參考圖延續角色或產品 | FLUX.3 Image Klein、Qwen Image 2.1 |
+| 參考圖延續角色或產品 | FLUX.3 Image Klein、Qwen Image 2.1、P-H3-Image |
 | 動漫角色、插畫 | Anima、Illustrious、NoobAI XL |
 | 獸人、奇幻生物、卡通 | Pony Diffusion V6 XL |
 | 搭配 LoRA／ControlNet 自由調整 | Stable Diffusion XL |
@@ -27,6 +32,7 @@
 | 我想要… | 建議模型 |
 | --- | --- |
 | 用多張參考圖、影片、音訊維持一致性 | MiniMax H3 |
+| 先快速試動作和構圖，再做正式版 | MiniMax H3 Turbo |
 | 頭尾幀、生成音訊，較省點數且畫質較高 | LTX 2.5 |
 | 套用特效 LoRA（例如地球縮放、德式背摔） | Wan 2.2 |
 | 讓角色模仿影片動作 | Wan Animate 2、SCAIL 2 |
@@ -99,7 +105,7 @@
 
 'm-image': {
   t: '圖片模型一覽', level: '進階', minutes: 10,
-  d: '17 款圖片模型的特色、強項與適用情境，並用同一組提示詞實際比較。',
+  d: '18 款圖片模型的特色、強項與適用情境，並用同一組提示詞實際比較。',
   src: '3fe55cb6aede803884dccd1ff6ab49ab',
   body: `
 生成結果總是不太對？除了提示詞，**選對模型**也是關鍵。這篇整理 moonland.ai 上的圖片模型，從特色、強項、適用情境到實際效果一次比較。
@@ -131,25 +137,28 @@
 
 ## 總覽
 
-| 模型 | 擅長 | 擴充功能 |
-| --- | --- | --- |
-| [Stable Diffusion XL](#h-sdxl) | 寫實、角色插畫、概念藝術 | LoRA、ControlNet、Embedding、負面提示詞 |
-| [Krea 2](#h-krea) | 攝影感、電影感、藝術風格 | LoRA |
-| [Z-Image](#h-zimage) | 中文理解、人物、多元風格 | LoRA、ControlNet |
-| [Ideogram 4](#h-ideogram) | 文字生成、平面設計 | － |
-| [Fibo 2.0](#h-fibo) | 圖片編輯（不支援文生圖） | － |
-| [FLUX.3 Image Klein](#h-flux3) | 生成與編輯、多張參考圖 | 參考圖片、LoRA |
-| [FLUX.2](#h-flux2) | 產品攝影、商業視覺 | 參考圖片、編輯、LoRA |
-| [FLUX.2 [Klein]](#h-flux2k) | 快速生成與編輯、換裝 | 編輯、LoRA |
-| [FLUX.1](#h-flux1) | 寫實人物、生活攝影 | LoRA、ControlNet |
-| [Qwen Image](#h-qwen) | 文字排版、海報、資訊圖表 | LoRA、ControlNet |
-| [Qwen Image 2.1](#h-qwen21) | 參考圖輔助生成 | 參考圖片、LoRA |
-| [Qwen Image Edit](#h-qwenedit) | 依文字指令編輯圖片 | LoRA（必須提供參考圖） |
-| [Anima](#h-anima) | 動漫角色、插畫 | LoRA |
-| [Illustrious](#h-illustrious) | 高品質動漫插畫、服裝細節 | LoRA、ControlNet、Embedding |
-| [NoobAI XL](#h-noobai) | 二次元角色、多樣畫風 | LoRA、ControlNet、Embedding |
-| [Pony Diffusion V6 XL](#h-pony) | 獸人、奇幻生物、卡通 | LoRA、ControlNet、Embedding |
-| [Lumina](#h-lumina) | 概念藝術、視覺實驗 | LoRA |
+在「選擇生成工具」點錢幣圖示「**點數**」，就只會列出用點數的模型。最後一欄是用預設設定生成一張圖大約花幾點；解析度調高會花更多，送出前會再顯示實際花費。
+
+| 模型 | 擅長 | 擴充功能 | 每張約花（點） |
+| --- | --- | --- | --- |
+| [Stable Diffusion XL](#h-sdxl) | 寫實、角色插畫、概念藝術 | LoRA、ControlNet、Embedding、負面提示詞 | 23 |
+| [Krea 2](#h-krea) | 攝影感、電影感、藝術風格 | LoRA | 25 |
+| [P-H3-Image](#h-ph3) | 寫實攝影、電影感、平面設計 | 多張參考圖片、編輯 | 49 |
+| [Z-Image](#h-zimage) | 中文理解、人物、多元風格 | LoRA、ControlNet | 25 |
+| [Ideogram 4](#h-ideogram) | 文字生成、平面設計 | － | 30 |
+| [Fibo 2.0](#h-fibo) | 圖片編輯（不支援文生圖） | － | 33 |
+| [FLUX.3 Image Klein](#h-flux3) | 生成與編輯、多張參考圖 | 參考圖片、LoRA | 23 |
+| [FLUX.2](#h-flux2) | 產品攝影、商業視覺 | 參考圖片、編輯、LoRA | 30 |
+| [FLUX.2 [Klein]](#h-flux2k) | 快速生成與編輯、換裝 | 編輯、LoRA | 30 |
+| [FLUX.1](#h-flux1) | 寫實人物、生活攝影 | LoRA、ControlNet | 32 |
+| [Qwen Image](#h-qwen) | 文字排版、海報、資訊圖表 | LoRA、ControlNet | 30 |
+| [Qwen Image 2.1](#h-qwen21) | 參考圖輔助生成 | 參考圖片、LoRA | 26 |
+| [Qwen Image Edit](#h-qwenedit) | 依文字指令編輯圖片 | LoRA（必須提供參考圖） | 35 |
+| [Anima](#h-anima) | 動漫角色、插畫 | LoRA | 38 |
+| [Illustrious](#h-illustrious) | 高品質動漫插畫、服裝細節 | LoRA、ControlNet、Embedding | 23 |
+| [NoobAI XL](#h-noobai) | 二次元角色、多樣畫風 | LoRA、ControlNet、Embedding | 23 |
+| [Pony Diffusion V6 XL](#h-pony) | 獸人、奇幻生物、卡通 | LoRA、ControlNet、Embedding | 23 |
+| [Lumina](#h-lumina) | 概念藝術、視覺實驗 | LoRA | 43 |
 
 ## 比較用的提示詞
 
@@ -201,6 +210,16 @@ Krea 2 強調**高品質影像與視覺表現**，在構圖、光影、材質與
 [i 15]
 |||
 [i 16]
+:::
+
+## P-H3-Image {#h-ph3}
+
+由 Pruna AI 以 MiniMax H3 為基礎開發的圖片模型，擅長**寫實攝影、電影感畫面與自然光影**，畫面像實拍的照片或電影劇照，也適合**平面設計**。
+
+也支援**參考圖片編輯**，可以一次結合**多張參考圖片**創作，例如把一張圖裡的人物放進另一張圖的場景。
+
+:::tip 適合誰
+想要實拍照片、電影劇照般的質感，或想用多張參考圖組合出新畫面的人。
 :::
 
 ## Z-Image {#h-zimage}
@@ -518,7 +537,7 @@ Fibo 2.0 專精**圖片編輯**，適合修改圖片中的物件、顏色、材�
 
 'm-video': {
   t: '影片模型比較', level: '進階', minutes: 6,
-  d: 'MiniMax H3、LTX 2.5、Wan 2.2、Wan Animate 2、SCAIL 2、SeedVR2 的功能與用法比較。',
+  d: 'MiniMax H3、MiniMax H3 Turbo、LTX 2.5、Wan 2.2、Wan Animate 2、SCAIL 2、SeedVR2 的功能與用法比較。',
   src: '3d755cb6aede8027b9bce4cafa5798f4',
   body: `
 想用參考圖片和影片生成？想做頭尾幀？想讓角色模仿舞蹈？影片模型這麼多，先弄清楚每個的強項，就能事半功倍。
@@ -527,14 +546,17 @@ Fibo 2.0 專精**圖片編輯**，適合修改圖片中的物件、顏色、材�
 
 ## 總覽
 
-| 模型 | 強項 | 可用素材 |
-| --- | --- | --- |
-| [MiniMax H3](#h-minimax) | 多素材參考、維持一致性 | 參考圖片、參考影片、參考音訊；支援頭尾幀 |
-| [LTX 2.5](#h-ltx) | 頭尾幀較省點、畫質較高、可生成音訊 | 起始圖片、尾幀圖片 |
-| [Wan 2.2](#h-wan22) | 大量特效 LoRA | 起始圖片 |
-| [Wan Animate 2](#h-wananimate) | 讓圖片角色照影片表演 | 來源圖片、驅動影片 |
-| [SCAIL 2](#h-scail) | 模仿動作或取代主體 | 參考圖片、驅動影片 |
-| [SeedVR2](#h-seedvr) | 放大與修補影片細節 | 影片 |
+在「選擇生成工具」點錢幣圖示「**點數**」，就只會列出用點數的模型。最後一欄是用預設設定生成一次大約花幾點；時長、解析度調高會花更多，送出前會再顯示實際花費。
+
+| 模型 | 強項 | 可用素材 | 預設約花（點） |
+| --- | --- | --- | --- |
+| [MiniMax H3](#h-minimax) | 多素材參考、維持一致性 | 參考圖片、參考影片、參考音訊；支援頭尾幀 | 626 |
+| [MiniMax H3 Turbo](#h-minimax-turbo) | H3 的高速版，較快、較省點數 | 和 MiniMax H3 相近 | 313 |
+| [LTX 2.5](#h-ltx) | 頭尾幀較省點、畫質較高、可生成音訊 | 起始圖片、尾幀圖片 | 165 |
+| [Wan 2.2](#h-wan22) | 大量特效 LoRA | 起始圖片 | 380 |
+| [Wan Animate 2](#h-wananimate) | 讓圖片角色照影片表演 | 來源圖片、驅動影片 | 1,809 |
+| [SCAIL 2](#h-scail) | 模仿動作或取代主體 | 參考圖片、驅動影片 | 653 |
+| [SeedVR2](#h-seedvr) | 放大與修補影片細節 | 影片 | 567 |
 
 ## 選擇模型
 
@@ -569,6 +591,14 @@ Fibo 2.0 專精**圖片編輯**，適合修改圖片中的物件、顏色、材�
 > 一隻跟人一樣大的老鼠在田徑場奔跑，從遠處不斷跨欄並逐漸靠近鏡頭，最終達到終點，角色參考@image1，場景參考@image2，跨欄動作參考@video1，手持鏡頭
 
 [v 144]
+
+### MiniMax H3 Turbo {#h-minimax-turbo}
+
+MiniMax H3 的**高速版本**：畫質稍微降低，但算得更快，預設約 313 點，大約是 MiniMax H3 的一半。2026/11/05 起改用 Pika H3 Flex，畫質與動態都有改善。目前標示為「實驗」功能。
+
+:::tip 適合誰
+想先快速試動作和構圖，滿意後再用 MiniMax H3 生成正式版的人。
+:::
 
 ## LTX 2.5 {#h-ltx}
 
@@ -690,12 +720,14 @@ Fibo 2.0 專精**圖片編輯**，適合修改圖片中的物件、顏色、材�
 
 ## 總覽
 
-| 模型 | 優點 | 缺點 | 提示詞 |
-| --- | --- | --- | --- |
-| [ACE Step 1.5 XL](#h-ace) | 快速、便宜、穩定、時長精準 | 音質普通、風格較固定、人聲稍有 AI 感 | 歌詞、風格 |
-| [MiniMax Music 3.0](#h-minimax-music) | 人聲自然、編曲成熟多元、音質好 | 慢、耗點高、時長常比設定短 | 歌詞、風格 |
-| [YuE2](#h-yue) | 人聲自然、編曲多元、音質好、便宜，可用樂譜驅動 | 無法控制時長 | 歌詞、風格、樂譜 |
-| [Stable Audio 3.0](#h-stable-audio) | 擅長配樂、獨奏、音效，音質好、時長精準 | 不能寫歌詞 | 風格 |
+最後一欄是用預設設定生成一次大約花幾點；時長調長會花更多，送出前會再顯示實際花費。
+
+| 模型 | 優點 | 缺點 | 提示詞 | 預設約花（點） |
+| --- | --- | --- | --- | --- |
+| [ACE Step 1.5 XL](#h-ace) | 快速、便宜、穩定、時長精準 | 音質普通、風格較固定、人聲稍有 AI 感 | 歌詞、風格 | 148 |
+| [MiniMax Music 3.0](#h-minimax-music) | 人聲自然、編曲成熟多元、音質好 | 慢、耗點高、時長常比設定短 | 歌詞、風格 | 623 |
+| [YuE2](#h-yue) | 人聲自然、編曲多元、音質好、便宜，可用樂譜驅動 | 無法控制時長 | 歌詞、風格、樂譜 | 250 |
+| [Stable Audio 3.0](#h-stable-audio) | 擅長配樂、獨奏、音效，音質好、時長精準 | 不能寫歌詞 | 風格 | 90 |
 
 ## 選擇模型
 

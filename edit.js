@@ -3,7 +3,7 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#drafts 草稿箱、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
 Object.assign(ICONS, {
@@ -52,7 +52,7 @@ const fmt = (iso) => {
 let LIVE = null;   // 正式版：{ login: 'oidc'|'dev'|'none', user, role }；示範版是 null
 function initialState() {
   return {
-    v: 1, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS), history: {}, log: [], trash: [], uploads: {}, nextMedia: 9001,
+    v: 2, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS, window.DRAFTS), history: {}, log: [], trash: [], uploads: {}, nextMedia: 9001,
     editors: [
       { no: 'A0001', name: '王小明', role: 'owner', at: now() },
       { no: 'A0002', name: '林小華', role: 'editor', at: now() },
@@ -64,7 +64,7 @@ let S = null;
 let me = null;
 function loadDemo() {
   try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
-  if (!S || S.v !== 1) S = initialState();
+  if (!S || S.v !== 2) S = initialState();
   Object.assign(MEDIA, S.uploads);
   try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
 }
@@ -161,7 +161,8 @@ function toast(msg) {
   toast.timer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 function tabs(cur) {
-  const items = [['pages', '頁面'], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`], ['tools', '檢查與備份']];
+  const drafts = Object.values(S.pages).filter((p) => p.draft).length;
+  const items = [['pages', '頁面'], ['drafts', `草稿箱${drafts ? `（${drafts}）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -217,6 +218,7 @@ function viewDenied() {
 // ---------------------------------------------------------
 function badge(id) {
   const p = S.pages[id];
+  if (p.draft) return '<span class="chip ed-draft">草稿</span>';
   if (p.isNew) return '<span class="chip ed-new">新頁面</span>';
   if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>';
   return '';
@@ -336,6 +338,7 @@ function viewEdit() {
         <label class="ed-f"><span>標題<em>必填</em></span><input name="t" maxlength="60" value="${esc(d.t)}" required></label>
         <label class="ed-f"><span>目錄上顯示的名稱<small>選填，標題太長時用</small></span><input name="n" maxlength="30" value="${esc(d.n)}"></label>
         <label class="ed-f wide"><span>摘要<small>顯示在標題下方，也會出現在分類列表和搜尋結果</small></span><textarea name="d" rows="2" maxlength="200">${esc(d.d)}</textarea></label>
+        <label class="ed-f ed-check wide"><input type="checkbox" name="draft"${d.draft ? ' checked' : ''}><span>草稿，先不公開<small>勾選後說明中心看不到這頁${d.groups ? '（分類裡的頁面也一起隱藏）' : ''}；取消勾選再儲存就會公開</small></span></label>
         <label class="ed-f"><span>放在哪裡</span><select name="where">${whereOptions(d)}</select></label>
         <label class="ed-f"><span>標籤<small>選填，例如「新手」</small></span><input name="tag" maxlength="8" value="${esc(d.tag)}"></label>
         ${d.groups ? '' : `<label class="ed-f"><span>程度</span><select name="level">${LEVELS.map((l) => `<option value="${l}"${l === d.level ? ' selected' : ''}>${l || '不標示'}</option>`).join('')}</select></label>
@@ -348,7 +351,7 @@ function viewEdit() {
         <details class="ed-more wide"><summary>進階設定</summary>
           <label class="ed-f"><span>網址代號<small>只能用英文小寫、數字和 -；其他頁面連到這頁時會用到</small></span><input name="slug" maxlength="40" value="${esc(d.id)}" pattern="[a-z0-9-]+" spellcheck="false" autocapitalize="off"></label>
           ${d.groups ? '' : `<label class="ed-f"><span>相關模型<small>選填，用逗號分開，會顯示在標題下方</small></span><input name="models" maxlength="120" value="${esc(d.models)}"></label>`}
-          ${d.isNew ? '' : `<p class="ed-hint"><a href="./#${esc(d.origId)}" target="_blank" rel="noopener">在說明中心看這頁目前的樣子 ↗</a></p>`}
+          ${d.isNew || S.pages[d.origId].draft ? '' : `<p class="ed-hint"><a href="./#${esc(d.origId)}" target="_blank" rel="noopener">在說明中心看這頁目前的樣子 ↗</a></p>`}
         </details>
       </div>
       <div class="ed-split" data-pane="write">
@@ -427,11 +430,12 @@ function readForm(f) {
   if (f.elements.level) d.level = f.elements.level.value;
   if (f.elements.minutes) d.minutes = f.elements.minutes.value;
   if (f.elements.models) d.models = f.elements.models.value;
+  d.draft = f.elements.draft.checked;
   const icon = f.querySelector('input[name="icon"]:checked');
   if (icon) d.icon = icon.value;
   if (d.groups) d.groups.forEach((g, gi) => { if (f.elements[`g${gi}`]) g.g = f.elements[`g${gi}`].value.trim(); });
 }
-const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'body'];
+const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'body', 'draft'];
 
 let saving = false;
 async function savePage(f) {
@@ -451,6 +455,7 @@ async function savePage(f) {
   const page = {};
   FIELDS.forEach((k) => { page[k] = typeof d[k] === 'string' ? d[k].trim() : d[k]; });
   page.body = d.body.replace(/\s+$/, '');
+  if (!page.draft) delete page.draft;
   let action = '修改';
   if (d.isNew) {
     page.isNew = true;
@@ -488,7 +493,8 @@ async function savePage(f) {
   saving = false;
   if (!ok) return;
   setDirty(false);
-  toast(LIVE ? `已儲存「${page.t}」，說明中心已經更新。` : `已儲存「${page.t}」（示範：只存在這台電腦）`);
+  toast(page.draft ? `已存成草稿「${page.t}」，說明中心看不到這頁。${LIVE ? '' : '（示範：只存在這台電腦）'}`
+    : LIVE ? `已儲存「${page.t}」，說明中心已經更新。` : `已儲存「${page.t}」（示範：只存在這台電腦）`);
   if (d.isNew || d.id !== d.origId) { skipGuard = true; location.hash = `#edit/${d.id}`; }
   else { draft = startDraft(d.id); }
 }
@@ -870,7 +876,8 @@ function viewHelp() {
       <li>點頁面名稱開始編輯；用 ↑ ↓ 調整順序；垃圾桶是刪除。</li>
       <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類裡還有頁面時不能刪除，要先把頁面搬走或刪除。</li>
       <li>要換位置：進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
-      <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li></ul>`)}
+      <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
+      <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿箱」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
@@ -941,6 +948,14 @@ function restore(i) {
   toast(`已還原「${x.page.t}」，放在「${l.label}」的最後面。`);
   render();
 }
+// 草稿箱：還沒公開的頁面。草稿留在目錄裡的位置，說明中心看不到
+function viewDrafts() {
+  const list = Object.keys(S.pages).filter((id) => S.pages[id].draft && locate(id));
+  return `${tabs('drafts')}<div class="ed-head"><div><h1>草稿箱</h1><p class="ed-hint">還沒公開的頁面。寫好後進入頁面，取消勾選「草稿」再儲存就會出現在說明中心。新增頁面時勾選「草稿」，就會放進這裡。</p></div></div>
+    ${list.length ? `<ul class="ed-list">${list.map((id) => { const p = S.pages[id]; return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}<span class="chip ed-draft">草稿</span></b><small>${esc(locate(id).label.replace('（直接列在目錄上）', ''))}</small></span></a></li>`; }).join('')}</ul>`
+      : '<p class="ed-hint">目前沒有草稿。</p>'}`;
+}
+
 // 檢查與備份：全站檢查缺圖、壞連結；正式版可以下載備份、主管理員可以從備份還原
 function viewTools() {
   const problems = Model.checkAll(S.pages, MEDIA);
@@ -1021,7 +1036,7 @@ function render(keepDraft) {
     return;
   }
   draft = null;
-  app.innerHTML = ({ media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, tools: viewTools, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = ({ drafts: viewDrafts, media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   document.title = '編輯後台｜moonland.ai 說明中心';
 }

@@ -6,6 +6,7 @@ window.SECTIONS = [
   { label: '開始使用', rows: [
     { id: 'quick-start', icon: 'rocket', tag: '新手' },
     { id: 'credits', icon: 'coin' },
+    { id: 'credit-tools', icon: 'planet', n: '登月幣怎麼用' },
     { id: 'trial-login', icon: 'key' },
     { id: 'gallery', icon: 'grid' },
   ] },
@@ -31,14 +32,17 @@ window.SECTIONS = [
     { id: 'music-3d', t: '音樂與 3D', icon: 'music',
       d: '用文字與歌詞生成歌曲、背景音樂與音效，或用一張圖片生成 3D 模型。',
       groups: [{ g: '', items: [['music', '音樂生成'], ['model-3d', '3D 模型生成']] }] },
-    { id: 'credit-tools', icon: 'planet', n: '外部模型（登月幣）' },
   ] },
   { label: '學習資源', rows: [
     { id: 'recipes', t: '應用範例', icon: 'sparkles',
       d: '跟著做就能完成的主題教學：從一個具體成品出發，帶你走完整個流程。',
       groups: [{ g: '', items: [['chat-recipes', '「交談」應用大全'], ['pvc', 'PVC 公仔風格'], ['logo', 'LOGO 創作'], ['outfit', '人物角色換衣'], ['face-swap', '名畫換臉']] }] },
     { id: 'models', t: '模型指南', icon: 'layers',
-      groups: [{ g: '', items: [['m-choose', '模型怎麼選', '新手'], ['m-image', '圖片模型一覽'], ['m-video', '影片模型比較'], ['m-music', '音樂模型比較']] }] },
+      groups: [
+        { g: '先看這篇', items: [['m-choose', '模型怎麼選', '新手']] },
+        { g: '點數模型', items: [['m-image', '圖片模型一覽'], ['m-video', '影片模型比較'], ['m-music', '音樂模型比較']] },
+        { g: '登月幣模型', items: [['credit-image', '登月幣圖片模型', '付費'], ['credit-video', '登月幣影片模型', '付費'], ['credit-music-3d', '登月幣音樂與 3D', '付費']] },
+      ] },
   ] },
   { label: '團隊管理', rows: [
     { id: 'team', t: '團隊成員', icon: 'users',
