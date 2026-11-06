@@ -96,7 +96,7 @@
   function checkBody(body, id, pages, MEDIA) {
     const out = [];
     body = String(body || '');
-    const media = [...new Set([...body.matchAll(/\[(?:i|v|a)\s+(\d+)/g)].map((m) => m[1]).filter((n) => !MEDIA[n]))];
+    const media = [...new Set([...body.matchAll(/\[(?:i|v|a|3d)\s+(\d+)/g)].map((m) => m[1]).filter((n) => !MEDIA[n]))];
     if (media.length) out.push(`找不到媒體編號 ${media.join('、')}`);
     const ids = [...new Set([...body.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]))];
     const links = ids.filter((k) => (k.startsWith('h-') ? !body.includes(`{#${k}}`) : !(k === 'home' || k === id || pages[k])));

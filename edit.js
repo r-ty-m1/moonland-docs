@@ -381,7 +381,7 @@ function cheatSheet() {
     [':::steps … :::', '步驟；每一步用「@ 」開頭'],
     [':::tip 標題 … :::', '綠色提示框；:::warn 是黃色注意框'],
     ['> 提示詞', '可以一鍵複製的提示詞框'],
-    ['[i 編號 說明]', '圖片；v 是影片、a 是音訊'],
+    ['[i 編號 說明]', '圖片；v 是影片、a 是音訊、3d 是 3D 模型（.glb）'],
     [':::row … ||| … :::', '並排，用 ||| 分欄'],
     [':::compare … :::', '前後比較；兩行 [i 編號 標籤]，?? 開頭是可展開的提示詞'],
   ];
@@ -414,7 +414,7 @@ function paintPreview() {
   // 連到不存在的頁面時提醒
   const bad = [...new Set([...d.body.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]).filter((k) => !k.startsWith('h-') && !S.pages[k] && k !== d.id))];
   document.getElementById('linkWarn').textContent = bad.length ? `提醒：這些連結找不到頁面：${bad.map((k) => `#${k}`).join('、')}` : '';
-  const missing = [...new Set([...d.body.matchAll(/\[(?:i|v|a)\s+(\d+)/g)].map((m) => m[1]).filter((n) => !MEDIA[n]))];
+  const missing = [...new Set([...d.body.matchAll(/\[(?:i|v|a|3d)\s+(\d+)/g)].map((m) => m[1]).filter((n) => !MEDIA[n]))];
   if (missing.length) document.getElementById('linkWarn').textContent += `${bad.length ? '；' : '提醒：'}找不到圖片編號 ${missing.join('、')}`;
 }
 let previewTimer = 0;
@@ -748,8 +748,8 @@ cmpForm.addEventListener('submit', async (e) => {
 // 6b. 圖庫：說明中心用到的所有媒體，依區域（assets/media 的資料夾）分類，可搜尋、複製；編輯時可直接挑圖
 // ---------------------------------------------------------
 const AREAS = { start: '開始使用', chat: '交談', image: '圖片生成', video: '影片生成', lab: '實驗室', recipes: '應用範例', models: '模型指南', team: '團隊管理', support: '支援', unused: '暫時沒用到', upload: '示範上傳' };
-const KINDS = { image: ['圖片', 'i'], video: ['影片', 'v'], audio: ['音訊', 'a'] };
-const kindOf = (f) => (/\.mp4$/i.test(f) ? 'video' : /\.mp3$/i.test(f) ? 'audio' : 'image');
+const KINDS = { image: ['圖片', 'i'], video: ['影片', 'v'], audio: ['音訊', 'a'], '3d': ['3D 模型', '3d'] };
+const kindOf = (f) => (/\.glb$/i.test(f) ? '3d' : /\.mp4$/i.test(f) ? 'video' : /\.mp3$/i.test(f) ? 'audio' : 'image');
 // 每個編號：檔名、區域、類型，以及用在哪些頁面的哪個段落（從目前的頁面內容即時算出）
 function mediaIndex() {
   const uses = {};
@@ -759,7 +759,7 @@ function mediaIndex() {
     for (const line of p.body.split('\n')) {
       const hm = line.trim().match(/^#{2,4}\s+(.+?)(?:\s+\{#[\w-]+\})?$/);
       if (hm) { h = hm[1].replace(/\*\*/g, ''); continue; }
-      for (const m of line.matchAll(/\[(?:i|v|a)\s+(\d+)(?:\s+([^\]]+))?\]/g)) {
+      for (const m of line.matchAll(/\[(?:i|v|a|3d)\s+(\d+)(?:\s+([^\]]+))?\]/g)) {
         const list = uses[m[1]] = uses[m[1]] || [];
         if (!list.some((u) => u.id === id)) list.push({ id, t: p.t, h, c: m[2] || '' });
       }
@@ -785,6 +785,7 @@ function mediaCard(m, pick) {
   const url = mediaUrl(m.n);
   const thumb = m.kind === 'image' ? `<img src="${url}" alt="" loading="lazy" decoding="async">`
     : m.kind === 'video' ? `<video data-src="${url}" muted playsinline preload="none"></video><span class="ed-m-kind">${ic('video')}影片</span>`
+    : m.kind === '3d' ? `<span class="ed-m-kind">${ic('cube')}3D 模型</span>`
     : `<span class="ed-m-kind">${ic('music')}音訊</span>`;
   const where = m.uses.length
     ? m.uses.map((u) => `${pick ? esc(u.t) : `<a href="#edit/${u.id}">${esc(u.t)}</a>`}${u.h ? ` › ${esc(u.h)}` : ''}`).join('<br>')

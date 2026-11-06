@@ -9,6 +9,7 @@ const ICONS = {
   coin: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1 M12 7v10',
   key: 'M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z M15 9h.01',
   grid: 'M4 4h6v6h-6z M14 4h6v6h-6z M4 14h6v6h-6z M14 14h6v6h-6z',
+  cube: 'M21 16.008v-8.018a1.98 1.98 0 0 0 -1 -1.717l-7 -4.008a2.016 2.016 0 0 0 -2 0l-7 4.008c-.619 .355 -1 1.01 -1 1.718v8.018c0 .709 .381 1.363 1 1.717l7 4.008a2.016 2.016 0 0 0 2 0l7 -4.008c.619 -.355 1 -1.01 1 -1.718z M12 22v-10 M12 12l8.73 -5.04 M3.27 6.96l8.73 5.04',
   chat: 'M8 9h8 M8 13h6 M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z',
   image: 'M15 8h.01 M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5 M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3',
   video: 'M15 10l4.553 -2.276a1 1 0 0 1 1.447 .894v6.764a1 1 0 0 1 -1.447 .894l-4.553 -2.276v-4z M3 8a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z',
@@ -79,7 +80,7 @@ function inline(s) {
   return h;
 }
 
-const isStarter = (t) => /^(:::|#{2,4}\s|>|\||\[(i|v|a|embed)\s|- |\d+\.\s|---$|@ |\?\? |\|\|\|$)/.test(t);
+const isStarter = (t) => /^(:::|#{2,4}\s|>|\||\[(i|v|a|3d|embed)\s|- |\d+\.\s|---$|@ |\?\? |\|\|\|$)/.test(t);
 
 function splitAt(lines, test) {
   const parts = [];
@@ -97,7 +98,7 @@ function splitAt(lines, test) {
 
 let headingCount = 0;
 function media(t) {
-  let m = t.match(/^\[(i|v|a)\s+(\d+)(?:\s+(.+))?\]$/);
+  let m = t.match(/^\[(i|v|a|3d)\s+(\d+)(?:\s+(.+))?\]$/);
   if (m) {
     const [, k, n, cap] = m;
     const url = mediaUrl(n);
@@ -106,6 +107,8 @@ function media(t) {
     const capHtml = cap ? `<figcaption>${inline(cap)}</figcaption>` : '';
     if (!url) return `<div class="media-missing">${T('找不到媒體 #{n}', { n })}</div>`;
     if (k === 'i') return `<figure class="fig"><img src="${url}" alt="${esc(cap || '')}" loading="lazy" decoding="async"${box} data-zoom>${capHtml}</figure>`;
+    // 3D 模型：先放一個按鈕，點了才下載模型和檢視程式（檔案大，避免一打開文章就下載）
+    if (k === '3d') return `<figure class="fig model3d"><button type="button" class="m3d-load" data-src="${url}" data-alt="${esc(plainText(cap || ''))}" style="aspect-ratio:${ar || 1}">${ic('cube', 'ic m3d-ic')}<span class="m3d-t">${T('點一下載入 3D 模型')}</span><span class="m3d-s">${T('載入後可以拖曳旋轉、雙指縮放')}</span></button>${capHtml}</figure>`;
     if (k === 'v') return `<figure class="fig"><video src="${url}" controls preload="metadata" playsinline${box}></video>${capHtml}</figure>`;
     return `<figure class="fig audio"><audio src="${url}" controls preload="none"></audio>${capHtml}</figure>`;
   }
@@ -216,7 +219,7 @@ function blocks(lines) {
       out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c, i) => `<td data-label="${esc(plainText(head[i] || ''))}">${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
       continue;
     }
-    if (/^\[(i|v|a|embed)\s/.test(t)) { out += media(t); i++; continue; }
+    if (/^\[(i|v|a|3d|embed)\s/.test(t)) { out += media(t); i++; continue; }
     if (t.startsWith('- ')) {
       const items = [];
       while (i < lines.length && lines[i].trim().startsWith('- ')) { items.push(lines[i].trim().slice(2)); i++; }
@@ -239,7 +242,7 @@ function blocks(lines) {
 }
 const renderMarkup = (src) => { headingCount = 0; return blocks(String(src).replace(/\r/g, '').split('\n')); };
 const plainText = (src) => String(src)
-  .replace(/\[(i|v|a|embed)\s[^\]]*\]/g, ' ')
+  .replace(/\[(i|v|a|3d|embed)\s[^\]]*\]/g, ' ')
   .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')
   .replace(/\{\{([^{}]{1,10})\}\}/g, ' $1 ')
   .replace(/[*#>|:@?]/g, ' ');
@@ -277,4 +280,46 @@ document.addEventListener('keydown', (e) => {
   if (!knob || step === undefined) return;
   e.preventDefault();
   setCompare(knob.closest('.cmp-view'), +knob.getAttribute('aria-valuenow') + step);
+});
+
+// ---------------------------------------------------------
+// 5. 3D 模型：點按鈕才載入檢視程式（Google model-viewer，檔案在 assets/vendor/，不從外部網站載入）
+// ---------------------------------------------------------
+let modelViewerReady = null;
+function loadModelViewer() {
+  if (!modelViewerReady) {
+    modelViewerReady = new Promise((ok, fail) => {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = 'assets/vendor/model-viewer.min.js';
+      s.onload = () => customElements.whenDefined('model-viewer').then(ok);
+      s.onerror = () => { modelViewerReady = null; fail(new Error('load')); };
+      document.head.appendChild(s);
+    });
+  }
+  return modelViewerReady;
+}
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('.m3d-load');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.querySelector('.m3d-t').textContent = T('載入中…');
+  try {
+    await loadModelViewer();
+  } catch {
+    btn.disabled = false;
+    btn.querySelector('.m3d-t').textContent = T('載入失敗，點一下再試一次');
+    return;
+  }
+  const mv = document.createElement('model-viewer');
+  mv.setAttribute('src', btn.dataset.src);
+  mv.setAttribute('alt', btn.dataset.alt || T('3D 模型'));
+  mv.setAttribute('camera-controls', '');
+  mv.setAttribute('auto-rotate', '');
+  mv.setAttribute('touch-action', 'pan-y');
+  mv.setAttribute('shadow-intensity', '1');
+  mv.setAttribute('environment-image', 'neutral');
+  mv.style.aspectRatio = btn.style.aspectRatio;
+  mv.addEventListener('error', () => mv.closest('.fig').classList.add('failed'));
+  btn.replaceWith(mv);
 });

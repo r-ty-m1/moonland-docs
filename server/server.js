@@ -32,6 +32,7 @@ const TYPES = {
   '.ico': 'image/x-icon',
   '.mp4': 'video/mp4',
   '.mp3': 'audio/mpeg',
+  '.glb': 'model/gltf-binary',
   '.txt': 'text/plain; charset=utf-8',
 };
 

@@ -16,14 +16,14 @@ const refs = new Set();
 const dataFiles = (dir) => fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.js')).map((f) => path.join(ROOT, dir, f));
 for (const file of dataFiles('data')) {
   const src = fs.readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/\[(?:i|v|a)\s+(\d+)/g)) refs.add(m[1]);
+  for (const m of src.matchAll(/\[(?:i|v|a|3d)\s+(\d+)/g)) refs.add(m[1]);
 }
 const missing = [...refs].filter((n) => !MEDIA[n] || !fs.existsSync(path.join(ROOT, 'assets/media', MEDIA[n][0])));
 assert.deepEqual(missing, [], `找不到媒體：${missing.join(', ')}`);
 console.log(`✓ 文章引用 ${refs.size} 個媒體，檔案都在`);
 
 // --- 1a. 媒體檔名都照規則（區域資料夾/文章代號-序號），而且資料夾裡沒有對照表以外的檔案 ---
-const NAME = /^(?:(?:start|chat|image|video|lab|recipes|models|team|support)\/[a-z0-9]+(?:-[a-z0-9]+)*-\d{2,3}|unused\/[\w-]+)\.(?:webp|mp4|mp3)$/;
+const NAME = /^(?:(?:start|chat|image|video|lab|recipes|models|team|support)\/[a-z0-9]+(?:-[a-z0-9]+)*-\d{2,3}|unused\/[\w-]+)\.(?:webp|mp4|mp3|glb)$/;
 const badName = [...new Set(Object.values(MEDIA).map((e) => e[0]))].filter((f) => !NAME.test(f));
 assert.deepEqual(badName, [], `這些媒體檔名不符合命名規則：${badName.join(', ')}`);
 const listed = new Set(Object.values(MEDIA).map((e) => e[0]));

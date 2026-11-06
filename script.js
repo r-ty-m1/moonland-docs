@@ -17,7 +17,7 @@ const ALIASES = {
   basics: 'img-basics', 'c-basics': 'chat-intro', 'c-settings': 'chat-settings', 'c-edit': 'chat-edit',
   'c-recipes': 'chat-recipes', 'c-pvc': 'pvc', 'c-logo': 'logo', 'c-outfit': 'outfit', 'l-face': 'face-swap',
   'l-prompt': 'img-prompt', 'g-basics': 'gallery', 'o-music': 'music', 'o-3d': 'model-3d',
-  'm-img': 'm-choose', 'm-imgc': 'm-image', 'm-vid': 'm-video', 'm-credit': 'models',
+  'm-img': 'm-choose', 'm-imgc': 'm-image', 'm-vid': 'm-video', 'm-credit': 'models', 'credit-music-3d': 'credit-3d',
   'a-login': 'team-login', 'a-trial': 'trial-login', 'a-projects': 'projects', 'a-admin': 'admin',
   'a-invite': 'admin-2', 'a-tags': 'admin-3', 'a-credits': 'admin-4',
   'a-1': 'admin-1', 'a-2': 'admin-2', 'a-3': 'admin-3', 'a-4': 'admin-4', 'a-5': 'admin-5', 'a-6': 'admin-6',

@@ -72,6 +72,7 @@
 | `\| 欄 \| 欄 \|` | 表格，第一列是標題 |
 | `[i 123 說明]` | 圖片（數字是 media.js 的編號，說明可省略） |
 | `[v 123 說明]`、`[a 123 說明]` | 影片、音訊 |
+| `[3d 123 說明]` | 3D 模型（.glb）：先顯示「點一下載入」按鈕，點了才下載，讀者可以拖曳旋轉、縮放。寬高比照 `data/media.js` 寫的比例 |
 | `:::compare` … `:::` | 前後比較（拖曳分隔線）：前兩行寫 `[i 編號 Before]`、`[i 編號 After]`（左＝修改前、右＝修改後），可再用 `?? Prompt(After)` 加一段可展開的提示詞；框的比例跟左圖一樣，也可寫 `:::compare 3:4` |
 | `[embed 網址 說明]` | 嵌入其他網頁（目前沒有文章使用） |
 | `:::tip 標題` … `:::` | 綠色提示框；`:::warn` 黃色警告；`:::note` 灰色說明 |
@@ -94,6 +95,13 @@
 ```
 
 ## 圖片與影片
+
+### 3D 模型（.glb）
+
+- 檔案放法和圖片一樣（例如 `assets/media/models/m-3d-01.glb`），在 `data/media.js` 加一行 `["models/m-3d-01.glb", 1.5]`，文章寫 `[3d 編號]`。
+- 每個檔案盡量在 **10 MB 以內**（Pixal3D 用「高相容」或 2K 材質匯出）。不要用 Draco／KTX2 壓縮的 GLB：解壓程式要從 Google 網站下載，公司內部網路可能連不到。
+- 檢視程式是 Google 的 model-viewer 4.4.0（Apache-2.0），檔案在 `assets/vendor/model-viewer.min.js`，只有讀者點了按鈕才會載入。更新版本時，從 `https://cdn.jsdelivr.net/npm/@google/model-viewer@<版本>/dist/model-viewer.min.js` 下載換掉即可。
+- 編輯後台目前只能上傳圖片；3D 檔和影片一樣，要由平台組放進網站檔案。
 
 ### 分類與命名規則
 
@@ -133,7 +141,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261106l`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261106m`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
