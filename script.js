@@ -54,7 +54,7 @@ const root = document.documentElement;
 const side = document.getElementById('side');
 const view = document.getElementById('view');
 const toc = document.getElementById('toc');
-// 「付費」用金色，和一般標籤（新手等）分開
+// 「付費」（登月幣）用紫色，和一般標籤（新手等）分開
 const PAID = '付費';
 const tagHtml = (tag) => (tag ? `<span class="tag${tag === PAID ? ' paid' : ''}">${esc(tag)}</span>` : '');
 

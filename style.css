@@ -24,6 +24,10 @@
   --warn-soft: rgba(242, 178, 60, 0.12);
   --warn-ink: #f3cd85;
   --warn-line: rgba(242, 178, 60, 0.4);
+  /* 登月幣：紫色，和平台「選擇生成工具」的月亮標籤一致 */
+  --coin-soft: rgba(146, 108, 255, 0.18);
+  --coin-ink: #c7b4ff;
+  --coin-line: rgba(160, 125, 255, 0.5);
   --shot: #121815;
   --overlay: rgba(0, 0, 0, 0.6);
   --logo-on-dark: inline-block;
@@ -58,6 +62,9 @@
     --warn-soft: #fdf3df;
     --warn-ink: #7a4c06;
     --warn-line: #e8c27a;
+    --coin-soft: #f1ebff;
+    --coin-ink: #5a34b0;
+    --coin-line: #c6b2f3;
     --shot: #eef2f0;
     --overlay: rgba(10, 13, 11, 0.4);
     --logo-on-dark: none;
@@ -84,6 +91,9 @@
   --warn-soft: #fdf3df;
   --warn-ink: #7a4c06;
   --warn-line: #e8c27a;
+  --coin-soft: #f1ebff;
+  --coin-ink: #5a34b0;
+  --coin-line: #c6b2f3;
   --shot: #eef2f0;
   --overlay: rgba(10, 13, 11, 0.4);
   --logo-on-dark: none;
@@ -333,9 +343,9 @@ a.nav-row[aria-current="page"] .ic, .cat-row.cur .cat-link .ic, .cat-row.in .cat
 }
 .chip.brand { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); }
 .chip.todo { border-color: transparent; background: var(--warn-soft); color: var(--warn-ink); }
-/* 付費（登月幣）：金色，比一般標籤醒目 */
-.chip.paid, .tag.paid { border: 1px solid var(--warn-line); background: var(--warn-soft); color: var(--warn-ink); font-weight: 700; }
-.sub-label.paid { color: var(--warn-ink); font-weight: 700; }
+/* 付費（登月幣）：紫色，比一般標籤醒目 */
+.chip.paid, .tag.paid { border: 1px solid var(--coin-line); background: var(--coin-soft); color: var(--coin-ink); font-weight: 700; }
+.sub-label.paid { color: var(--coin-ink); font-weight: 700; }
 
 .callout {
   margin: 1.4em 0; padding: 14px 18px;
