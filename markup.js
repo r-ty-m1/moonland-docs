@@ -69,6 +69,8 @@ const mediaRatio = (n) => (MEDIA[n] && MEDIA[n][1]) || 0;
 function inline(s) {
   let h = esc(s);
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // {{最常用}} 這類小標誌（10 個字以內）
+  h = h.replace(/\{\{([^{}]{1,10})\}\}/g, '<span class="chip pick">$1</span>');
   h = h.replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\(([^)\s]+)\)/g, (m, text, href) => {
     if (href.startsWith('#h-')) return `<a href="#" data-to="${href.slice(1)}">${text}</a>`;
     if (/^https?:/.test(href)) return `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
@@ -239,6 +241,7 @@ const renderMarkup = (src) => { headingCount = 0; return blocks(String(src).repl
 const plainText = (src) => String(src)
   .replace(/\[(i|v|a|embed)\s[^\]]*\]/g, ' ')
   .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')
+  .replace(/\{\{([^{}]{1,10})\}\}/g, ' $1 ')
   .replace(/[*#>|:@?]/g, ' ');
 
 // ---------------------------------------------------------

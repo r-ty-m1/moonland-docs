@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261106f`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261106i`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -47,6 +47,9 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 編輯後台「使用說明」分頁（`edit.js` 的 `viewHelp`）：給編輯者。後台功能改了要同步改說明。
 
 ## 已知待辦與注意事項
+
+- **最常用標誌**（2026-11-06）：文章裡寫 `{{最常用}}` 會變成 `.chip.pick` 小標誌（`markup.js` 的 `inline`），放在總覽表的模型名稱與該模型的小標題後；本頁目錄不顯示標誌。依公司內部使用比例：點數圖片 Qwen Image 2.1、點數影片 MiniMax H3、點數建模 Pixal3D、登月幣圖片 GPT Image 2.5 Sunburst、登月幣影片 Seedance 2.5、登月幣建模 Tripo P2.0。
+- 點數模型的介紹順序照平台「選擇生成工具」的清單（2026-11-06）。Krea 2 的動物範例圖在 Notion 原稿就是重複的人物圖，網站先只放兩張，等使用者重新生成。
 
 - Notion 之後會關閉。所有媒體已搬進網站，文章不再連 Notion。Notion 原始檔（三個 zip 和 manifest）在使用者電腦的「下載」資料夾，預計搬到 `F:\RD\Moonland\moonland-media` 保存。
 - 前後比較（2026-10-30 起）改用網站內建的 `:::compare` 區塊（`markup.js` 的 `compare()`，拖曳程式也在 `markup.js`），圖片編號 585–593（`models/m-image-*`）。原本嵌入的外部工具 `Image_Compare`（使用者另一個 GitHub 公開專案，用 GitHub Token 從瀏覽器上傳圖片）已不再使用，使用者認為不安全；不要再嵌入它。編輯後台有「前後比較」按鈕可插入。

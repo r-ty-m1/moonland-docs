@@ -5,29 +5,32 @@
    ========================================================= */
 
 :root {
-  /* 深色（預設）：底色照平台（2026-11-06）：內容區 #09090b、版頭與側欄 #18181b、選取 #27272a */
+  /* 深色（預設）：照平台的顏色設定（2026-11-06 使用者從平台 :root 複製，lab() 換算成色號）
+     平台名稱：background #09090b、card／sidebar #18181b、secondary／accent #27272a、
+     foreground #fafafa、muted-foreground #9f9fa9、border 白 10%、input 白 15%、primary #2bfd82、coin #c27aff */
   --bg: #09090b;
   --surface: #18181b;
-  --raised: #1f1f23;
+  --raised: #27272a;
   --hover: #27272a;
-  --line: #27272a;
-  --line-strong: #3a3a3f;
-  --fg: #ececee;
-  --fg-2: #bcbcc3;
-  --muted: #8b8b94;
-  --brand: #00ff6a;            /* logo 的綠 */
-  --brand-ic: #00ff6a;         /* 圖示、標記、強調字 */
-  --accent: #46f791;           /* 連結 */
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.15);
+  --fg: #fafafa;
+  --fg-2: #d4d4d8;             /* 平台 chart-1，介於主文字與灰字之間 */
+  --muted: #9f9fa9;
+  --brand: #00ff6a;            /* logo 的綠（logo 圖檔的顏色，不改） */
+  --brand-ic: #2bfd82;         /* 圖示、標記、強調字：平台 primary */
+  --accent: #2bfd82;           /* 連結：平台 primary */
   --accent-ink: #9dfcc5;       /* 綠底上的文字 */
-  --accent-soft: rgba(0, 255, 106, 0.09);
-  --accent-line: rgba(0, 255, 106, 0.35);
-  --warn-soft: rgba(242, 178, 60, 0.12);
-  --warn-ink: #f3cd85;
-  --warn-line: rgba(242, 178, 60, 0.4);
-  /* 登月幣：紫色，和平台「選擇生成工具」的月亮標籤一致 */
-  --coin-soft: rgba(146, 108, 255, 0.18);
-  --coin-ink: #c7b4ff;
-  --coin-line: rgba(160, 125, 255, 0.5);
+  --accent-soft: rgba(43, 253, 130, 0.1);
+  --accent-line: rgba(43, 253, 130, 0.35);
+  --warn-soft: rgba(255, 185, 0, 0.12);   /* 平台 warning #ffb900 */
+  --warn-ink: #ffc933;
+  --warn-line: rgba(255, 185, 0, 0.4);
+  /* 登月幣：和平台的月亮標籤一樣，字用 coin #c27aff，底用 coin 的 15% 透明、沒有外框
+     （平台的 coin-foreground #350e53 是「實心紫底上的字」，這裡用不到） */
+  --coin-soft: rgba(194, 122, 255, 0.15);
+  --coin-ink: #c27aff;
+  --coin-line: transparent;
   --shot: #141416;
   --overlay: rgba(0, 0, 0, 0.6);
   --logo-on-dark: inline-block;
@@ -347,6 +350,9 @@ a.nav-row[aria-current="page"] .ic, .cat-row.cur .cat-link .ic, .cat-row.in .cat
 /* 付費（登月幣）：紫色，比一般標籤醒目 */
 .chip.paid, .tag.paid { border: 1px solid var(--coin-line); background: var(--coin-soft); color: var(--coin-ink); font-weight: 700; }
 .sub-label.paid { color: var(--coin-ink); font-weight: 700; }
+/* {{最常用}}：放在標題或表格的模型名稱後面 */
+.chip.pick { margin-left: 6px; padding: 1px 8px; vertical-align: 0.15em; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-ink); font-size: 0.75rem; font-weight: 700; line-height: 1.5; letter-spacing: 0; white-space: nowrap; }
+.chip.pick::before { content: "★ "; }
 
 .callout {
   margin: 1.4em 0; padding: 14px 18px;

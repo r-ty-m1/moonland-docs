@@ -297,7 +297,7 @@ function render() {
 function buildToc() {
   const hs = [...view.querySelectorAll('h2[id]')];
   toc.innerHTML = hs.length > 1
-    ? `<div class="toc-label">${T('本頁目錄')}</div>` + hs.map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent)}</a>`).join('')
+    ? `<div class="toc-label">${T('本頁目錄')}</div>` + hs.map((h) => `<a href="#" data-to="${h.id}">${esc([...h.childNodes].filter((n) => !(n.classList && n.classList.contains('chip'))).map((n) => n.textContent).join('').trim())}</a>`).join('')
     : '';
   spy();
 }
