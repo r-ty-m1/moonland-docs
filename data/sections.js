@@ -6,7 +6,7 @@ window.SECTIONS = [
   { label: '開始使用', rows: [
     { id: 'quick-start', icon: 'rocket', tag: '新手' },
     { id: 'credits', icon: 'coin' },
-    { id: 'credit-tools', icon: 'planet', n: '登月幣怎麼用' },
+    { id: 'credit-tools', icon: 'planet' },
     { id: 'pricing', icon: 'tag', tag: '新' },
     { id: 'trial-login', icon: 'key' },
     { id: 'gallery', icon: 'grid' },
