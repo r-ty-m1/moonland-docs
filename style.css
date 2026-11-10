@@ -843,3 +843,12 @@ dialog.zoom img { display: block; max-width: 96vw; max-height: 94vh; width: auto
   .row.media { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .row.media[style*="--n:1"] { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 「聯絡我們」頁的寫信表單（script.js 的 mailForm） */
+.mail-box { margin-top: 0; }
+.mail-box > p { color: var(--fg-2); }
+.fb-done .mail-copy {
+  display: block; width: 100%; box-sizing: border-box; margin-top: 10px; padding: 10px 12px;
+  font: inherit; font-size: 0.875rem; line-height: 1.6; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; resize: vertical;
+}

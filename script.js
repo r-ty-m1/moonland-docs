@@ -79,7 +79,7 @@ function navRow(r) {
 side.innerHTML =
   `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">${T('首頁')}</span></a>` +
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
-  `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonshine.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
+  `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonland.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
 
 function setOpen(cat, open) {
   cat.classList.toggle('open', open);
@@ -273,7 +273,7 @@ function render() {
   const id = currentId();
   let body;
   if (VIEWS[id]) body = VIEWS[id]();
-  else if (ARTICLES[id]) body = articleView(id);
+  else if (ARTICLES[id]) body = articleView(id) + (id === 'contact' ? mailForm() : '');
   else if (CATS[id]) body = catView(id);
   else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">${T('這篇內容整理中。')}</p>`;
   view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' ? '' : feedback()));
@@ -576,6 +576,66 @@ view.addEventListener('submit', async (e) => {
   view.querySelector('.fb-done').focus();
 });
 view.addEventListener('click', (e) => { if (e.target.closest('.fb-again')) render(); });
+
+// ---------------------------------------------------------
+// 「聯絡我們」頁的寫信表單：網站本身不能寄信，按「寄出」會開啟使用者的郵件程式，
+// 收件人、主旨、內容都先填好，使用者再按一次傳送。
+// ---------------------------------------------------------
+const SUPPORT_MAIL = 'support@moonland.ai';
+const MAIL_TOPICS = ['使用問題', '教育訓練', '方案與價格', '客製化技術支援', '帳號與點數', '其他'];
+const MAIL_MAX = 1500; // 郵件連結太長，部分郵件程式會打不開
+
+function mailForm() {
+  return `<section class="mail-box" aria-labelledby="mailTitle">
+    <h2 id="mailTitle">${T('直接寫信給我們')}</h2>
+    <p>${T('填好後按「寄出」，會開啟你的郵件程式（例如 Outlook、Gmail），收件人與內容都已填好，再按一次傳送即可。')}</p>
+    <form class="fb-form" id="mailForm" novalidate>
+      <label class="fb-field"><span class="fb-label">${T('問題類型')}</span>
+        <select name="topic">${MAIL_TOPICS.map((t) => `<option>${T(t)}</option>`).join('')}</select></label>
+      <label class="fb-field"><span class="fb-label">${T('主旨')}</span>
+        <input name="subject" maxlength="80" placeholder="${T('例如：影片一直生成失敗')}"></label>
+      <label class="fb-field"><span class="fb-label">${T('內容')}</span>
+        <textarea name="message" rows="6" maxlength="${MAIL_MAX}" placeholder="${T('請描述你遇到的情況，例如用了哪個工具、做了什麼、出現什麼訊息。')}"></textarea>
+        <small class="fb-count">0 / ${MAIL_MAX}</small></label>
+      <label class="fb-field"><span class="fb-label">${T('稱呼')}<small>${T('選填')}</small></span>
+        <input name="sender" maxlength="40"></label>
+      <p class="fb-error" role="alert"></p>
+      <button class="fb-submit" type="submit">${T('寄出')}</button>
+    </form>
+  </section>`;
+}
+
+view.addEventListener('input', (e) => {
+  if (e.target.name === 'message' && e.target.form && e.target.form.id === 'mailForm') {
+    e.target.form.querySelector('.fb-count').textContent = `${e.target.value.length} / ${MAIL_MAX}`;
+  }
+});
+view.addEventListener('submit', (e) => {
+  const f = e.target;
+  if (f.id !== 'mailForm') return;
+  e.preventDefault();
+  const err = f.querySelector('.fb-error');
+  const subject = f.subject.value.trim(), message = f.message.value.trim(), name = f.sender.value.trim();
+  if (!subject) { err.textContent = T('請填寫主旨。'); f.subject.focus(); return; }
+  if (!message) { err.textContent = T('請填寫內容。'); f.message.focus(); return; }
+  err.textContent = '';
+  const fullSubject = `[${f.topic.value}] ${subject}`;
+  const body = `${message}\n\n${name ? `${T('稱呼')}：${name}\n` : ''}${T('來自說明中心「聯絡我們」')}`;
+  location.href = `mailto:${SUPPORT_MAIL}?subject=${encodeURIComponent(fullSubject)}&body=${encodeURIComponent(body)}`;
+  f.outerHTML = `<div class="fb-done" role="status" tabindex="-1">${ic('check')}<div><b>${T('已開啟郵件程式')}</b>
+    <p>${T('請在郵件程式裡按「傳送」，信才會寄出。')}</p>
+    <p class="fb-preview">${T('沒有跳出郵件程式？請複製下面的內容，寄到')} <b>${SUPPORT_MAIL}</b>。</p>
+    <textarea class="mail-copy" readonly rows="6">${esc(`${T('主旨')}：${fullSubject}\n\n${body}`)}</textarea>
+    <button type="button" class="fb-again mail-copy-btn">${T('複製內容')}</button></div></div>`;
+  view.querySelector('.fb-done').focus();
+});
+view.addEventListener('click', async (e) => {
+  const b = e.target.closest('.mail-copy-btn');
+  if (!b) return;
+  const t = b.parentElement.querySelector('.mail-copy');
+  try { await navigator.clipboard.writeText(t.value); } catch { t.select(); document.execCommand('copy'); }
+  b.textContent = T('已複製');
+});
 
 // ---------------------------------------------------------
 // 回到頂端

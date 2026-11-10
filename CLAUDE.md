@@ -12,7 +12,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者不熟悉程式與部署，解釋時用白話，避免未解釋的術語。
 - 改完直接推到 `main`，不用每次詢問。
 - 推送前跑 `node server/test.js`（檢查每篇文章引用的媒體都有對照、檔案都在，伺服器運作正常）。
-- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261106m`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
+- **改了 css 或 js 就換版本號**：`index.html` 裡 `?v=` 後面的數字（例如 `20261110c`；`edit.html`、`admin.html` 也要一起換），並同步 `README.md` 的範例。否則 GitHub Pages 的訪客會讀到瀏覽器快取的舊檔。公司內部部署不受影響，伺服器會自動用檔案雜湊。
 - 驗證要實際看：用 Playwright 開頁面截圖、逐頁檢查，不要只看程式碼。手機寬度至少測 360 和 390，並測三種字體大小。
 
 ## 架構重點
@@ -24,6 +24,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 手機（寬度 620px 以下）表格會改成一列一張卡片，靠每個儲存格的 `data-label`；只有圖片的並排會維持兩欄。
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。`config.js` 的 `googleScriptUrl` 有值就 POST 到 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）；沒值就 POST 到 `api/feedback`，伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
+- 「聯絡我們」頁下方的寫信表單（2026-11-10）是程式產生的（`script.js` 的 `mailForm`），不在文章內容裡：按「寄出」用 `mailto:` 開啟使用者的郵件程式寄到 support@moonland.ai（使用者選的做法，網站本身不寄信），並顯示可複製的內容作為備案。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
 - 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份；草稿（`draft: true`）只在後台「草稿箱」看得到，`toSite` 會跳過，初始草稿在 `data/drafts.js`（index.html 不載入、伺服器不對外提供）。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
