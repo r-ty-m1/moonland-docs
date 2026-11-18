@@ -29,7 +29,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 
 - 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份；草稿（`draft: true`）只在後台「草稿箱」看得到，`toSite` 會跳過，初始草稿在 `data/drafts.js`（index.html 不載入、伺服器不對外提供）。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
 
-## 部署到公司內部（尚未推送）
+## 部署到公司內部（2026-11-18 第一次部署成功）
 
 網站要放到公司內部的 Gitea 自動部署，部署設定都已備好：`Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml`、`server/server.js`（無相依套件的靜態伺服器）。
 
@@ -39,8 +39,9 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 部署流程用 mason plugin（取代 vibe-deploy，原始碼 `U:\_研發\tznung\mason`，使用者已安裝）：assess-readiness → containerize → deploy-site；推送權限用 gitea-access。推送需要用使用者的公司帳號，所以要在使用者自己的電腦上做。工作用的 clone 在 `F:\RD\Moonland\moonland-docs\repo`，`.env`（Zulip 四個值）也放這裡。
 - 2026-11-18 使用者決定：網址 `https://moonland-docs-vibe.moonshine-studio.net`（應用名稱 moonland-docs）、說明中心對外公開、登入沿用公司 SSO 不加「登出公司帳號」、上傳的圖片與影片改存 S3、正式站讓搜尋引擎收錄、主管理員是使用者本人（員編 20261004，`server/owners.json`）。`config.js` 已填 Google Apps Script 網址，但 2026-11-18 從公司網路打開回 403，要請使用者把部署的「誰可以存取」設成「任何人」。測試用環境變數 `GOOGLE_SCRIPT_URL=""` 關掉轉存。
 - `vibe.yaml` 宣告了 `environment.required`：`ZULIP_SITE`、`ZULIP_BOT_EMAIL`、`ZULIP_API_KEY`、`FEEDBACK_NOTIFY_EMAIL`，部署前 `.env` 要有值，否則部署失敗。
-- 容器映像還沒實際建置驗證過。使用者 2026-11-18 裝了 Docker 與 Python，但當時 Docker Desktop 沒開，本機建置沒跑成。
-- **使用者目前只要預覽給主管看，還沒要求推到公司 Gitea。** 沒有明確要求不要推。
+- 容器映像已由公司 CI 建置並通過健康檢查（2026-11-18）。使用者電腦的 Docker Desktop 引擎回 500、起不來，本機的 compose（含 Silo）還沒跑過；真的 Silo 上傳要在正式站實測。
+- 2026-11-18 第一次部署成功（commit `56ff68b`，用 mason deploy-site）。工作 clone 有兩個 remote：`origin` 是 GitHub（預覽版），`gitea` 是公司 Gitea `ufst47/moonland-docs`（推 `main` 就會部署）。改完兩邊都推，保持同步。
+- 使用者的電腦擋外部連線（Google、chat、自己的正式網址都連不到），不要從這台驗證外部網址；請使用者用手機或別的網路確認。
 
 ## 維護手冊
 

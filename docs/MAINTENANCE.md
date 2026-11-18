@@ -16,7 +16,7 @@
 | 網站負責人 | （填姓名、員工編號） |
 | 預覽網址 | https://r-ty-m1.github.io/moonland-docs/ （上線後停用） |
 | 正式網址 | https://moonland-docs-vibe.moonshine-studio.net/ （應用名稱 `moonland-docs`，2026-11-18 決定；對外公開，搜尋引擎可收錄） |
-| 程式碼 | 公司 Gitea：（填 repository 網址）。目前還在 GitHub `r-ty-m1/moonland-docs` |
+| 程式碼 | 公司 Gitea：https://gitea.moonshine-studio.net/ufst47/moonland-docs （推到這裡的 `main` 就會部署）。GitHub `r-ty-m1/moonland-docs` 是預覽版，內容保持同步 |
 | 部署平台 | MoonShine vibe 平台（Gitea Actions → Deployment API → 中央 CD） |
 | 回饋存放 | 網站伺服器存一份；填了 Google 試算表網址時再轉存到試算表（擁有者：　　），見〈5. 回饋〉 |
 | 編輯後台 | `/edit.html`；主管理員：（填，員工編號也要寫進 `server/owners.json`） |
@@ -203,8 +203,8 @@ GitHub Pages 預覽版沒有伺服器：有填 Google 網址就直接送到試�
 
 ### 部署
 - [ ] 主管審核預覽版
-- [ ] 設定 Gitea 推送權限（mason 的 `gitea-access`）
-- [ ] 推到公司 Gitea，第一次由 CI 建置。容器映像**還沒實際建置驗證過**，第一次要看 CI 結果
+- [x] 設定 Gitea 推送權限（mason 的 `gitea-access`，2026-11-18）
+- [x] 推到公司 Gitea，第一次由 CI 建置並部署成功（2026-11-18，commit `56ff68b`；Zulip 的四個設定值已送上平台）
 - [x] 應用名稱 `moonland-docs`，網址 https://moonland-docs-vibe.moonshine-studio.net/ （2026-11-18）
 - [x] 說明中心對外公開、編輯後台要公司帳號登入；登入沿用公司登入狀態，不做「登出公司帳號」（2026-11-18）
 - [x] 搜尋引擎可收錄正式網站；GitHub Pages 預覽版與後台頁不收錄（2026-11-18）
