@@ -101,7 +101,14 @@ function cleanFeedback(b) {
   return null;
 }
 
-// 簡單的防洗版：同一個來源 10 分鐘內最多 30 筆
+// 簡單的防洗版：同一個訪客 10 分鐘內最多 30 筆
+// 公司平台上請求都經過 Cloudflare 與反向代理，連進來的位址全是代理，所以先看代理轉來的訪客位址；
+// 只用連線位址的話，全站訪客會共用同一份 30 筆的額度（2026-11-18 正式站的意見回饋因此送不出去）
+function visitorOf(req) {
+  const h = req.headers;
+  const ip = h['cf-connecting-ip'] || h['x-real-ip'] || String(h['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+  return String(ip).slice(0, 64);
+}
 const hits = new Map();
 function tooMany(ip) {
   const now = Date.now();
@@ -121,7 +128,7 @@ function canReadFeedback(req) {
 }
 
 function postFeedback(req, res) {
-  if (tooMany(req.socket.remoteAddress)) return sendJson(res, 429, { error: '送出太頻繁，請稍後再試' });
+  if (tooMany(visitorOf(req))) return sendJson(res, 429, { error: '送出太頻繁，請稍後再試' });
   let body = '';
   req.setEncoding('utf8');
   req.on('data', (c) => { body += c; if (body.length > 8192) { sendJson(res, 413, { error: '內容太長' }); req.destroy(); } });

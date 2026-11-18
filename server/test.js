@@ -102,6 +102,11 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal(got.entries[2].value, 'none');
     assert.equal(got.entries[1].message, '看不懂 <b>這段</b>');
     assert.equal(got.entries[1].extra, undefined, '不認得的欄位不該存下來');
+    // 經過代理時依轉來的訪客位址計算：A 用完額度，B 仍然送得出去
+    const vote = (ip) => fetch(base + '/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip }, body: JSON.stringify({ kind: 'vote', page: 'quick-start', value: 'up' }) });
+    for (let i = 0; i < 30; i++) await vote('203.0.113.1');
+    assert.equal((await vote('203.0.113.1')).status, 429, '同一個訪客超過 30 筆要擋');
+    assert.equal((await vote('203.0.113.2')).status, 201, '不同訪客不能共用額度');
     console.log('✓ 回饋：送出、驗證、後台密碼都正常');
 
     // --- 4. 編輯後台（DEV_LOGIN 假登入；T0001 是 EDITOR_OWNERS 裡的主管理員） ---
