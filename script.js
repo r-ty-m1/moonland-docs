@@ -199,14 +199,16 @@ const VIEWS = {
     return `${crumb('feedback')}<div class="cat-head"><span class="cat-icon">${ic('message')}</span><h1>${T('意見回饋')}</h1></div>
     <p class="lead">${T('照著教學做還是卡住、看完仍然不懂，或有讓說明中心更好的建議，都歡迎告訴我們。帳號、點數等需要即時處理的問題，請改用<a href="#contact">聯絡我們</a>。')}</p>
     <form class="fb-form" id="fbForm" novalidate>
-      <fieldset class="fb-field"><legend>${T('回饋類型')}</legend>
-        <div class="fb-types">${FB_TYPES.map(([v, t, d]) => `<label class="fb-type"><input type="radio" name="type" value="${v}"><span><b>${T(t)}</b><small>${T(d)}</small></span></label>`).join('')}</div>
+      <fieldset class="fb-field"><legend>${T('回饋類型')}<small>${T('請選一個')}</small></legend>
+        <div class="fb-types">${FB_TYPES.map(([v, t, d]) => `<label class="fb-type"><input type="radio" name="type" value="${v}"${v === 'unclear' && fbFrom ? ' checked' : ''}><span><b>${T(t)}</b><small>${T(d)}</small></span></label>`).join('')}</div>
+        <p class="fb-error" data-for="type" role="alert"></p>
       </fieldset>
       <label class="fb-field"><span class="fb-label">${T('相關頁面')}</span>
         <select name="page"><option value="">${T('整個網站／沒有特定頁面')}</option>${opts}</select></label>
       <label class="fb-field"><span class="fb-label">${T('內容')}</span>
-        <textarea name="message" rows="6" maxlength="2000" placeholder="${esc(T(FB_HINT.other))}"></textarea>
-        <small class="fb-count">0 / 2000</small></label>
+        <textarea name="message" rows="6" maxlength="2000" placeholder="${esc(T(FB_HINT[fbFrom ? 'unclear' : 'other']))}"></textarea>
+        <small class="fb-count">0 / 2000</small>
+        <p class="fb-error" data-for="message" role="alert"></p></label>
       <label class="fb-field"><span class="fb-label">${T('聯絡方式')}<small>${T('選填，需要我們回覆時再填')}</small></span>
         <input name="contact" maxlength="120" autocomplete="email" placeholder="${T('E-mail 或 LINE ID')}"></label>
       <p class="fb-error" role="alert"></p>
@@ -560,20 +562,33 @@ document.addEventListener('keydown', (e) => {
 // ---------------------------------------------------------
 view.addEventListener('change', (e) => {
   const f = e.target.form;
-  if (f && f.id === 'fbForm' && e.target.name === 'type') f.message.placeholder = T(FB_HINT[e.target.value]);
+  if (f && f.id === 'fbForm' && e.target.name === 'type') { f.message.placeholder = T(FB_HINT[e.target.value]); clearFieldErrors(f, 'type'); }
 });
 view.addEventListener('input', (e) => {
   if (e.target.name === 'message' && e.target.form && e.target.form.id === 'fbForm') {
     e.target.form.querySelector('.fb-count').textContent = `${e.target.value.length} / 2000`;
+    if (e.target.value.trim()) clearFieldErrors(e.target.form, 'message');
   }
 });
+function fieldError(f, name, text) {
+  const p = f.querySelector(`.fb-error[data-for="${name}"]`);
+  p.textContent = text;
+  const box = p.closest('.fb-field');
+  box.classList.add('invalid');
+  box.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function clearFieldErrors(f, name) {
+  f.querySelectorAll(name ? `.fb-error[data-for="${name}"]` : '.fb-error[data-for]').forEach((p) => { p.textContent = ''; p.closest('.fb-field').classList.remove('invalid'); });
+}
 async function onFeedbackSubmit(e) {
   const f = e.target;
   const err = f.querySelector('.fb-error');
   const type = f.type.value, message = f.message.value.trim();
-  if (!type) { err.textContent = T('請選擇回饋類型。'); f.querySelector('input[name="type"]').focus(); return; }
-  if (!message) { err.textContent = T('請寫下回饋內容。'); f.message.focus(); return; }
+  clearFieldErrors(f);
   err.textContent = '';
+  // 錯誤放在沒填的欄位旁邊並捲到畫面中間（2026-11-18：原本紅字在最下面，捲上去後看不到，像是按了沒反應）
+  if (!type) { fieldError(f, 'type', T('請先選一個回饋類型。')); f.querySelector('input[name="type"]').focus({ preventScroll: true }); return; }
+  if (!message) { fieldError(f, 'message', T('請寫下回饋內容。')); f.message.focus({ preventScroll: true }); return; }
   const btn = f.querySelector('.fb-submit');
   btn.disabled = true; btn.textContent = T('送出中…');
   const page = f.page.value;

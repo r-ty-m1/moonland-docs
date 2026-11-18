@@ -500,7 +500,7 @@ ol.steps > li::before {
 .fb-field { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .fb-field legend, .fb-label { font-weight: 500; color: var(--fg); padding: 0; margin-bottom: 8px; }
 .fb-label { margin-bottom: 0; }
-.fb-label small { font-weight: 400; color: var(--muted); font-size: 0.8125rem; margin-left: 8px; }
+.fb-label small, .fb-field legend small { font-weight: 400; color: var(--muted); font-size: 0.8125rem; margin-left: 8px; }
 .fb-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .fb-type { position: relative; display: block; cursor: pointer; }
 .fb-type input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
@@ -523,6 +523,9 @@ ol.steps > li::before {
 .fb-count { justify-self: end; color: var(--muted); font-size: 0.75rem; }
 .fb-error { margin: -8px 0 0; color: var(--warn-ink); font-size: 0.875rem; }
 .fb-error:empty { display: none; }
+.fb-error[data-for] { margin: 0; font-weight: 500; }
+.fb-field.invalid .fb-type span, .fb-field.invalid textarea { border-color: var(--warn-line); }
+.fb-field.invalid legend, .fb-field.invalid .fb-label { color: var(--warn-ink); }
 .fb-submit, .fb-again {
   justify-self: start; font: inherit; font-weight: 500; cursor: pointer;
   padding: 10px 22px; border: 0; border-radius: 10px; background: var(--brand); color: #04140a;
