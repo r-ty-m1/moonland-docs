@@ -53,7 +53,7 @@ console.log(`✓ ${Object.keys(ARTICLES).length} 篇文章的站內連結都找�
 // --- 2. 伺服器 ---
 const PORT = 18080 + Math.floor(Math.random() * 1000);
 const DATA_DIR = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moonland-fb-'));
-const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR, ADMIN_TOKEN: 'test-token', DEV_LOGIN: '1', EDITOR_OWNERS: 'T0001', OIDC_ISSUER: '' }, stdio: 'inherit' });
+const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, GOOGLE_SCRIPT_URL: '', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR, ADMIN_TOKEN: 'test-token', DEV_LOGIN: '1', EDITOR_OWNERS: 'T0001', OIDC_ISSUER: '' }, stdio: 'inherit' });
 const base = `http://127.0.0.1:${PORT}`;
 
 (async () => {
@@ -182,6 +182,7 @@ const base = `http://127.0.0.1:${PORT}`;
     fs.rmSync(DATA_DIR, { recursive: true, force: true });
   }
   await oidcTest();
+  await s3Test();
 })().catch((e) => { console.error(e); child.kill('SIGTERM'); process.exit(1); });
 
 // --- 5. 公司帳號登入：用假的 OIDC 伺服器（模擬 Authentik）走一次完整流程 ---
@@ -213,7 +214,7 @@ async function oidcTest() {
 
   const port = PORT + 1;
   const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moonland-oidc-'));
-  const srv = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DATA_DIR: dir, OIDC_ISSUER: issuer, OIDC_CLIENT_ID: 'cid', OIDC_CLIENT_SECRET: 'csecret', EDITOR_OWNERS: 'T0001', DEV_LOGIN: '1' }, stdio: 'inherit' });
+  const srv = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env: { ...process.env, GOOGLE_SCRIPT_URL: '', PORT: String(port), HOST: '127.0.0.1', DATA_DIR: dir, OIDC_ISSUER: issuer, OIDC_CLIENT_ID: 'cid', OIDC_CLIENT_SECRET: 'csecret', EDITOR_OWNERS: 'T0001', DEV_LOGIN: '1' }, stdio: 'inherit' });
   const b = `http://127.0.0.1:${port}`;
   try {
     for (let i = 0; i < 50; i++) { try { if ((await fetch(b + '/healthz')).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
@@ -241,6 +242,95 @@ async function oidcTest() {
   } finally {
     srv.kill('SIGTERM');
     idp.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// --- 6. 物件儲存：用假的 S3 伺服器（模擬 Silo）測上傳圖片、上傳影片、讀取轉址、備份還原 ---
+async function s3Test() {
+  // 簽章先對 AWS 文件公開的範例（Signature Version 4），兩種簽法都要一字不差
+  const { presignUrl, authHeaders } = require('./s3.js');
+  const ex = { accessKey: 'AKIAIOSFODNN7EXAMPLE', secretKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', region: 'us-east-1', date: new Date('2013-05-24T00:00:00Z') };
+  assert.ok(presignUrl({ ...ex, method: 'GET', url: 'https://examplebucket.s3.amazonaws.com/test.txt', expires: 86400 })
+    .endsWith('X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404'), '預簽網址的簽章和 AWS 範例不同');
+  assert.ok(authHeaders({ ...ex, method: 'GET', url: 'https://examplebucket.s3.amazonaws.com/test.txt', headers: { Range: 'bytes=0-9' }, payloadHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' })
+    .authorization.endsWith('Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41'), '標頭簽章和 AWS 範例不同');
+
+  const http = require('node:http');
+  const objects = new Map();   // key → { body, type }
+  const signed = [];
+  const s3 = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://x');
+    const key = decodeURIComponent(u.pathname).replace(/^\/test-bucket\//, '');
+    signed.push(Boolean(req.headers.authorization || u.searchParams.get('X-Amz-Signature')));
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      if (req.method === 'PUT') { objects.set(key, { body: Buffer.concat(chunks), type: req.headers['content-type'] || '' }); res.writeHead(200, { etag: '"x"' }); return res.end(); }
+      const o = objects.get(key);
+      if (req.method === 'DELETE') { objects.delete(key); res.writeHead(204); return res.end(); }
+      if (!o) { res.writeHead(404); return res.end('<Error><Code>NoSuchKey</Code></Error>'); }
+      res.writeHead(200, { 'content-type': o.type, 'content-length': o.body.length });
+      res.end(req.method === 'HEAD' ? undefined : o.body);
+    });
+  });
+  await new Promise((r) => s3.listen(0, '127.0.0.1', r));
+  const s3url = `http://127.0.0.1:${s3.address().port}`;
+  const port = PORT + 2;
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moonland-s3-'));
+  const env = { ...process.env, GOOGLE_SCRIPT_URL: '', PORT: String(port), HOST: '127.0.0.1', DATA_DIR: dir, DEV_LOGIN: '1', EDITOR_OWNERS: 'T0001', OIDC_ISSUER: '',
+    S3_ENDPOINT: s3url, S3_PUBLIC_ENDPOINT: s3url, S3_BUCKET: 'test-bucket', S3_ACCESS_KEY_ID: 'AK', S3_SECRET_ACCESS_KEY: 'SK', S3_REGION: 'us-east-1', S3_FORCE_PATH_STYLE: 'true' };
+  const srv = spawn(process.execPath, [path.join(__dirname, 'server.js')], { env, stdio: 'inherit' });
+  const b = `http://127.0.0.1:${port}`;
+  try {
+    for (let i = 0; i < 50; i++) { try { if ((await fetch(b + '/healthz')).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
+    const r = await fetch(b + '/api/auth/dev', { method: 'POST', body: 'no=T0001&name=主管', redirect: 'manual' });
+    const cookie = r.headers.get('set-cookie').split(';')[0];
+    const owner = (p, o = {}) => fetch(b + p, { ...o, headers: { cookie, 'x-ml-editor': '1', ...(o.headers || {}) } });
+
+    // 圖片：經伺服器存進 S3，讀取時轉址到簽好的網址
+    const webp = Buffer.concat([Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1'), Buffer.alloc(8)]);
+    const img = await (await owner('/api/editor/media?page=quick-start&ratio=1.5', { method: 'POST', headers: { 'content-type': 'image/webp' }, body: webp })).json();
+    assert.ok(objects.has(`media/${img.path}`), '圖片要存進 S3');
+    assert.equal(objects.get(`media/${img.path}`).type, 'image/webp');
+    const go = await fetch(`${b}/assets/media/${img.path}`, { redirect: 'manual' });
+    assert.equal(go.status, 302, '上傳的圖片要轉址到 S3');
+    const loc = new URL(go.headers.get('location'));
+    assert.equal(loc.pathname, `/test-bucket/media/${img.path}`);
+    assert.ok(loc.searchParams.get('X-Amz-Signature'), '讀取網址要有簽章');
+    assert.equal((await fetch(go.headers.get('location'))).status, 200);
+    const again = await fetch(`${b}/assets/media/${img.path}`, { redirect: 'manual' });
+    assert.equal(again.headers.get('location'), go.headers.get('location'), '同一小時內讀取網址要一樣，瀏覽器才快取得到');
+    assert.equal((await fetch(`${b}/assets/media/start/no-such-99.webp`, { redirect: 'manual' })).status, 404, '不是上傳的檔案不轉址');
+
+    // 影片：先拿上傳網址，瀏覽器直接傳到 S3，再請伺服器確認
+    assert.equal((await owner('/api/editor/video/start?page=quick-start&ratio=1.7778&size=999999999', { method: 'POST' })).status, 413, '超過 90 MB 要拒絕');
+    const st = await (await owner('/api/editor/video/start?page=quick-start&ratio=1.7778&size=2048', { method: 'POST' })).json();
+    assert.match(st.path, /^start\/quick-start-\d{2}\.mp4$/);
+    assert.notEqual(st.path.replace('.mp4', ''), img.path.replace('.webp', ''), '影片和圖片的序號不能撞');
+    const fin = (body) => owner('/api/editor/video/finish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await fin({ path: st.path, ratio: 1.7778 })).status, 400, '還沒傳上去不能給編號');
+    assert.equal((await fetch(st.uploadUrl, { method: 'PUT', headers: { 'content-type': 'video/mp4' }, body: Buffer.alloc(2048) })).status, 200);
+    assert.equal((await fin({ path: 'start/other-01.mp4', ratio: 1.7778 })).status, 400, '不是這次保留的檔名要拒絕');
+    const v = await (await fin({ path: st.path, ratio: 1.7778 })).json();
+    assert.ok(+v.n > +img.n, '影片要拿到新編號');
+    assert.match(await (await fetch(b + '/content.js')).text(), new RegExp(`"${v.n}":\\["${st.path}"`), 'content.js 要有新影片');
+    const st2 = await (await owner('/api/editor/video/start?page=quick-start&ratio=1&size=10', { method: 'POST' })).json();
+    await fetch(st2.uploadUrl, { method: 'PUT', headers: { 'content-type': 'text/html' }, body: '<html>' });
+    assert.equal((await fin({ path: st2.path, ratio: 1 })).status, 400, '不是 MP4 要拒絕');
+    assert.ok(!objects.has(`media/${st2.path}`), '不合格的檔案要從 S3 刪掉');
+
+    // 備份包含 S3 上的圖片與影片；還原時放回 S3
+    const bk = await (await owner('/api/editor/backup')).json();
+    assert.ok(bk.files[img.path] && bk.files[st.path], '備份要包含 S3 上的圖片與影片');
+    objects.clear();
+    assert.equal((await owner('/api/editor/restore', { method: 'POST', body: JSON.stringify(bk) })).status, 200);
+    assert.ok(objects.has(`media/${img.path}`) && objects.has(`media/${st.path}`), '還原要把檔案放回 S3');
+    assert.ok(signed.every(Boolean), '每個 S3 請求都要有簽章');
+    console.log('✓ 物件儲存：圖片與影片存進 S3、讀取轉址、大小與格式檢查、備份還原都正常（模擬 Silo）');
+  } finally {
+    srv.kill('SIGTERM');
+    s3.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }

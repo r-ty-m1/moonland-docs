@@ -593,13 +593,16 @@ linkForm.addEventListener('submit', (e) => {
   insertAt(`[${text.replace(/[\[\]]/g, '')}](${href})`);
 });
 
-// 圖片對話框：上傳的圖片縮到 1600px 寬、轉成 WebP，示範版存在瀏覽器裡
+// 圖片對話框：上傳的圖片縮到 1600px 寬、轉成 WebP，示範版存在瀏覽器裡；影片（正式版）直接傳到物件儲存
 const imgDlg = document.getElementById('imgDlg');
 const imgForm = document.getElementById('imgForm');
 let pendingImg = null;
+let pendingVid = null;   // { file, ratio }：正式版才能上傳影片，直接傳到物件儲存
+const isVideoNum = (n) => MEDIA[n] && /\.mp4$/.test(MEDIA[n][0]);
 function openImage() {
   imgForm.reset();
   pendingImg = null;
+  pendingVid = null;
   document.getElementById('imgThumb').innerHTML = '';
   imgForm.querySelector('.ed-err').textContent = '';
   syncKind(imgForm);
@@ -619,19 +622,40 @@ imgForm.addEventListener('change', async (e) => {
   const f = imgForm;
   const thumb = document.getElementById('imgThumb');
   const err = f.querySelector('.ed-err');
-  if (e.target.name === 'kind') { syncKind(f); thumb.innerHTML = ''; pendingImg = null; err.textContent = ''; return; }
+  if (e.target.name === 'kind') { syncKind(f); thumb.innerHTML = ''; pendingImg = pendingVid = null; err.textContent = ''; return; }
   if (e.target.name === 'file' && f.elements.file.files[0]) {
+    const file = f.elements.file.files[0];
     err.textContent = '';
-    try { pendingImg = await shrink(f.elements.file.files[0]); thumb.innerHTML = `<img src="${pendingImg[0]}" alt="">`; }
+    pendingImg = pendingVid = null;
+    thumb.innerHTML = '';
+    if (file.type.startsWith('video/')) {
+      if (!LIVE) { err.textContent = '示範版不能上傳影片，正式版才可以。'; return; }
+      if (file.type !== 'video/mp4') { err.textContent = '影片只接受 MP4。'; return; }
+      if (file.size > 90 * 1024 * 1024) { err.textContent = '影片超過 90 MB，請先壓縮或剪短。'; return; }
+      try { pendingVid = { file, ratio: await videoRatio(file) }; thumb.innerHTML = `<video src="${URL.createObjectURL(file)}" muted controls preload="metadata"></video>`; }
+      catch (x) { err.textContent = '讀不到這支影片，請換一支試試。'; }
+      return;
+    }
+    try { pendingImg = await shrink(file); thumb.innerHTML = `<img src="${pendingImg[0]}" alt="">`; }
     catch (x) { pendingImg = null; err.textContent = '讀不到這張圖片，請換一張試試。'; }
   }
 });
 imgForm.elements.num.addEventListener('input', () => {
   const n = imgForm.elements.num.value.trim();
-  document.getElementById('imgThumb').innerHTML = MEDIA[n] && /\.(webp|png|jpe?g|gif)$|^data:/.test(MEDIA[n][0]) ? `<img src="${mediaUrl(n)}" alt="">` : n ? '<p class="ed-hint">找不到這個編號的圖片。</p>' : '';
+  document.getElementById('imgThumb').innerHTML = isVideoNum(n) ? `<video src="${mediaUrl(n)}" muted controls preload="metadata"></video>`
+    : MEDIA[n] && /\.(webp|png|jpe?g|gif)$|^data:/.test(MEDIA[n][0]) ? `<img src="${mediaUrl(n)}" alt="">` : n ? '<p class="ed-hint">找不到這個編號的圖片或影片。</p>' : '';
 });
+function videoRatio(file) {
+  return new Promise((ok, fail) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); v.videoWidth ? ok(+(v.videoWidth / v.videoHeight).toFixed(3)) : fail(new Error('no size')); };
+    v.onerror = () => fail(new Error('bad video'));
+    v.src = URL.createObjectURL(file);
+  });
+}
 // 正式版上傳：伺服器依「區域／文章代號-序號」命名、給編號，回傳編號
-async function uploadImage([dataUrl, ratio]) {
+function uploadPlace() {
   const d = draft;
   const pageId = (document.getElementById('pageForm').elements.slug.value.trim() || d.id);
   let area;
@@ -641,13 +665,37 @@ async function uploadImage([dataUrl, ratio]) {
     const c = d.where.match(/^c:([\w-]+):/);
     area = c ? Model.areaOfPlace(S.sections.findIndex((s) => s.rows.some((r) => r.id === c[1])), c[1]) : Model.areaOfPlace(+si, rowId);
   }
+  return `page=${encodeURIComponent(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pageId) ? pageId : d.id)}&area=${area}`;
+}
+async function uploadImage([dataUrl, ratio]) {
   const blob = await (await fetch(dataUrl)).blob();
-  const r = await api(`api/editor/media?page=${encodeURIComponent(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pageId) ? pageId : d.id)}&area=${area}&ratio=${ratio}`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+  const r = await api(`api/editor/media?${uploadPlace()}&ratio=${ratio}`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || '上傳失敗');
   MEDIA[j.n] = [j.path, j.ratio];
   S.uploads[j.n] = MEDIA[j.n];
   return j.n;
+}
+// 影片：伺服器給一個只能放這個檔案的上傳網址，瀏覽器直接傳到物件儲存（不經過網站），傳完再請伺服器給編號
+async function uploadVideo({ file, ratio }, progress) {
+  const r = await api(`api/editor/video/start?${uploadPlace()}&ratio=${ratio}&size=${file.size}`, { method: 'POST' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || '上傳失敗');
+  await new Promise((ok, fail) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', j.uploadUrl);
+    x.setRequestHeader('content-type', 'video/mp4');
+    x.upload.onprogress = (e) => { if (e.lengthComputable) progress(Math.round((e.loaded / e.total) * 100)); };
+    x.onload = () => (x.status >= 200 && x.status < 300 ? ok() : fail(new Error(/QuotaExceeded/.test(x.responseText) ? '儲存空間已滿' : '影片沒有傳上去')));
+    x.onerror = () => fail(new Error('連不到儲存空間'));
+    x.send(file);
+  });
+  const r2 = await api('api/editor/video/finish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: j.path, ratio: j.ratio }) });
+  const k = await r2.json().catch(() => ({}));
+  if (!r2.ok) throw new Error(k.error || '上傳失敗');
+  MEDIA[k.n] = [k.path, k.ratio];
+  S.uploads[k.n] = MEDIA[k.n];
+  return k.n;
 }
 
 imgForm.addEventListener('submit', async (e) => {
@@ -655,9 +703,16 @@ imgForm.addEventListener('submit', async (e) => {
   const f = imgForm;
   const err = f.querySelector('.ed-err');
   let n;
-  if (f.elements.kind.value === 'upload' && LIVE) {
+  let video = false;
+  if (f.elements.kind.value === 'upload' && pendingVid) {
     e.preventDefault();
-    if (!pendingImg) { err.textContent = '請先選擇一張圖片。'; return; }
+    err.textContent = '影片上傳中… 0%';
+    try { n = await uploadVideo(pendingVid, (p) => { err.textContent = `影片上傳中… ${p}%`; }); } catch (x) { err.textContent = `${x.message}，請再試一次。`; return; }
+    err.textContent = '';
+    video = true;
+  } else if (f.elements.kind.value === 'upload' && LIVE) {
+    e.preventDefault();
+    if (!pendingImg) { err.textContent = '請先選擇一張圖片或影片。'; return; }
     err.textContent = '上傳中…';
     try { n = await uploadImage(pendingImg); } catch (x) { err.textContent = `${x.message}，請再試一次。`; return; }
     err.textContent = '';
@@ -669,12 +724,13 @@ imgForm.addEventListener('submit', async (e) => {
     if (!persist()) { delete S.uploads[n]; delete MEDIA[n]; S.nextMedia--; e.preventDefault(); err.textContent = '瀏覽器空間不夠，示範版放不下這張圖片。'; return; }
   } else {
     n = f.elements.num.value.trim();
-    if (!MEDIA[n]) { e.preventDefault(); err.textContent = '找不到這個編號的圖片。'; return; }
+    if (!MEDIA[n]) { e.preventDefault(); err.textContent = '找不到這個編號的圖片或影片。'; return; }
+    video = isVideoNum(n);
   }
   const cap = f.elements.cap.value.trim().replace(/[\[\]]/g, '');
   e.preventDefault();
   imgDlg.close();
-  insertBlock(`[i ${n}${cap ? ` ${cap}` : ''}]`);
+  insertBlock(`[${video ? 'v' : 'i'} ${n}${cap ? ` ${cap}` : ''}]`);
 });
 
 // 前後比較對話框：左右各選一張（上傳或填編號），插入 :::compare 區塊
@@ -890,9 +946,9 @@ function viewHelp() {
       <div class="ed-cheat">${cheatSheet()}</div>
       <p>小提醒：連到別的頁面請用「連結」按鈕挑選，不要自己打網址；改了頁面的「網址代號」，其他頁面的連結會自動跟著改。</p>`)}
     ${sec('4. 圖片', `<ul>
-      <li><b>插入圖片</b>：工具列「圖片」→ 從電腦上傳，或「從圖庫挑選」網站上已經有的圖。</li>
+      <li><b>插入圖片或影片</b>：工具列「圖片」→ 從電腦上傳，或「從圖庫挑選」網站上已經有的圖片、影片。</li>
       <li>上傳的圖會自動縮小、轉成網頁用的格式，並自動取好檔名、給一個編號，<b>不用自己改檔名</b>${LIVE ? '' : '（正式版）'}。</li>
-      <li>目前只能上傳圖片。影片、音訊請交給網站負責人。</li>
+      <li>影片只接受 MP4，90 MB 以內（正式版）；太大請先壓縮或剪短。上傳時畫面會顯示進度，傳完才能插入。音訊請交給網站負責人。</li>
       <li>截圖請盡量只截需要的部分，讀者在手機上才看得清楚；不要放有個人資料、密碼或公司機密的畫面。</li>
       <li>「圖片說明」會顯示在圖片下方，也能讓圖庫搜尋得到。</li>
       <li>文章裡圖片寫成 <code>[i 123 說明]</code>，123 是圖片編號；同一張圖可以用在很多篇。</li></ul>`)}
@@ -968,7 +1024,7 @@ function viewTools() {
         : `<p class="ed-ok">${ic('check')}全部 ${Object.values(S.pages).filter((p) => !p.system).length} 頁都沒有問題。</p>`}
     </section>
     <section class="ed-sec"><div class="ed-sec-head"><h2>備份</h2></div>
-      ${LIVE ? `<p class="ed-hint">把所有頁面、目錄、版本紀錄、編輯者名單和後台上傳的圖片，下載成一個檔案。<b>網站的儲存空間不是備份</b>，建議每個月、或大改之前下載一次，存到公司的雲端硬碟。</p>
+      ${LIVE ? `<p class="ed-hint">把所有頁面、目錄、版本紀錄、編輯者名單和後台上傳的圖片、影片，下載成一個檔案。<b>網站的儲存空間不是備份</b>，建議每個月、或大改之前下載一次，存到公司的雲端硬碟。</p>
         <p><a class="ed-btn" href="api/editor/backup" download>${ic('down')}下載備份檔</a></p>
         ${myRole() === 'owner' ? `<form class="ed-addform" id="restoreForm" novalidate>
           <h2>從備份還原（主管理員）</h2>

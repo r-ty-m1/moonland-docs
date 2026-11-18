@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
-<link rel="stylesheet" href="style.css?v=20261118a">
-<link rel="stylesheet" href="edit.css?v=20261118a">
+<link rel="stylesheet" href="style.css?v=20261118b">
+<link rel="stylesheet" href="edit.css?v=20261118b">
 </head>
 <body>
 <header class="top">
@@ -57,16 +57,16 @@
 
 <dialog class="ed-dlg" id="imgDlg" aria-labelledby="imgDlgT">
   <form method="dialog" id="imgForm">
-    <h2 id="imgDlgT">插入圖片</h2>
-    <fieldset class="ed-f ed-radios"><legend>圖片來源</legend>
+    <h2 id="imgDlgT">插入圖片或影片</h2>
+    <fieldset class="ed-f ed-radios"><legend>來源</legend>
       <label><input type="radio" name="kind" value="upload" checked> 從電腦上傳</label>
-      <label><input type="radio" name="kind" value="old"> 網站上已經有的圖片（從圖庫挑選或輸入編號）</label>
+      <label><input type="radio" name="kind" value="old"> 網站上已經有的圖片或影片（從圖庫挑選或輸入編號）</label>
     </fieldset>
-    <label class="ed-f" data-kind="upload"><span>選擇圖片</span><input name="file" type="file" accept="image/*"></label>
-    <label class="ed-f" data-kind="old" hidden><span>圖片編號</span><input name="num" inputmode="numeric" pattern="\d+" maxlength="5"></label>
+    <label class="ed-f" data-kind="upload"><span>選擇圖片或影片<small>影片限 MP4、90 MB 以內</small></span><input name="file" type="file" accept="image/*,video/mp4"></label>
+    <label class="ed-f" data-kind="old" hidden><span>編號</span><input name="num" inputmode="numeric" pattern="\d+" maxlength="5"></label>
     <button type="button" class="ed-btn ed-pick" data-kind="old" data-pick-for="num" hidden>從圖庫挑選</button>
     <div class="ed-thumb" id="imgThumb"></div>
-    <label class="ed-f"><span>圖片說明<small>選填，會顯示在圖片下方</small></span><input name="cap" maxlength="80"></label>
+    <label class="ed-f"><span>說明<small>選填，會顯示在圖片或影片下方</small></span><input name="cap" maxlength="80"></label>
     <p class="ed-err" role="alert"></p>
     <div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">插入</button></div>
   </form>
@@ -120,22 +120,22 @@
 <p class="ed-toast" id="toast" role="status" aria-live="polite"></p>
 
 <!-- content --><!-- 公司網站上，這段會被伺服器換成 content.js（編輯後台存的內容） -->
-<script src="data/media.js?v=20261118a"></script>
-<script src="data/snippets.js?v=20261118a"></script>
-<script src="data/start.js?v=20261118a"></script>
-<script src="data/chat.js?v=20261118a"></script>
-<script src="data/image.js?v=20261118a"></script>
-<script src="data/video.js?v=20261118a"></script>
-<script src="data/lab.js?v=20261118a"></script>
-<script src="data/recipes.js?v=20261118a"></script>
-<script src="data/models.js?v=20261118a"></script>
-<script src="data/team.js?v=20261118a"></script>
-<script src="data/support.js?v=20261118a"></script>
-<script src="data/sections.js?v=20261118a"></script>
-<script src="data/drafts.js?v=20261118a"></script>
+<script src="data/media.js?v=20261118b"></script>
+<script src="data/snippets.js?v=20261118b"></script>
+<script src="data/start.js?v=20261118b"></script>
+<script src="data/chat.js?v=20261118b"></script>
+<script src="data/image.js?v=20261118b"></script>
+<script src="data/video.js?v=20261118b"></script>
+<script src="data/lab.js?v=20261118b"></script>
+<script src="data/recipes.js?v=20261118b"></script>
+<script src="data/models.js?v=20261118b"></script>
+<script src="data/team.js?v=20261118b"></script>
+<script src="data/support.js?v=20261118b"></script>
+<script src="data/sections.js?v=20261118b"></script>
+<script src="data/drafts.js?v=20261118b"></script>
 <!-- /content -->
-<script src="markup.js?v=20261118a"></script>
-<script src="model.js?v=20261118a"></script>
-<script src="edit.js?v=20261118a"></script>
+<script src="markup.js?v=20261118b"></script>
+<script src="model.js?v=20261118b"></script>
+<script src="edit.js?v=20261118b"></script>
 </body>
 </html>

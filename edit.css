@@ -205,7 +205,7 @@ a.ed-name:hover { background: var(--hover); }
 .ed-radios label { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; color: var(--fg-2); cursor: pointer; }
 .ed-radios input { accent-color: var(--brand-ic); width: 16px; height: 16px; margin: 0; }
 .ed-dlg-acts { display: flex; justify-content: flex-end; gap: 8px; }
-.ed-thumb img { display: block; max-height: 200px; width: auto; border-radius: 10px; border: 1px solid var(--line); }
+.ed-thumb img, .ed-thumb video { display: block; max-height: 200px; max-width: 100%; width: auto; border-radius: 10px; border: 1px solid var(--line); }
 .ed-thumb:empty { display: none; }
 .ed-dlg textarea { resize: vertical; line-height: 1.6; }
 .ed-cmp-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

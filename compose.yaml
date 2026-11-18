@@ -1,5 +1,7 @@
 # 只供本機測試：docker compose up --build，再打開 http://localhost:8080
 # 本機沒有公司帳號登入，DEV_LOGIN=1 讓編輯後台改用「輸入員工編號」的假登入；EDITOR_OWNERS 是測試用的主管理員
+# 物件儲存用本機的 Silo（silo、silo-init，來自 mason containerize 的範本）：帳號金鑰只在這台電腦有效，不是祕密，
+# 也不要列進 vibe.yaml 的 environment.required。正式環境的 S3_* 由平台部署時提供。Console：http://localhost:9001（localroot）
 services:
   web:
     build: .
@@ -10,5 +12,79 @@ services:
       EDITOR_OWNERS: "T0001"
       # 本機測試不真的發 Zulip 通知，只寫進 log
       ZULIP_DELIVERY: "dry-run"
+      # 本機測試不轉存到真的 Google 試算表
+      GOOGLE_SCRIPT_URL: ""
+      # 容器內呼叫 S3 用
+      S3_ENDPOINT: http://silo:9000
+      # 只用來簽給瀏覽器的網址：瀏覽器在主機上，連的是發布出來的 port
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_BUCKET: vibe-local-data
+      S3_ACCESS_KEY_ID: LOCALS3ACCESSKEY0001
+      S3_SECRET_ACCESS_KEY: local-only-not-a-secret-0123456789abcd
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: "true"
+    depends_on:
+      silo-init:
+        condition: service_completed_successfully
     volumes:
       - ./.data:/app/storage
+
+  silo:
+    # 與 .64 上的 Silo 同一版本。
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: localroot
+      MINIO_ROOT_PASSWORD: local-root-not-a-secret
+    ports:
+      # 只綁本機。9000 是 S3（預簽網址連這裡），9001 是 Console（帳號 localroot）。
+      # 9000 被占用時，兩個地方一起改：這裡左邊的主機 port，以及 app 的 S3_PUBLIC_ENDPOINT。
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - silo-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 建立 bucket、應用專屬的帳號與金鑰、CORS。每次啟動都跑一次，已經存在的會沿用。
+  silo-init:
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+    depends_on:
+      silo:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        mc() { /usr/bin/mc --quiet --no-color "$$@"; }
+        mc alias set local http://silo:9000 localroot local-root-not-a-secret >/dev/null
+        mc mb --ignore-existing local/vibe-local-data >/dev/null
+        # 和正式環境的 vibe-<名稱> policy 相同：只有自己的 bucket。
+        cat >/tmp/policy.json <<'JSON'
+        {"Version":"2012-10-17","Statement":[
+          {"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation","s3:ListBucketMultipartUploads"],"Resource":["arn:aws:s3:::vibe-local-data"]},
+          {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],"Resource":["arn:aws:s3:::vibe-local-data/*"]}]}
+        JSON
+        mc admin policy create local vibe-local /tmp/policy.json >/dev/null
+        mc admin user add local vbu-local local-parent-not-a-secret >/dev/null
+        mc admin policy attach local vibe-local --user vbu-local >/dev/null 2>&1 || true
+        mc admin user svcacct info local LOCALS3ACCESSKEY0001 >/dev/null 2>&1 \
+          || mc admin user svcacct add local vbu-local \
+               --access-key LOCALS3ACCESSKEY0001 --secret-key local-only-not-a-secret-0123456789abcd >/dev/null
+        cat >/tmp/cors.xml <<'XML'
+        <CORSConfiguration><CORSRule>
+          <AllowedOrigin>http://localhost:8080</AllowedOrigin>
+          <AllowedOrigin>http://127.0.0.1:8080</AllowedOrigin>
+          <AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>HEAD</AllowedMethod>
+          <AllowedHeader>content-type</AllowedHeader><AllowedHeader>content-md5</AllowedHeader><AllowedHeader>x-amz-*</AllowedHeader>
+          <ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3000</MaxAgeSeconds>
+        </CORSRule></CORSConfiguration>
+        XML
+        mc cors set local/vibe-local-data /tmp/cors.xml >/dev/null
+        echo "本機 Silo 就緒：bucket vibe-local-data，Console http://localhost:9001"
+
+volumes:
+  silo-data:

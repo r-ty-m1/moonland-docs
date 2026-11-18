@@ -4,7 +4,9 @@
 // - 誰能編輯：server/owners.json 的員工編號永遠是主管理員；其他人看後台「編輯者名單」
 // - 內容存在 DATA_DIR（部署時是 persistence 磁碟）：
 //     content.json   目錄、頁面、版本紀錄、修改紀錄、最近刪除、編輯者名單（第一次啟動時從 data/*.js 複製）
-//     media.json     後台上傳的圖片對照表；檔案在 media/<區域>/<文章代號>-<序號>.webp
+//     media.json     後台上傳的圖片、影片對照表
+// - 上傳的檔案：平台有提供物件儲存（vibe.yaml 的 storage: s3，見 server/s3.js）時存在 S3 的 media/<區域>/<文章代號>-<序號>.<副檔名>；
+//   沒有時（本機直接跑）存在 DATA_DIR/media/。圖片經伺服器上傳；影片由瀏覽器直接傳到 S3（不經過網站，最大 90 MB）
 //     session-secret 登入 cookie 的簽章金鑰（自動產生）
 // - 說明中心從 /content.js 讀內容，存檔後立刻生效
 const fs = require('node:fs');
@@ -12,17 +14,23 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
 const Model = require('../model.js');
+const S3 = require('./s3.js');
 
 const CALLBACK_PATH = '/api/auth/callback/authentik';
 const SESSION_HOURS = 12;
 const LIMITS = { log: 500, history: 30, trash: 100 };
 const AREAS = ['start', 'chat', 'image', 'video', 'lab', 'recipes', 'models', 'team', 'support'];
+// 影片直接從瀏覽器傳到 S3：單次上傳，留在 Cloudflare 單一請求 100 MB 的限制以內
+const VIDEO_MAX = 90 * 1024 * 1024;
+const UPLOAD_RE = /^[a-z]+\/[a-z0-9-]+-\d{2,3}\.(?:webp|jpg|mp4)$/;
 
 module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   const OIDC = { issuer: process.env.OIDC_ISSUER || '', id: process.env.OIDC_CLIENT_ID || '', secret: process.env.OIDC_CLIENT_SECRET || '' };
   const LOGIN = OIDC.issuer && OIDC.id && OIDC.secret ? 'oidc' : process.env.DEV_LOGIN === '1' ? 'dev' : 'none';
   const file = (f) => path.join(DATA_DIR, f);
   const MEDIA_DIR = file('media');
+  const store = S3.create();
+  console.log(store ? '上傳的圖片與影片存在物件儲存（S3）' : '沒有 S3 設定：上傳的圖片存在 DATA_DIR/media，不能上傳影片');
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
   // 寫檔先寫到暫存檔再改名，寫到一半當機也不會留下壞掉的檔案
@@ -253,52 +261,109 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     return [200, { rev: C.rev, savedAt: C.savedAt, editors: C.editors }];
   }
 
-  // 上傳：瀏覽器已經縮好、轉好 WebP（或 JPEG），伺服器只檢查、命名、給編號
-  function upload(req, url, buf) {
-    const isWebp = buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
-    const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
-    if (!isWebp && !isJpeg) return [400, { error: '只接受 WebP 或 JPEG 圖片' }];
+  // 命名：「區域／文章代號-序號.副檔名」，序號接著這篇在這個區域裡最大的；影片上傳中的先保留，不會撞名
+  const reserved = new Map();   // 檔名 → 保留到期時間
+  function nameFor(url, ext) {
     const pageId = url.searchParams.get('page') || '';
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pageId)) return [400, { error: '頁面代號不合格' }];
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pageId)) return [null, '頁面代號不合格'];
     const ratio = +(+url.searchParams.get('ratio')).toFixed(4);
-    if (!(ratio > 0.05 && ratio < 20)) return [400, { error: '寬高比不正確' }];
+    if (!(ratio > 0.05 && ratio < 20)) return [null, '寬高比不正確'];
     const MEDIA = allMedia();
     let area = url.searchParams.get('area');
     if (!AREAS.includes(area)) area = Model.areaFor(pageId, C.sections, MEDIA);
-    // 序號：這篇文章在這個區域裡最大的序號 +1；編號：用過的最大號 +1
+    const now = Date.now();
+    for (const [k, t] of reserved) if (t < now) reserved.delete(k);
     let seq = 0;
-    for (const e of Object.values(MEDIA)) {
-      const m = String(e[0]).match(/^([a-z]+)\/([a-z0-9-]+)-(\d{2,3})\.\w+$/);
+    for (const p of [...Object.values(MEDIA).map((e) => String(e[0])), ...reserved.keys()]) {
+      const m = p.match(/^([a-z]+)\/([a-z0-9-]+)-(\d{2,3})\.\w+$/);
       if (m && m[1] === area && m[2] === pageId) seq = Math.max(seq, +m[3]);
     }
-    const rel = `${area}/${pageId}-${String(seq + 1).padStart(2, '0')}.${isWebp ? 'webp' : 'jpg'}`;
+    return [{ rel: `${area}/${pageId}-${String(seq + 1).padStart(2, '0')}.${ext}`, ratio }];
+  }
+  function addUpload(rel, ratio) {
+    const MEDIA = allMedia();
     const n = String(Math.max(-1, ...Object.keys(MEDIA).map(Number).filter(Number.isFinite)) + 1);
-    fs.mkdirSync(path.join(MEDIA_DIR, area), { recursive: true });
-    fs.writeFileSync(path.join(MEDIA_DIR, rel), buf);
     uploads = { ...uploads, [n]: [rel, ratio] };
     writeJson('media.json', uploads);
     buildContentJs();
+    return n;
+  }
+  async function saveFile(rel, buf, type) {
+    if (store) return store.put(`media/${rel}`, buf, type);
+    fs.mkdirSync(path.join(MEDIA_DIR, rel.split('/')[0]), { recursive: true });
+    fs.writeFileSync(path.join(MEDIA_DIR, rel), buf);
+  }
+  async function readFile(rel) {
+    if (store) return store.get(`media/${rel}`);
+    return fs.readFileSync(path.join(MEDIA_DIR, rel));
+  }
+
+  // 上傳圖片：瀏覽器已經縮好、轉好 WebP（或 JPEG），伺服器只檢查、命名、給編號
+  async function upload(req, url, buf) {
+    const isWebp = buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
+    const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    if (!isWebp && !isJpeg) return [400, { error: '只接受 WebP 或 JPEG 圖片' }];
+    const [name, bad] = nameFor(url, isWebp ? 'webp' : 'jpg');
+    if (!name) return [400, { error: bad }];
+    reserved.set(name.rel, Date.now() + 60e3);
+    try {
+      await saveFile(name.rel, buf, isWebp ? 'image/webp' : 'image/jpeg');
+    } catch (e) {
+      console.error('上傳圖片失敗', e.message);
+      return [e.code === 'XMinioAdminBucketQuotaExceeded' ? 507 : 502, { error: e.message }];
+    } finally { reserved.delete(name.rel); }
+    const n = addUpload(name.rel, name.ratio);
+    return [201, { n, path: name.rel, ratio: name.ratio }];
+  }
+
+  // 上傳影片第一步：伺服器決定檔名，回傳一個 10 分鐘內有效、只能放這個檔案的上傳網址
+  function videoStart(url) {
+    if (!store) return [503, { error: '儲存尚未設定，暫時不能上傳影片' }];
+    const size = Number(url.searchParams.get('size'));
+    if (!(size > 0)) return [400, { error: '檔案大小不正確' }];
+    if (size > VIDEO_MAX) return [413, { error: '影片超過 90 MB，請先壓縮或剪短' }];
+    const [name, bad] = nameFor(url, 'mp4');
+    if (!name) return [400, { error: bad }];
+    reserved.set(name.rel, Date.now() + 15 * 60e3);
+    return [200, { path: name.rel, ratio: name.ratio, uploadUrl: store.presign('PUT', `media/${name.rel}`, { expires: 600 }) }];
+  }
+  // 第二步：瀏覽器傳完後，伺服器確認檔案真的在、大小與格式對，才給編號
+  async function videoFinish(body) {
+    if (!store) return [503, { error: '儲存尚未設定' }];
+    const rel = isObj(body) && String(body.path || '');
+    const ratio = +(+(isObj(body) && body.ratio)).toFixed(4);
+    if (!UPLOAD_RE.test(rel) || !rel.endsWith('.mp4') || !reserved.has(rel)) return [400, { error: '找不到這次的上傳，請重新上傳' }];
+    if (!(ratio > 0.05 && ratio < 20)) return [400, { error: '寬高比不正確' }];
+    const info = await store.head(`media/${rel}`);
+    if (!info) return [400, { error: '影片沒有傳上去，請再試一次' }];
+    if (info.size > VIDEO_MAX || !/^video\/mp4\b/.test(info.type)) {
+      await store.del(`media/${rel}`).catch(() => {});
+      reserved.delete(rel);
+      return [400, { error: '只接受 90 MB 以內的 MP4 影片' }];
+    }
+    reserved.delete(rel);
+    const n = addUpload(rel, ratio);
     return [201, { n, path: rel, ratio }];
   }
 
   // 備份：內容＋上傳的圖片（base64）存成一個 JSON 檔；還原時整份覆蓋
-  function backup() {
+  async function backup() {
     const files = {};
     for (const [rel] of Object.values(uploads)) {
-      try { files[rel] = fs.readFileSync(path.join(MEDIA_DIR, rel)).toString('base64'); } catch {}
+      try { files[rel] = (await readFile(rel)).toString('base64'); } catch (e) { console.error('備份時讀不到', rel, e.message); }
     }
     return { kind: 'moonland-docs-backup', version: 1, at: new Date().toISOString(), content: C, uploads, files };
   }
-  function restoreBackup(user, b) {
+  async function restoreBackup(user, b) {
     if (!isObj(b) || b.kind !== 'moonland-docs-backup' || !isObj(b.content)) return [400, { error: '這不是說明中心的備份檔' }];
     const shape = Model.checkShape(b.content.sections, b.content.pages);
     if (shape) return [400, { error: `備份檔內容有問題：${shape}` }];
     const files = isObj(b.files) ? b.files : {};
     const ups = isObj(b.uploads) ? b.uploads : {};
     for (const [rel] of Object.values(ups)) {
-      if (!/^[a-z]+\/[a-z0-9-]+-\d{2,3}\.(?:webp|jpg)$/.test(rel) || typeof files[rel] !== 'string') continue;
-      fs.mkdirSync(path.join(MEDIA_DIR, rel.split('/')[0]), { recursive: true });
-      fs.writeFileSync(path.join(MEDIA_DIR, rel), Buffer.from(files[rel], 'base64'));
+      if (!UPLOAD_RE.test(rel) || typeof files[rel] !== 'string') continue;
+      const ext = rel.split('.').pop();
+      await saveFile(rel, Buffer.from(files[rel], 'base64'), { webp: 'image/webp', jpg: 'image/jpeg', mp4: 'video/mp4' }[ext]);
     }
     uploads = ups;
     writeJson('media.json', uploads);
@@ -355,14 +420,16 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       let out;
       if (pathname === '/api/editor/state' && req.method === 'GET') out = [200, stateFor(user)];
       else if (pathname === '/api/editor/state' && req.method === 'PUT') out = putState(user, role, JSON.parse((await readBody(req, 30e6)).toString() || 'null'));
-      else if (pathname === '/api/editor/media' && req.method === 'POST') out = upload(req, url, await readBody(req, 8e6));
+      else if (pathname === '/api/editor/media' && req.method === 'POST') out = await upload(req, url, await readBody(req, 8e6));
+      else if (pathname === '/api/editor/video/start' && req.method === 'POST') out = videoStart(url);
+      else if (pathname === '/api/editor/video/finish' && req.method === 'POST') out = await videoFinish(JSON.parse((await readBody(req, 4096)).toString() || 'null'));
       else if (pathname === '/api/editor/check' && req.method === 'GET') out = [200, { problems: Model.checkAll(C.pages, allMedia()) }];
       else if (pathname === '/api/editor/backup' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="moonland-docs-backup-${new Date().toISOString().slice(0, 10)}.json"` });
-        res.end(JSON.stringify(backup()));
+        res.end(JSON.stringify(await backup()));
         return true;
       } else if (pathname === '/api/editor/restore' && req.method === 'POST') {
-        out = role === 'owner' ? restoreBackup(user, JSON.parse((await readBody(req, 200e6)).toString() || 'null')) : [403, { error: '只有主管理員可以從備份還原' }];
+        out = role === 'owner' ? await restoreBackup(user, JSON.parse((await readBody(req, 400e6)).toString() || 'null')) : [403, { error: '只有主管理員可以從備份還原' }];
       } else out = [404, { error: 'Not found' }];
       sendJson(res, out[0], out[1]);
     } catch (e) {
@@ -377,11 +444,13 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     return true;
   }
 
-  // 後台上傳的圖片優先：/assets/media/<區域>/<檔名> 先找 DATA_DIR/media
-  function uploadedFile(rel) {
+  // 後台上傳的檔案：/assets/media/<區域>/<檔名> 是上傳的就回 { url }（S3 的讀取網址，轉址過去）或 { file }（本機檔案）
+  function uploadedMedia(rel) {
+    if (!Object.values(uploads).some((e) => e[0] === rel)) return null;
+    if (store) return { url: store.presign('GET', `media/${rel}`, { stable: true }) };
     const f = path.join(MEDIA_DIR, rel);
-    return f.startsWith(MEDIA_DIR + path.sep) && fs.existsSync(f) ? f : null;
+    return f.startsWith(MEDIA_DIR + path.sep) && fs.existsSync(f) ? { file: f } : null;
   }
 
-  return { handle, uploadedFile, LOGIN };
+  return { handle, uploadedMedia, LOGIN };
 };

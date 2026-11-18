@@ -101,7 +101,7 @@
 - 檔案放法和圖片一樣（例如 `assets/media/models/m-3d-01.glb`），在 `data/media.js` 加一行 `["models/m-3d-01.glb", 1.5]`，文章寫 `[3d 編號]`。
 - 每個檔案盡量在 **10 MB 以內**（Pixal3D 用「高相容」或 2K 材質匯出）。不要用 Draco／KTX2 壓縮的 GLB：解壓程式要從 Google 網站下載，公司內部網路可能連不到。
 - 檢視程式是 Google 的 model-viewer 4.4.0（Apache-2.0），檔案在 `assets/vendor/model-viewer.min.js`，只有讀者點了按鈕才會載入。更新版本時，從 `https://cdn.jsdelivr.net/npm/@google/model-viewer@<版本>/dist/model-viewer.min.js` 下載換掉即可。
-- 編輯後台目前只能上傳圖片；3D 檔和影片一樣，要由平台組放進網站檔案。
+- 編輯後台可以上傳圖片與影片（MP4），3D 檔和音訊還不行，要由平台組放進網站檔案。
 
 ### 分類與命名規則
 
@@ -141,7 +141,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261118a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261118b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -167,7 +167,9 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 - **公司帳號登入**：`vibe.yaml` 的 `auth.mode: oidc`，網站自己當 OIDC client（`server/editor.js`，授權碼流程＋PKCE，請求 `employee_number`）。平台部署時自動注入 `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`。只有編輯後台要登入，說明中心照常不用。登出只登出本站，公司帳號維持登入。
 - **誰能編輯**：`server/owners.json` 的員工編號永遠是主管理員（不能在後台移除，改了要重新部署）；其他人由主管理員在「編輯者名單」新增。權限判斷都在伺服器。
 - **內容存在伺服器**：`DATA_DIR`（部署時是 `/app/storage`，`vibe.yaml` 的 persistence）裡的 `content.json`。第一次啟動時從 `data/*.js` 複製；之後說明中心讀伺服器產生的 `/content.js`（`index.html` 裡 `<!-- content -->` 那段會被換掉），存檔後立刻生效。
-- **上傳圖片**：瀏覽器先縮到 1600px 寬、轉成 WebP，伺服器依命名規則取檔名（`區域/文章代號-序號.webp`）、給新編號，存在 `DATA_DIR/media/`，網址和程式附的圖片一樣是 `assets/media/...`。目前只能傳圖片。
+- **上傳圖片與影片**：圖片由瀏覽器先縮到 1600px 寬、轉成 WebP，再經伺服器存檔；影片（MP4、90 MB 以內）由瀏覽器拿伺服器簽好的網址直接傳到物件儲存，不經過網站。伺服器依命名規則取檔名（`區域/文章代號-序號.副檔名`）、給新編號，網址和程式附的檔案一樣是 `assets/media/...`。
+  - 存在哪裡：平台有提供物件儲存（`vibe.yaml` 的 `storage: s3`，程式在 `server/s3.js`，只用 Node 內建模組）時存在 S3 的 `media/<區域>/<檔名>`，讀取時伺服器轉址到簽好的網址；沒有 S3 設定時（本機直接跑）圖片存在 `DATA_DIR/media/`，不能傳影片。
+  - 程式附的媒體（`assets/media/`，約 220 MB）維持放在程式裡：GitHub Pages 預覽版要用，而且不會被後台改動。
 - **草稿**：頁面勾選「草稿，先不公開」就只在後台看得到（`draft: true`，`model.js` 的 `toSite` 會跳過），全部列在「草稿箱」分頁。公開的頁面連到草稿，儲存時會提醒。
 - **儲存前檢查**：儲存單頁時檢查缺圖與壞連結（`model.js`），「檢查與備份」分頁可以檢查全站。
 - **兩人同時修改**：每次存檔都帶版本號，版本不對伺服器回 409，後台會載入最新內容、請使用者再做一次（正在編輯的文字會保留）。
@@ -188,5 +190,6 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 - 本機測試：`docker compose up --build`，打開 http://localhost:8080
 - 測試：`node server/test.js`（不需要安裝任何套件）
 - 說明中心不需要登入、網址對外公開；只有編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`）。
-- 內容、上傳的圖片、回饋存在 persistence 磁碟（`vibe.yaml` 的 `mount_path: /app/storage`，`Dockerfile` 的 `DATA_DIR`）。不能掛在 `/app/data`，那是程式附的文章資料夾。
+- 內容、上傳檔案的對照表、回饋存在 persistence 磁碟（`vibe.yaml` 的 `mount_path: /app/storage`，`Dockerfile` 的 `DATA_DIR`）。不能掛在 `/app/data`，那是程式附的文章資料夾。上傳的圖片與影片存在平台的物件儲存（`storage: s3`）。
+- 本機用 `docker compose up --build` 時會一起啟動本機的 Silo（S3），Console 在 http://localhost:9001（帳號 localroot）。
 - 推到公司 Gitea 的預設分支後，CI 會自動測試、建置並部署。

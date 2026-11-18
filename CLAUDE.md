@@ -33,13 +33,12 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 
 網站要放到公司內部的 Gitea 自動部署，部署設定都已備好：`Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml`、`server/server.js`（無相依套件的靜態伺服器）。
 
-- 說明中心不用登入、網址對外公開；編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`、`callback_path: /api/auth/callback/authentik`）。內容、上傳、回饋存在 persistence（`mount_path: /app/storage`，Dockerfile 的 `DATA_DIR`；不能用 `/app/data`，那是程式附的文章資料夾）。圖片目前存 persistence，沒用 S3。
+- 說明中心不用登入、網址對外公開；編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`、`callback_path: /api/auth/callback/authentik`）。內容、上傳、回饋存在 persistence（`mount_path: /app/storage`，Dockerfile 的 `DATA_DIR`；不能用 `/app/data`，那是程式附的文章資料夾）。後台上傳的圖片與影片存物件儲存（2026-11-18 使用者要求，`vibe.yaml` 的 `storage: s3`，`server/s3.js` 自己實作 SigV4、不裝 SDK，簽章用 AWS 官方範例釘在 `server/test.js`）：圖片經伺服器 PUT、影片由瀏覽器拿預簽網址直接 PUT（單次、上限 90 MB，避開 Cloudflare 100 MB）、`/video/start` 先保留檔名、`/video/finish` HEAD 確認後才給編號；讀取時 302 到簽章時間取整到小時的預簽網址。沒有 `S3_*` 時圖片退回 `DATA_DIR/media`、影片回 503。程式附的 `assets/media/` 不搬。本機 `compose.yaml` 已併入 mason 的本機 Silo；Docker Desktop 在使用者電腦 2026-11-18 起不來，還沒用真的 Silo 測過。
 - 回饋後台：使用者選用公司 Google 試算表（2026-11-18），後台讀試算表、密碼是 Apps Script 指令碼屬性 `ADMIN_TOKEN`。伺服器端的 `ADMIN_TOKEN` 沒有宣告在 `vibe.yaml`，所以沒設試算表時正式站的後台讀不到伺服器上的回饋。
 - `ci.yaml` 由公司範本產生，不要手動改；要更新用 mason 的 containerize skill（`ci_template.py`），`deploy-site` 部署前會自動更新。2026-11-18 檢查是 `outdated`（舊的 vibe-deploy 範本），第一次部署時更新。
 - 部署流程用 mason plugin（取代 vibe-deploy，原始碼 `U:\_研發\tznung\mason`，使用者已安裝）：assess-readiness → containerize → deploy-site；推送權限用 gitea-access。推送需要用使用者的公司帳號，所以要在使用者自己的電腦上做。工作用的 clone 在 `F:\RD\Moonland\moonland-docs\repo`，`.env`（Zulip 四個值）也放這裡。
-- 2026-11-18 使用者決定：網址 `https://moonland-docs-vibe.moonshine-studio.net`（應用名稱 moonland-docs）、說明中心對外公開、登入沿用公司 SSO 不加「登出公司帳號」、上傳圖片維持 persistence 不用 S3、正式站讓搜尋引擎收錄。
+- 2026-11-18 使用者決定：網址 `https://moonland-docs-vibe.moonshine-studio.net`（應用名稱 moonland-docs）、說明中心對外公開、登入沿用公司 SSO 不加「登出公司帳號」、上傳的圖片與影片改存 S3、正式站讓搜尋引擎收錄、主管理員是使用者本人（員編 20261004，`server/owners.json`）。`config.js` 已填 Google Apps Script 網址，但 2026-11-18 從公司網路打開回 403，要請使用者把部署的「誰可以存取」設成「任何人」。測試用環境變數 `GOOGLE_SCRIPT_URL=""` 關掉轉存。
 - `vibe.yaml` 宣告了 `environment.required`：`ZULIP_SITE`、`ZULIP_BOT_EMAIL`、`ZULIP_API_KEY`、`FEEDBACK_NOTIFY_EMAIL`，部署前 `.env` 要有值，否則部署失敗。
-- `server/owners.json` 的 `owners` 目前是空的，上線前要填網站負責人的員工編號，否則沒有人能進後台管理名單。
 - 容器映像還沒實際建置驗證過。使用者 2026-11-18 裝了 Docker 與 Python，但當時 Docker Desktop 沒開，本機建置沒跑成。
 - **使用者目前只要預覽給主管看，還沒要求推到公司 Gitea。** 沒有明確要求不要推。
 

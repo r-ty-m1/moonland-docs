@@ -62,7 +62,9 @@ const sendJson = (res, status, obj) => send(res, status, JSON.stringify(obj), TY
 
 // ---------- 回饋 ----------
 // config.js 的 googleScriptUrl（公開的 Apps Script 網址）。有填時，伺服器收到的回饋也轉存到 Google 試算表
+// 環境變數 GOOGLE_SCRIPT_URL 有設定時以它為準（測試設成空字串，免得假資料跑進真的試算表）
 const GOOGLE_URL = (() => {
+  if (process.env.GOOGLE_SCRIPT_URL !== undefined) return process.env.GOOGLE_SCRIPT_URL;
   try {
     const m = /googleScriptUrl:\s*'([^']*)'/.exec(fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8'));
     return m && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(m[1]) ? m[1] : '';
@@ -151,8 +153,13 @@ function getFeedback(req, res) {
 }
 
 function serveFile(req, res, rel) {
-  // 後台上傳的圖片存在 DATA_DIR/media，網址和程式附的圖片一樣是 assets/media/...
-  const file = (rel.startsWith('assets/media/') && editor.uploadedFile(rel.slice(13))) || path.join(ROOT, rel);
+  // 後台上傳的檔案網址和程式附的一樣是 assets/media/...：存在 S3 的轉址到簽好的讀取網址，存在 DATA_DIR/media 的直接送
+  const up = rel.startsWith('assets/media/') && editor.uploadedMedia(rel.slice(13));
+  if (up && up.url) {
+    res.writeHead(302, { location: up.url, 'cache-control': 'private, max-age=600' });
+    return res.end();
+  }
+  const file = (up && up.file) || path.join(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) && !file.startsWith(DATA_DIR + path.sep)) return send(res, 404, 'Not found');
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return send(res, 404, 'Not found');
