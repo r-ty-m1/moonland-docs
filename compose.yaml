@@ -8,5 +8,7 @@ services:
     environment:
       DEV_LOGIN: "1"
       EDITOR_OWNERS: "T0001"
+      # 本機測試不真的發 Zulip 通知，只寫進 log
+      ZULIP_DELIVERY: "dry-run"
     volumes:
       - ./.data:/app/storage

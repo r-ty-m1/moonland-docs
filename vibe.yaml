@@ -12,3 +12,11 @@ persistence:
 auth:
   mode: oidc
   callback_path: /api/auth/callback/authentik
+# 執行時需要的設定，只寫名稱。值放在負責人電腦上專案根目錄的 .env（不進 git），
+# 部署時由 mason 的 deploy-site 交給平台。用途見 server/notify.js（收到回饋時用 Zulip 通知負責人）
+environment:
+  required:
+    - ZULIP_SITE
+    - ZULIP_BOT_EMAIL
+    - ZULIP_API_KEY
+    - FEEDBACK_NOTIFY_EMAIL

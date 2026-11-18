@@ -23,7 +23,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - **所有字級用 `rem`**，不要寫 `px`，否則右上角「字體大小」（標準 100%、大 115%、特大 130%）放大不到。
 - 手機（寬度 620px 以下）表格會改成一列一張卡片，靠每個儲存格的 `data-label`；只有圖片的並排會維持兩欄。
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
-- 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。`config.js` 的 `googleScriptUrl` 有值就 POST 到 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）；沒值就 POST 到 `api/feedback`，伺服器回 404/405（GitHub Pages）時改存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
+- 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。瀏覽器一律先 POST 到 `api/feedback`（2026-11-18 起）：伺服器存一份、`config.js` 的 `googleScriptUrl` 有值時轉存 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）、文字回饋用 Zulip 私訊 `FEEDBACK_NOTIFY_EMAIL`（`server/notify.js`，照 mason 的 zulip-notify：只寫類型／頁面／後台連結、每小時最多 20 則、`ZULIP_DELIVERY=dry-run` 本機不發）。伺服器回 404/405（GitHub Pages）時，有 Google 網址就直接送過去，沒有就存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
 - 「聯絡我們」頁下方的寫信表單（2026-11-10）是程式產生的（`script.js` 的 `mailForm`），不在文章內容裡：按「寄出」用 `mailto:` 開啟使用者的郵件程式寄到 support@moonland.ai（使用者選的做法，網站本身不寄信），並顯示可複製的內容作為備案。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
@@ -34,11 +34,13 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 網站要放到公司內部的 Gitea 自動部署，部署設定都已備好：`Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml`、`server/server.js`（無相依套件的靜態伺服器）。
 
 - 說明中心不用登入、網址對外公開；編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`、`callback_path: /api/auth/callback/authentik`）。內容、上傳、回饋存在 persistence（`mount_path: /app/storage`，Dockerfile 的 `DATA_DIR`；不能用 `/app/data`，那是程式附的文章資料夾）。圖片目前存 persistence，沒用 S3。
-- 回饋若存公司伺服器（`config.js` 沒填 Google 網址），persistence 已開；但回饋後台仍只靠 `ADMIN_TOKEN` 密碼，要改成公司登入可沿用 `server/editor.js` 的登入。
-- `ci.yaml` 由公司範本產生，不要手動改；要更新用 vibe-deploy 的 containerize skill。
-- 部署流程用 vibe-deploy 這組 skills（assess-readiness → containerize → deploy-site；推送權限用 gitea-access）。推送需要用使用者的公司帳號登入，所以要在使用者自己的電腦上做。
+- 回饋後台：使用者選用公司 Google 試算表（2026-11-18），後台讀試算表、密碼是 Apps Script 指令碼屬性 `ADMIN_TOKEN`。伺服器端的 `ADMIN_TOKEN` 沒有宣告在 `vibe.yaml`，所以沒設試算表時正式站的後台讀不到伺服器上的回饋。
+- `ci.yaml` 由公司範本產生，不要手動改；要更新用 mason 的 containerize skill（`ci_template.py`），`deploy-site` 部署前會自動更新。2026-11-18 檢查是 `outdated`（舊的 vibe-deploy 範本），第一次部署時更新。
+- 部署流程用 mason plugin（取代 vibe-deploy，原始碼 `U:\_研發\tznung\mason`，使用者已安裝）：assess-readiness → containerize → deploy-site；推送權限用 gitea-access。推送需要用使用者的公司帳號，所以要在使用者自己的電腦上做。工作用的 clone 在 `F:\RD\Moonland\moonland-docs\repo`，`.env`（Zulip 四個值）也放這裡。
+- 2026-11-18 使用者決定：網址 `https://moonland-docs-vibe.moonshine-studio.net`（應用名稱 moonland-docs）、說明中心對外公開、登入沿用公司 SSO 不加「登出公司帳號」、上傳圖片維持 persistence 不用 S3、正式站讓搜尋引擎收錄。
+- `vibe.yaml` 宣告了 `environment.required`：`ZULIP_SITE`、`ZULIP_BOT_EMAIL`、`ZULIP_API_KEY`、`FEEDBACK_NOTIFY_EMAIL`，部署前 `.env` 要有值，否則部署失敗。
 - `server/owners.json` 的 `owners` 目前是空的，上線前要填網站負責人的員工編號，否則沒有人能進後台管理名單。
-- 容器映像還沒實際建置驗證過（開發環境連不到 Docker Hub），第一次推上去由 CI 建置時才會驗證。
+- 容器映像還沒實際建置驗證過。使用者 2026-11-18 裝了 Docker 與 Python，但當時 Docker Desktop 沒開，本機建置沒跑成。
 - **使用者目前只要預覽給主管看，還沒要求推到公司 Gitea。** 沒有明確要求不要推。
 
 ## 維護手冊
@@ -54,9 +56,8 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 
 - Notion 之後會關閉。所有媒體已搬進網站，文章不再連 Notion。Notion 原始檔（三個 zip 和 manifest）在使用者電腦的「下載」資料夾，預計搬到 `F:\RD\Moonland\moonland-media` 保存。
 - 前後比較（2026-10-30 起）改用網站內建的 `:::compare` 區塊（`markup.js` 的 `compare()`，拖曳程式也在 `markup.js`），圖片編號 585–593（`models/m-image-*`）。原本嵌入的外部工具 `Image_Compare`（使用者另一個 GitHub 公開專案，用 GitHub Token 從瀏覽器上傳圖片）已不再使用，使用者認為不安全；不要再嵌入它。編輯後台有「前後比較」按鈕可插入。
-- 「登月幣工具」頁在 Notion 原稿是空的，內容待使用者補。
 - **登月幣模型**（2026-11-06 使用者確認）：GPT Image、Kling、Seedance、MiniMax H3 Max／Max Turbo、FLUX 3 Image（FLUX.3 Image Klein 才是點數版；MiniMax H3 與 H3 Turbo 是點數版）等用登月幣計費，**不能寫進點數模型的頁面**（點數圖片模型、點數影片模型、模型指南）。2026-11-06 使用者同意：模型介紹都在「學習資源 › 模型指南」，用小標分「先看這篇／點數模型／登月幣模型」；登月幣頁的目錄項目帶標籤「付費」（`script.js` 的 `PAID`，顯示成紫色 `.tag.paid`／`.chip.paid`（`--coin-*` 色票，2026-11-06 使用者要求和平台月亮標籤一致），所在小標也變紫色）；登月幣頁 `credit-image`、`credit-video`、`credit-music`、`credit-3d`（文章在 `data/lab.js`；2026-11-06 由舊的 `credit-music-3d` 拆開，舊網址導到 `credit-3d`。點數模型也分圖片／影片／音樂／3D 四篇，`m-3d` 在 `data/models.js`）放在付費小標下，`credit-tools` 加值登月幣（2026-11-10 由「登月幣怎麼用」改名，只講購買；「一次要花多少」併入 `credits`，方案比較只在 `pricing`）放在「開始使用」的「點數與登月幣」後面。創作工具裡不再有登月幣分類。使用者不要放草稿箱，但要補完圖片才推送。模型清單是使用者從平台「選擇生成工具」（篩選月亮圖示）複製的 HTML 整理而來；月亮數字＝每張／每次大約花幾枚登月幣。點數模型的預估點數也照平台清單補在各總覽表。免費帳號每日 1,000 點；登月幣 1 元 = 1 枚、最少 1,000、無期限、每次加值附一年進階權益；價目表 https://moonland.ai/pricing。
 - 多圖編輯的張數上限，Notion 原稿有 3 張和 9 張兩種說法，網站目前寫 9 張，待使用者確認。
 - 手機上看截圖裡的介面文字會很小，只能點圖放大；若要改善，需要重新截放大局部的圖。
 - **3D 模型**（2026-11-06）：文章寫 `[3d 編號]`（.glb），`markup.js` 先放按鈕，點了才載入 `assets/vendor/model-viewer.min.js`（Google model-viewer 4.4.0，放在網站裡、不從外部載入）。編輯後台還不能上傳 3D 檔。使用者會提供 Pixal3D 的 GLB 範例，放進「點數 3D 模型」。
-- 網站有加 `noindex`，不讓搜尋引擎收錄。
+- 搜尋引擎（2026-11-18 使用者決定）：正式網站可收錄；`index.html` 只在 `*.github.io`（預覽版）用 JS 加 `noindex`；`edit.html`、`admin.html` 一律 `noindex`。

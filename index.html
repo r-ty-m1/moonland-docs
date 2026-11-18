@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>moonland.ai 說明中心</title>
 <meta name="description" content="moonland.ai 官方使用教學：交談、圖片生成、影片生成、音樂、實驗室、模型指南與團隊管理。">
-<meta name="robots" content="noindex">
 <link rel="icon" href="assets/favicon.png">
 <script>
+  // 正式網站讓搜尋引擎收錄；GitHub Pages 的預覽版不收錄，免得和正式網站重複
+  if (/\.github\.io$/.test(location.hostname)) document.write('<meta name="robots" content="noindex">');
   // 在畫面繪製前套用使用者上次選的明暗模式與目錄狀態，避免閃爍
   try {
     var t = localStorage.getItem('ml-theme');
@@ -20,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
-<link rel="stylesheet" href="style.css?v=20261110c">
+<link rel="stylesheet" href="style.css?v=20261118a">
 </head>
 <body>
 <a class="skip" href="#view">跳到主要內容</a>
@@ -67,22 +68,22 @@
 
 <dialog class="zoom" id="zoom" aria-label="放大檢視"><img alt=""></dialog>
 
-<script src="config.js?v=20261110c"></script>
+<script src="config.js?v=20261118a"></script>
 <!-- content --><!-- 公司網站上，這段會被伺服器換成 content.js（編輯後台存的內容） -->
-<script src="data/media.js?v=20261110c"></script>
-<script src="data/snippets.js?v=20261110c"></script>
-<script src="data/start.js?v=20261110c"></script>
-<script src="data/chat.js?v=20261110c"></script>
-<script src="data/image.js?v=20261110c"></script>
-<script src="data/video.js?v=20261110c"></script>
-<script src="data/lab.js?v=20261110c"></script>
-<script src="data/recipes.js?v=20261110c"></script>
-<script src="data/models.js?v=20261110c"></script>
-<script src="data/team.js?v=20261110c"></script>
-<script src="data/support.js?v=20261110c"></script>
-<script src="data/sections.js?v=20261110c"></script>
+<script src="data/media.js?v=20261118a"></script>
+<script src="data/snippets.js?v=20261118a"></script>
+<script src="data/start.js?v=20261118a"></script>
+<script src="data/chat.js?v=20261118a"></script>
+<script src="data/image.js?v=20261118a"></script>
+<script src="data/video.js?v=20261118a"></script>
+<script src="data/lab.js?v=20261118a"></script>
+<script src="data/recipes.js?v=20261118a"></script>
+<script src="data/models.js?v=20261118a"></script>
+<script src="data/team.js?v=20261118a"></script>
+<script src="data/support.js?v=20261118a"></script>
+<script src="data/sections.js?v=20261118a"></script>
 <!-- /content -->
-<script src="markup.js?v=20261110c"></script>
-<script src="script.js?v=20261110c"></script>
+<script src="markup.js?v=20261118a"></script>
+<script src="script.js?v=20261118a"></script>
 </body>
 </html>

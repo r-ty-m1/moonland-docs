@@ -210,7 +210,7 @@ function pager(id) {
 const feedback = () => `<div class="feedback">${T('這篇有幫助嗎？')}<button type="button" aria-pressed="false" data-vote="up">${T('有幫助')}</button><button type="button" aria-pressed="false" data-vote="down">${T('還需要改進')}</button><span class="fb-thanks" role="status"></span></div>`;
 
 // ---------------------------------------------------------
-// 回饋：送到網站伺服器（server/server.js 的 /api/feedback），後台頁 admin.html 查看。
+// 回饋：先送網站伺服器（server/server.js 的 /api/feedback，會轉存 Google 試算表並用 Zulip 通知負責人），後台頁 admin.html 查看。
 // GitHub Pages 預覽版沒有伺服器，改存在這台電腦的瀏覽器裡，後台頁也會讀出來。
 // ---------------------------------------------------------
 const FB_TYPES = [
@@ -239,6 +239,13 @@ function visitorId() {
 // 頁面標題一律送中文版的，後台才不會同一篇出現中英兩種名稱
 async function sendFeedback(entry) {
   entry = { ...entry, vid: visitorId() };
+  // 先送網站伺服器（公司部署）：伺服器存一份、轉存 Google 試算表、通知負責人
+  try {
+    const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
+    if (r.ok) return 'server';
+    if (r.status !== 404 && r.status !== 405) return 'failed';   // 有伺服器但拒收（格式錯、太頻繁）
+  } catch (e) { /* 連不到伺服器：往下試 Google 試算表 */ }
+  // 沒有伺服器（GitHub Pages）：有填 Google 試算表網址就直接送過去
   const google = window.SITE_CONFIG && window.SITE_CONFIG.googleScriptUrl;
   if (google) {
     try {
@@ -247,11 +254,6 @@ async function sendFeedback(entry) {
       return (await r.json()).ok ? 'server' : 'failed';
     } catch (e) { return 'failed'; }
   }
-  try {
-    const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
-    if (r.ok) return 'server';
-    if (r.status !== 404 && r.status !== 405) return 'failed';   // 有伺服器但拒收（格式錯、太頻繁）
-  } catch (e) { return 'failed'; }
   try {
     const list = JSON.parse(localStorage.getItem(FB_LOCAL) || '[]');
     list.push({ ...entry, id: 'local-' + Date.now(), at: new Date().toISOString() });

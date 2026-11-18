@@ -4,11 +4,13 @@
 // - 所有檔案都帶 cache-control: no-cache（每次先問伺服器有沒有更新）
 // - index.html 裡的 css / js 網址改成內容雜湊，部署新版時瀏覽器與 Cloudflare 一定抓新檔
 // - /api/feedback：POST 收回饋（任何人）；GET 讀全部回饋（後台用，見 canReadFeedback）
+//   收到後存一份在伺服器；config.js 有填 Google 試算表網址時再轉存過去；文字回饋另用 Zulip 通知負責人（server/notify.js）
 // - 編輯後台（公司帳號登入、內容存放、上傳）在 server/editor.js；說明中心的內容從 /content.js 讀
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { notifyFeedback } = require('./notify.js');
 
 const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, '..'));
 const PORT = Number(process.env.PORT || 8080);
@@ -59,6 +61,27 @@ function send(res, status, body, type) {
 const sendJson = (res, status, obj) => send(res, status, JSON.stringify(obj), TYPES['.json']);
 
 // ---------- 回饋 ----------
+// config.js 的 googleScriptUrl（公開的 Apps Script 網址）。有填時，伺服器收到的回饋也轉存到 Google 試算表
+const GOOGLE_URL = (() => {
+  try {
+    const m = /googleScriptUrl:\s*'([^']*)'/.exec(fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8'));
+    return m && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(m[1]) ? m[1] : '';
+  } catch { return ''; }
+})();
+
+// 轉存失敗只記 log：伺服器上已經有一份，不影響訪客
+async function forwardToGoogle(entry) {
+  if (!GOOGLE_URL) return;
+  try {
+    // 不指定 content-type（text/plain），和瀏覽器直接送的格式一樣
+    const r = await fetch(GOOGLE_URL, { method: 'POST', body: JSON.stringify(entry), signal: AbortSignal.timeout(15000) });
+    const body = await r.json().catch(() => ({}));
+    if (!body.ok) console.error('回饋轉存 Google 試算表失敗', r.status, body.error || '');
+  } catch (e) {
+    console.error('回饋轉存 Google 試算表失敗', e.message);
+  }
+}
+
 const NOTE_TYPES = ['stuck', 'unclear', 'suggest', 'other'];
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
@@ -113,6 +136,8 @@ function postFeedback(req, res) {
       return sendJson(res, 503, { error: '暫時無法儲存' });
     }
     sendJson(res, 201, { ok: true });
+    forwardToGoogle(entry);
+    if (entry.kind === 'note') notifyFeedback(entry);
   });
 }
 

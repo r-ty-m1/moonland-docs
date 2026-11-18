@@ -141,21 +141,20 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261110c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261118a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
-文章底部「這篇有幫助嗎？」和「意見回饋」頁（`#feedback`）的資料，依 `config.js` 送到下面其中一個地方：
+文章底部「這篇有幫助嗎？」和「意見回饋」頁（`#feedback`）的資料：
 
-1. **Google 試算表**（`googleScriptUrl` 有填網址時）：存進公司 Google 帳號雲端硬碟的一份試算表，設定步驟見 [`google-apps-script/README.md`](google-apps-script/README.md)。後台用 Apps Script 指令碼屬性 `ADMIN_TOKEN` 當密碼讀取；也可以直接打開試算表看。
-2. **網站自己的伺服器**（沒填網址、部署在公司內部時）：`server/server.js` 的 `/api/feedback`，存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。
-3. **預覽模式**（兩者都沒有，例如目前的 GitHub Pages）：見下方。
+1. **公司網站**：一律先送到網站伺服器（`server/server.js` 的 `/api/feedback`），存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。`config.js` 的 `googleScriptUrl` 有填網址時，伺服器再轉存到公司 Google 帳號的試算表（設定步驟見 [`google-apps-script/README.md`](google-apps-script/README.md)）；文字回饋另用 Zulip 私訊負責人（`server/notify.js`，設定見 `docs/MAINTENANCE.md`〈用 mason 部署〉）。
+2. **GitHub Pages 預覽版**（沒有伺服器）：有填 Google 網址就直接送到試算表；沒填就進預覽模式，見下方。
 
 回饋後台若看到標示「英文版」的舊回饋，是英文版移除前送出的。
 
-- 後台在 `admin.html`（只有中文）。存在伺服器時，讀取回饋要密碼：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
+- 後台在 `admin.html`（只有中文）。有 Google 試算表時讀試算表，密碼是 Apps Script 指令碼屬性 `ADMIN_TOKEN`，也可以直接打開試算表看。沒有試算表時讀伺服器：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
 - **GitHub Pages 預覽版沒有伺服器**：回饋改存在送出者自己的瀏覽器，後台顯示示範資料加上這台電腦送出的回饋，方便展示流程，但收不到別人的回饋。
-- 在自己電腦試真的流程：`node server/server.js`，打開 http://localhost:8080 送幾則，再開 http://localhost:8080/admin.html。
+- 在自己電腦試真的流程：`node server/server.js`，打開 http://localhost:8080 送幾則，再開 http://localhost:8080/admin.html。要看 Zulip 通知會發給誰、發什麼而不真的發出，加上環境變數 `ZULIP_DELIVERY=dry-run`，內容會印在終端機。
 
 部署到公司內部時不用管這個版本號：`server/server.js` 啟動時會自動換成檔案內容的雜湊。
 
