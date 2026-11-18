@@ -1,4 +1,4 @@
-# 由 vibe-deploy 的 containerize skill 產生。
+# 由 mason 的 containerize skill 產生。
 #
 # 這份 workflow 不含任何 Secret，也不含任何基礎設施位址（除了下方的
 # DEPLOYMENT_API）。Registry 位址、帳號與 image 名稱都由 Deployment API 在驗證
