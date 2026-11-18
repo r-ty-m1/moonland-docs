@@ -53,6 +53,20 @@ SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
 const root = document.documentElement;
 const side = document.getElementById('side');
 const view = document.getElementById('view');
+// 「意見回饋」與「聯絡我們」表單的送出最先掛上（2026-11-18）：後面的功能在某些瀏覽器出錯時，
+// 送出程式才不會跟著沒掛上，否則表單會變成整頁重新載入、跳回頂部，回饋也沒送出
+view.addEventListener('submit', (e) => {
+  const id = e.target && e.target.id;
+  if (id !== 'fbForm' && id !== 'mailForm') return;
+  e.preventDefault();
+  Promise.resolve().then(() => (id === 'fbForm' ? onFeedbackSubmit : onMailSubmit)(e)).catch((err) => {
+    console.error('表單送出失敗', err);
+    const msg = e.target.querySelector && e.target.querySelector('.fb-error');
+    if (msg) msg.textContent = T('送出失敗，請重新整理頁面再試，或改用「聯絡我們」的管道。');
+  });
+});
+// 舊版 Safari（iOS 13 以前）的 matchMedia 沒有 addEventListener
+const onMediaChange = (mq, fn) => (mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn));
 const toc = document.getElementById('toc');
 // 「付費」（登月幣）用紫色，和一般標籤（新手等）分開
 const PAID = '付費';
@@ -415,7 +429,7 @@ navBtn.addEventListener('click', () => {
   syncNavBtn();
 });
 scrim.addEventListener('click', closeDrawer);
-mqMobile.addEventListener('change', () => { root.classList.remove('drawer-open'); syncNavBtn(); });
+onMediaChange(mqMobile, () => { root.classList.remove('drawer-open'); syncNavBtn(); });
 
 // ---------------------------------------------------------
 // 明暗模式
@@ -435,7 +449,7 @@ themeBtn.addEventListener('click', () => {
   try { localStorage.setItem('ml-theme', next); } catch (e) {}
   paintThemeBtn();
 });
-sysLight.addEventListener('change', paintThemeBtn);
+onMediaChange(sysLight, paintThemeBtn);
 
 // ---------------------------------------------------------
 // 字體大小：標準／大／特大，記在這台裝置上
@@ -553,10 +567,8 @@ view.addEventListener('input', (e) => {
     e.target.form.querySelector('.fb-count').textContent = `${e.target.value.length} / 2000`;
   }
 });
-view.addEventListener('submit', async (e) => {
+async function onFeedbackSubmit(e) {
   const f = e.target;
-  if (f.id !== 'fbForm') return;
-  e.preventDefault();
   const err = f.querySelector('.fb-error');
   const type = f.type.value, message = f.message.value.trim();
   if (!type) { err.textContent = T('請選擇回饋類型。'); f.querySelector('input[name="type"]').focus(); return; }
@@ -576,7 +588,7 @@ view.addEventListener('submit', async (e) => {
     ${res === 'local' ? `<p class="fb-preview">${T('目前是預覽版，回饋只存在這台電腦的瀏覽器，可以到<a href="admin.html">後台頁</a>查看。')}</p>` : ''}
     <button type="button" class="fb-again">${T('再寫一則')}</button></div></div>`;
   view.querySelector('.fb-done').focus();
-});
+}
 view.addEventListener('click', (e) => { if (e.target.closest('.fb-again')) render(); });
 
 // ---------------------------------------------------------
@@ -612,10 +624,8 @@ view.addEventListener('input', (e) => {
     e.target.form.querySelector('.fb-count').textContent = `${e.target.value.length} / ${MAIL_MAX}`;
   }
 });
-view.addEventListener('submit', (e) => {
+function onMailSubmit(e) {
   const f = e.target;
-  if (f.id !== 'mailForm') return;
-  e.preventDefault();
   const err = f.querySelector('.fb-error');
   const subject = f.subject.value.trim(), message = f.message.value.trim(), name = f.sender.value.trim();
   if (!subject) { err.textContent = T('請填寫主旨。'); f.subject.focus(); return; }
@@ -630,7 +640,7 @@ view.addEventListener('submit', (e) => {
     <textarea class="mail-copy" readonly rows="6">${esc(`${T('主旨')}：${fullSubject}\n\n${body}`)}</textarea>
     <button type="button" class="fb-again mail-copy-btn">${T('複製內容')}</button></div></div>`;
   view.querySelector('.fb-done').focus();
-});
+}
 view.addEventListener('click', async (e) => {
   const b = e.target.closest('.mail-copy-btn');
   if (!b) return;
