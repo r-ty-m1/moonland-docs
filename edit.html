@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Zilla+Slab:wght@600;700&family=JetBrains+Mono:wght@400&display=swap">
-<link rel="stylesheet" href="style.css?v=20261118d">
-<link rel="stylesheet" href="edit.css?v=20261118d">
+<link rel="stylesheet" href="style.css?v=20261119a">
+<link rel="stylesheet" href="edit.css?v=20261119a">
 </head>
 <body>
 <header class="top">
@@ -117,25 +117,37 @@
   </form>
 </dialog>
 
+<dialog class="ed-dlg" id="delDlg" aria-labelledby="delDlgT">
+  <form method="dialog">
+    <h2 id="delDlgT">要怎麼處理這頁？</h2>
+    <p class="ed-hint">兩種做法讀者都看不到這頁，之後也都能在「草稿・封存・刪除」放回原位。</p>
+    <div class="ed-choices">
+      <button class="ed-choice" value="archive"><b>封存</b><small>暫時不用、之後可能還會用到。會一直保留，不會自動清掉。</small></button>
+      <button class="ed-choice ed-choice-del" value="delete"><b>刪除</b><small>不要了。放進「最近刪除」，只保留最近 100 筆，更早的會自動清掉。</small></button>
+    </div>
+    <div class="ed-dlg-acts"><button class="ed-btn" value="cancel">取消</button></div>
+  </form>
+</dialog>
+
 <p class="ed-toast" id="toast" role="status" aria-live="polite"></p>
 
 <!-- content --><!-- 公司網站上，這段會被伺服器換成 content.js（編輯後台存的內容） -->
-<script src="data/media.js?v=20261118d"></script>
-<script src="data/snippets.js?v=20261118d"></script>
-<script src="data/start.js?v=20261118d"></script>
-<script src="data/chat.js?v=20261118d"></script>
-<script src="data/image.js?v=20261118d"></script>
-<script src="data/video.js?v=20261118d"></script>
-<script src="data/lab.js?v=20261118d"></script>
-<script src="data/recipes.js?v=20261118d"></script>
-<script src="data/models.js?v=20261118d"></script>
-<script src="data/team.js?v=20261118d"></script>
-<script src="data/support.js?v=20261118d"></script>
-<script src="data/sections.js?v=20261118d"></script>
-<script src="data/drafts.js?v=20261118d"></script>
+<script src="data/media.js?v=20261119a"></script>
+<script src="data/snippets.js?v=20261119a"></script>
+<script src="data/start.js?v=20261119a"></script>
+<script src="data/chat.js?v=20261119a"></script>
+<script src="data/image.js?v=20261119a"></script>
+<script src="data/video.js?v=20261119a"></script>
+<script src="data/lab.js?v=20261119a"></script>
+<script src="data/recipes.js?v=20261119a"></script>
+<script src="data/models.js?v=20261119a"></script>
+<script src="data/team.js?v=20261119a"></script>
+<script src="data/support.js?v=20261119a"></script>
+<script src="data/sections.js?v=20261119a"></script>
+<script src="data/drafts.js?v=20261119a"></script>
 <!-- /content -->
-<script src="markup.js?v=20261118d"></script>
-<script src="model.js?v=20261118d"></script>
-<script src="edit.js?v=20261118d"></script>
+<script src="markup.js?v=20261119a"></script>
+<script src="model.js?v=20261119a"></script>
+<script src="edit.js?v=20261119a"></script>
 </body>
 </html>

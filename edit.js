@@ -3,7 +3,8 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#drafts 草稿箱、#media 圖庫、#log 修改紀錄、#trash 最近刪除、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區）、#media 圖庫、
+//   #log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
 Object.assign(ICONS, {
@@ -27,6 +28,8 @@ Object.assign(ICONS, {
   folder: 'M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2',
   file: 'M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
   lock: 'M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 M8 11v-4a4 4 0 1 1 8 0v4',
+  grip: 'M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+  archive: 'M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10 M10 12l4 0',
 });
 
 const STORE = 'ml-editor-demo';
@@ -52,7 +55,7 @@ const fmt = (iso) => {
 let LIVE = null;   // 正式版：{ login: 'oidc'|'dev'|'none', user, role }；示範版是 null
 function initialState() {
   return {
-    v: 2, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS, window.DRAFTS), history: {}, log: [], trash: [], uploads: {}, nextMedia: 9001,
+    v: 2, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS, window.DRAFTS), history: {}, log: [], trash: [], archive: [], uploads: {}, nextMedia: 9001,
     editors: [
       { no: 'A0001', name: '王小明', role: 'owner', at: now() },
       { no: 'A0002', name: '林小華', role: 'editor', at: now() },
@@ -65,6 +68,7 @@ let me = null;
 function loadDemo() {
   try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
   if (!S || S.v !== 2) S = initialState();
+  S.archive = S.archive || [];
   Object.assign(MEDIA, S.uploads);
   try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
 }
@@ -75,6 +79,7 @@ async function loadLive() {
   const r = await api('api/editor/state');
   if (!r.ok) throw new Error(`state ${r.status}`);
   S = await r.json();
+  S.archive = S.archive || [];
   Object.assign(MEDIA, S.uploads);
 }
 
@@ -89,7 +94,7 @@ function persist() {
     let msg;
     try {
       const r = await api('api/editor/state', { method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ rev: S.rev, sections: S.sections, pages: S.pages, history: S.history, log: S.log, trash: S.trash, editors: S.editors }) });
+        body: JSON.stringify({ rev: S.rev, sections: S.sections, pages: S.pages, history: S.history, log: S.log, trash: S.trash, archive: S.archive, editors: S.editors }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok) { S.rev = j.rev; S.editors = j.editors; return true; }
       msg = r.status === 409 ? '其他人剛剛也改了內容，已載入最新的版本；你剛才的動作沒有存到，請再做一次。'
@@ -162,7 +167,7 @@ function toast(msg) {
 }
 function tabs(cur) {
   const drafts = Object.values(S.pages).filter((p) => p.draft).length;
-  const items = [['pages', '頁面'], ['drafts', `草稿箱${drafts ? `（${drafts}）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['trash', `最近刪除${S.trash.length ? `（${S.trash.length}）` : ''}`], ['tools', '檢查與備份']];
+  const items = [['pages', '頁面'], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -223,31 +228,35 @@ function badge(id) {
   if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>';
   return '';
 }
-function acts(id, key, i, len, canDelete) {
+// 刪除鈕：按了會問要「封存」還是「刪除」
+function acts(id, canDelete) {
   const name = esc(S.pages[id].n || S.pages[id].t);
   return `<span class="ed-acts">
-    <button type="button" class="icon-btn sm" data-act="up" data-key="${key}" data-i="${i}" aria-label="把「${name}」往上移" title="往上移"${i === 0 ? ' disabled' : ''}>${ic('up')}</button>
-    <button type="button" class="icon-btn sm" data-act="down" data-key="${key}" data-i="${i}" aria-label="把「${name}」往下移" title="往下移"${i === len - 1 ? ' disabled' : ''}>${ic('down')}</button>
-    <button type="button" class="icon-btn sm ed-del" data-act="del" data-id="${id}" aria-label="刪除「${name}」" title="${canDelete === true ? '刪除' : esc(canDelete)}"${canDelete === true ? '' : ' disabled'}>${ic('trash')}</button>
+    <button type="button" class="icon-btn sm ed-del" data-act="del" data-id="${id}" aria-label="封存或刪除「${name}」" title="${canDelete === true ? '封存或刪除' : esc(canDelete)}"${canDelete === true ? '' : ' disabled'}>${ic('trash')}</button>
   </span>`;
 }
-function itemLi(id, key, i, len) {
+// 拖曳把手：滑鼠或手指按住拖到別的位置（可以跨分類）；鍵盤聚焦後按上下鍵移動
+function grip(id) {
+  const name = esc(S.pages[id].n || S.pages[id].t);
+  return `<button type="button" class="ed-grip" data-drag="${id}" aria-label="調整「${name}」的位置：拖曳，或按上下鍵" title="按住拖曳，調整順序或搬到別的分類">${ic('grip')}</button>`;
+}
+function itemLi(id) {
   const p = S.pages[id];
   if (p.system) {
-    return `<li class="ed-item"><span class="ed-name is-sys">${p.icon ? ic(p.icon) : ic('file')}<span><b>${esc(p.t)}</b><small>系統頁面，內容不能在這裡修改</small></span></span>${acts(id, key, i, len, '系統頁面不能刪除')}</li>`;
+    return `<li class="ed-item" data-id="${id}">${grip(id)}<span class="ed-name is-sys">${p.icon ? ic(p.icon) : ic('file')}<span><b>${esc(p.t)}</b><small>系統頁面，內容不能在這裡修改</small></span></span>${acts(id, '系統頁面不能刪除')}</li>`;
   }
-  return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}${tagHtml(p.tag)}${badge(id)}</b>${p.n && p.n !== p.t ? `<small>${esc(p.t)}</small>` : ''}</span></a>${acts(id, key, i, len, true)}</li>`;
+  return `<li class="ed-item" data-id="${id}">${grip(id)}<a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}${tagHtml(p.tag)}${badge(id)}</b>${p.n && p.n !== p.t ? `<small>${esc(p.t)}</small>` : ''}</span></a>${acts(id, true)}</li>`;
 }
-function catLi(r, key, i, len) {
+function catLi(r) {
   const p = S.pages[r.id];
   const count = r.groups.reduce((n, g) => n + g.items.length, 0);
   const many = r.groups.length > 1;
-  return `<li class="ed-cat">
-    <div class="ed-item"><a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, key, i, len, count ? '分類裡還有頁面，先把頁面刪除或搬走才能刪除分類' : true)}</div>
+  return `<li class="ed-cat" data-id="${r.id}">
+    <div class="ed-item">${grip(r.id)}<a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, count ? '分類裡還有頁面，先把頁面搬走、封存或刪除，才能處理分類' : true)}</div>
     <div class="ed-kids">${r.groups.map((g, gi) => {
       const k = `c:${r.id}:${gi}`;
       return `${many || g.g ? `<div class="ed-sub">${esc(g.g || '（沒有小標）')}</div>` : ''}
-        <ul class="ed-list">${g.items.map((id, j) => itemLi(id, k, j, g.items.length)).join('')}</ul>
+        <ul class="ed-list" data-key="${k}">${g.items.map((id) => itemLi(id)).join('')}</ul>
         <a class="ed-add" href="#new/${k}">${ic('plus')}在${esc(g.g ? `「${g.g}」` : `「${p.t}」`)}新增頁面</a>`;
     }).join('')}</div>
   </li>`;
@@ -255,38 +264,129 @@ function catLi(r, key, i, len) {
 function viewPages() {
   const changed = Object.keys(S.history).filter((k) => S.pages[k] && S.history[k].length).length;
   return `${tabs('pages')}
-    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；用箭頭調整在左側目錄裡的順序。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
+    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
     ${S.sections.map((sec, si) => `<section class="ed-sec" aria-labelledby="sec${si}">
       <div class="ed-sec-head"><h2 id="sec${si}">${esc(sec.label)}</h2>
         <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button></div>
-      <ul class="ed-list">${sec.rows.map((r, i) => (r.groups ? catLi(r, `s${si}`, i, sec.rows.length) : itemLi(r.id, `s${si}`, i, sec.rows.length))).join('')}</ul>
+      <ul class="ed-list" data-key="s${si}" data-top="1">${sec.rows.map((r) => (r.groups ? catLi(r) : itemLi(r.id))).join('')}</ul>
       <div class="ed-adds"><a class="ed-add" href="#new/s${si}">${ic('plus')}新增頁面</a><button type="button" class="ed-add" data-act="add-cat" data-si="${si}">${ic('folder')}新增分類</button></div>
     </section>`).join('')}
     <p class="ed-hint ed-count">${changed ? `目前有 ${changed} 頁${LIVE ? '在後台改過' : '在這台電腦上改過'}。` : ''}</p>`;
 }
 
-function swap(key, i, d) {
-  const l = listOf(key);
-  const j = i + d;
-  if (!l || j < 0 || j >= l.arr.length) return;
-  [l.arr[i], l.arr[j]] = [l.arr[j], l.arr[i]];
-  const id = idOf(l.arr[j]);
-  addLog(d < 0 ? '往上移' : '往下移', id, S.pages[id].t);
+// 把頁面搬到某個位置（key 見 allLists）的第 i 個。分類只能放在大分類底下
+const placeName = (key) => listOf(key).label.replace('（直接列在目錄上）', '');
+function movePage(id, key, i) {
+  const from = locate(id);
+  const to = listOf(key);
+  if (!from || !to || (isCat(id) && !to.top)) { render(); return; }
+  if (from.key === key && from.i === i) { render(); return; }
+  const [x] = from.arr.splice(from.i, 1);
+  to.arr.splice(i, 0, to.top ? (typeof x === 'string' ? { id: x } : x) : idOf(x));
+  addLog(from.key === key ? '調整順序' : `搬到「${placeName(key)}」`, id, S.pages[id].t);
   persist();
   render();
-  const b = app.querySelector(`[data-act="${d < 0 ? 'up' : 'down'}"][data-key="${key}"][data-i="${j}"]`);
-  (b && !b.disabled ? b : app.querySelector(`[data-key="${key}"][data-i="${j}"]:not([disabled])`) || app).focus();
+  if (from.key !== key) toast(`已把「${S.pages[id].t}」搬到「${placeName(key)}」。`);
+  const g = app.querySelector(`.ed-grip[data-drag="${id}"]`);
+  if (g) g.focus({ preventScroll: true });
 }
-function removePage(id) {
+
+// 拖曳：按住把手移動，經過的位置即時讓開；放開才存檔。按 Esc 取消
+let drag = null;
+app.addEventListener('pointerdown', (e) => {
+  const g = e.target.closest('.ed-grip');
+  if (!g || e.button > 0 || drag) return;
+  const li = g.closest('li[data-id]');
+  e.preventDefault();
+  drag = { id: li.dataset.id, li, cat: li.classList.contains('ed-cat'), pid: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, started: false, timer: 0 };
+  try { g.setPointerCapture(e.pointerId); } catch (x) {}
+});
+function placeDrag() {
+  const el = document.elementFromPoint(drag.x, drag.y);
+  if (!el) return;
+  let ul = el.closest('ul.ed-list[data-key]');
+  if (!ul || !app.contains(ul)) return;
+  if (drag.cat && ul.dataset.top !== '1') ul = ul.parentElement.closest('ul.ed-list[data-top="1"]');
+  // 停在分類的小標或「新增頁面」上：先不動，避免頁面在分類前後跳來跳去
+  else if (!drag.cat && el.closest('.ed-kids') && !el.closest('.ed-kids ul.ed-list')) return;
+  if (!ul) return;
+  let before = null;
+  for (const c of ul.children) {
+    if (c === drag.li || !c.matches('li[data-id]')) continue;
+    const box = (c.querySelector(':scope > .ed-item') || c).getBoundingClientRect();
+    if (drag.y < box.top + box.height / 2) { before = c; break; }
+  }
+  if (drag.li.parentElement === ul && drag.li.nextElementSibling === before) return;
+  ul.insertBefore(drag.li, before);
+}
+document.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.started) {
+    if (Math.abs(drag.y - drag.sy) + Math.abs(drag.x - drag.sx) < 5) return;
+    drag.started = true;
+    document.body.classList.add('ed-dragging');
+    drag.li.classList.add('is-dragging');
+    // 拖到畫面上下邊緣時自動捲動
+    drag.timer = setInterval(() => {
+      const edge = 70;
+      const d = drag.y < edge ? -(edge - drag.y) / 4 : drag.y > innerHeight - edge ? (drag.y - innerHeight + edge) / 4 : 0;
+      if (d) { scrollBy(0, d); placeDrag(); }
+    }, 16);
+  }
+  placeDrag();
+});
+function endDrag(e, cancel) {
+  if (!drag || (e && e.pointerId !== drag.pid)) return;
+  const d = drag;
+  drag = null;
+  clearInterval(d.timer);
+  document.body.classList.remove('ed-dragging');
+  d.li.classList.remove('is-dragging');
+  if (!d.started) return;
+  if (cancel) { render(); return; }
+  const ul = d.li.parentElement;
+  movePage(d.id, ul.dataset.key, [...ul.children].filter((c) => c.matches('li[data-id]')).indexOf(d.li));
+}
+document.addEventListener('pointerup', (e) => endDrag(e));
+document.addEventListener('pointercancel', (e) => endDrag(e, true));
+document.addEventListener('keydown', (e) => {
+  if (drag && e.key === 'Escape') { endDrag(null, true); return; }
+  const g = e.target.closest && e.target.closest('.ed-grip');
+  if (!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const l = locate(g.dataset.drag);
+  const j = l.i + (e.key === 'ArrowUp' ? -1 : 1);
+  if (j < 0 || j >= l.arr.length) return;
+  movePage(g.dataset.drag, l.key, j);
+});
+
+// 按刪除鈕：問要封存（留著，之後可以放回）還是刪除（放進最近刪除，太舊會自動清掉）
+const delDlg = document.getElementById('delDlg');
+let delId = null;
+function askRemove(id) {
+  delId = id;
+  document.getElementById('delDlgT').textContent = `要怎麼處理「${S.pages[id].t}」？`;
+  delDlg.returnValue = '';
+  delDlg.showModal();
+}
+delDlg.addEventListener('close', () => {
+  const id = delId;
+  delId = null;
+  if (!id || !S.pages[id]) return;
+  if (delDlg.returnValue === 'archive') takeDown(id, 'archive');
+  else if (delDlg.returnValue === 'delete') takeDown(id, 'trash');
+});
+// 從目錄拿下來，放進封存（archive）或最近刪除（trash）；兩邊都記得原本的位置，之後可以放回
+function takeDown(id, where) {
   const p = S.pages[id];
-  if (!confirm(`確定要刪除「${p.t}」嗎？\n刪除後可以在「最近刪除」找回來。`)) return;
   const l = locate(id);
   const [row] = l.arr.splice(l.i, 1);
-  S.trash.unshift({ id, key: l.key, row: clone(row), page: clone(p), at: now(), by: me.name });
+  S[where].unshift({ id, key: l.key, row: clone(row), page: clone(p), at: now(), by: me.name });
   delete S.pages[id];
-  addLog('刪除', id, p.t);
+  addLog(where === 'archive' ? '封存' : '刪除', id, p.t);
   persist();
-  toast(`已刪除「${p.t}」，可以在「最近刪除」找回來。`);
+  toast(where === 'archive' ? `已封存「${p.t}」，說明中心看不到了；可以在「草稿・封存・刪除」放回目錄。` : `已刪除「${p.t}」，可以在「草稿・封存・刪除」的最近刪除找回來。`);
   render();
 }
 
@@ -298,7 +398,7 @@ let dirty = false;
 
 function newId() {
   let n = 1;
-  while (S.pages[`page-${n}`] || S.trash.some((x) => x.id === `page-${n}`)) n++;
+  while (S.pages[`page-${n}`] || S.trash.some((x) => x.id === `page-${n}`) || S.archive.some((x) => x.id === `page-${n}`)) n++;
   return `page-${n}`;
 }
 function startDraft(id, newKey) {
@@ -448,6 +548,7 @@ async function savePage(f) {
   if (!d.t) { err.textContent = '請填寫標題。'; f.elements.t.focus(); return; }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.id)) { err.textContent = '網址代號只能用英文小寫、數字和 -。'; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
   if (d.id !== d.origId && (S.pages[d.id] || ['home', 'pages', 'feedback'].includes(d.id))) { err.textContent = `網址代號「${d.id}」已經有其他頁面在用了。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
+  if (d.id !== d.origId && S.archive.some((x) => x.id === d.id)) { err.textContent = `網址代號「${d.id}」是一篇封存的頁面在用，請換一個。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
   err.textContent = '';
   // 儲存前檢查：找不到的圖片、連到不存在頁面的連結。可以照樣儲存，但先提醒
   const problems = Model.checkBody(d.body, d.id, { ...S.pages, [d.id]: d }, MEDIA);
@@ -931,11 +1032,12 @@ function viewHelp() {
       <li>用完記得按右上角的登出。</li></ul>`, true)}
     ${sec('2. 頁面與目錄', `<ul>
       <li>「頁面」分頁就是說明中心左側目錄的樣子，由上到下照順序排。</li>
-      <li>點頁面名稱開始編輯；用 ↑ ↓ 調整順序；垃圾桶是刪除。</li>
-      <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類裡還有頁面時不能刪除，要先把頁面搬走或刪除。</li>
-      <li>要換位置：進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
+      <li>點頁面名稱開始編輯。</li>
+      <li><b>調整順序、換分類</b>：按住頁面左邊的 ${ic('grip', 'ic sm')} 拖到想放的位置再放開，可以拖進別的分類或小標底下（手機一樣用手指按住拖）。拖到一半想取消就按 Esc。用鍵盤的話，按 Tab 移到 ${ic('grip', 'ic sm')} 再按上下鍵。也可以進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
+      <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存或刪除，要先把頁面搬走。</li>
+      <li><b>垃圾桶</b>：會問你要「封存」還是「刪除」。<b>封存</b>是暫時拿下來、長期保留，之後可以放回；<b>刪除</b>是不要了，只保留最近 100 筆。</li>
       <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
-      <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿箱」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
+      <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿・封存・刪除」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
@@ -962,8 +1064,8 @@ function viewHelp() {
       <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；上傳時會自動照規則命名。</li></ul>`)}
     ${sec('7. 改錯了怎麼辦', `<ul>
       <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
-      <li><b>最近刪除</b>：刪掉的頁面會先放這裡，按「還原」放回原位。</li>
-      <li><b>修改紀錄</b>：誰在什麼時候改了哪一頁。</li>
+      <li><b>草稿・封存・刪除</b>：封存的頁面按「放回目錄」、刪掉的頁面按「還原」，都會回到原本的位置。</li>
+      <li><b>修改紀錄</b>：「內容修改」是誰在什麼時候改了哪一頁；「網站程式修改」是網站本身的版面、功能改了什麼（工程師更新程式時記的）。</li>
       <li><b>檢查與備份</b>：一次檢查全站的圖片和連結；下載整個網站的備份檔。網站的儲存空間不是備份，建議每個月、或大改之前下載一次，存到公司雲端硬碟。主管理員可以用備份檔還原整個網站。</li>
       <li>兩個人同時改內容時，後存的人會看到「其他人剛剛也改了內容」，畫面會換成最新版本；正在編輯的文字還在，再按一次儲存就好。</li></ul>`)}
     ${sec('8. 編輯者名單（主管理員）', `<ul>
@@ -981,37 +1083,75 @@ function viewHelp() {
 // ---------------------------------------------------------
 // 7. 修改紀錄、最近刪除、編輯者名單
 // ---------------------------------------------------------
-function viewLog() {
-  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>
+// 網站程式的修改紀錄：正式版跟著後台內容一起讀；示範版直接讀 server/changelog.json
+let codeChanges = null;
+function loadChanges() {
+  if (codeChanges || loadChanges.p) return;
+  if (LIVE && Array.isArray(S.changes)) { codeChanges = S.changes; return; }
+  loadChanges.p = fetch('server/changelog.json', { cache: 'no-cache' }).then((r) => r.json()).then((j) => { codeChanges = j.changes || []; })
+    .catch(() => { codeChanges = []; }).then(() => { loadChanges.p = null; if (/^#log\/code/.test(location.hash)) render(); });
+}
+function viewLog(sub) {
+  const code = sub === 'code';
+  const seg = `<div class="ed-seg" role="tablist" aria-label="修改紀錄的種類">
+    <a href="#log" role="tab" aria-selected="${!code}"${code ? '' : ' aria-current="page"'}>內容修改</a>
+    <a href="#log/code" role="tab" aria-selected="${code}"${code ? ' aria-current="page"' : ''}>網站程式修改</a></div>`;
+  if (code) {
+    loadChanges();
+    const list = codeChanges;
+    return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">網站本身的程式（版面、功能、修正錯誤）改了什麼。這些修改由工程師或網站負責人更新程式，不是在後台改的；文章內容的修改在「內容修改」。</p></div></div>${seg}
+      ${!list ? '<p class="ed-hint">讀取中…</p>' : list.length ? `<div class="ed-tbl"><table class="ed-table ed-code-log"><thead><tr><th>日期</th><th>改了什麼</th><th>版本</th></tr></thead><tbody>
+        ${list.map((x) => `<tr><td data-label="日期">${esc(String(x.date || '').replace(/-/g, '/'))}</td><td data-label="改了什麼">${esc(x.text || '')}</td><td data-label="版本">${x.commit ? `<code>${esc(x.commit)}</code>` : '<span class="ed-hint">最新</span>'}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="ed-hint">還沒有網站程式的修改紀錄。</p>'}`;
+  }
+  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>${seg}
     ${S.log.length ? `<div class="ed-tbl"><table class="ed-table"><thead><tr><th>時間</th><th>誰</th><th>做了什麼</th><th>頁面</th></tr></thead><tbody>
       ${S.log.map((x) => `<tr><td data-label="時間">${fmt(x.at)}</td><td data-label="誰">${esc(x.by)}</td><td data-label="做了什麼">${esc(x.action)}</td>
         <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
     </tbody></table></div>` : '<p class="ed-hint">還沒有任何修改。</p>'}`;
 }
-function viewTrash() {
-  return `${tabs('trash')}<div class="ed-head"><div><h1>最近刪除</h1><p class="ed-hint">刪掉的頁面會先放在這裡，按「還原」就會放回原本的位置。</p></div></div>
-    ${S.trash.length ? `<ul class="ed-list ed-trash">${S.trash.map((x, i) => `<li class="ed-item"><span class="ed-name">${ic(x.page.icon || 'file')}<span><b>${esc(x.page.t)}</b><small>${esc(x.by)} 在 ${fmt(x.at)} 刪除</small></span></span>
-      <button type="button" class="ed-btn" data-act="restore" data-i="${i}">${ic('restore')}還原</button></li>`).join('')}</ul>` : '<p class="ed-hint">沒有刪除的頁面。</p>'}`;
+// 草稿・封存・刪除：說明中心看不到的頁面放在同一頁
+// - 草稿：還在目錄裡的原位置，只是不公開；寫好取消勾選「草稿」就公開
+// - 封存：從目錄拿下來長期保留（不會自動清掉），可以放回原位置
+// - 最近刪除：只留最近 100 筆，太舊的自動清掉
+function viewShelf(route) {
+  const drafts = Object.keys(S.pages).filter((id) => S.pages[id].draft && locate(id));
+  const sec = (id, icon, title, hint, body) => `<section class="ed-sec" id="${id}" aria-labelledby="${id}-h"><div class="ed-sec-head"><h2 id="${id}-h">${ic(icon)}${title}</h2></div><p class="ed-hint">${hint}</p>${body}</section>`;
+  const taken = (x, verb) => `<span class="ed-name">${ic(x.page.icon || 'file')}<span><b>${esc(x.page.t)}</b><small>${esc(x.by)} 在 ${fmt(x.at)} ${verb}・原本在「${esc(listOf(x.key) ? placeName(x.key) : '已經不在的位置')}」</small></span></span>`;
+  return `${tabs('shelf')}<div class="ed-head"><div><h1>草稿・封存・刪除</h1><p class="ed-hint">說明中心看不到的頁面都在這裡。</p></div></div>
+    <nav class="ed-jump" aria-label="跳到">${[['drafts', '草稿', drafts.length], ['archive', '封存', S.archive.length], ['trash', '最近刪除', S.trash.length]].map(([k, t, n]) => `<a href="#${k}"${route === k ? ' aria-current="true"' : ''}>${t}<span class="chip">${n}</span></a>`).join('')}</nav>
+    ${sec('sh-drafts', 'pencil', `草稿（${drafts.length}）`, '還沒寫完、先不公開的頁面，留在目錄裡原本的位置。寫好後進入頁面，取消勾選「草稿」再儲存就會公開。',
+      drafts.length ? `<ul class="ed-list">${drafts.map((id) => { const p = S.pages[id]; return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}<span class="chip ed-draft">草稿</span></b><small>${esc(placeName(locate(id).key))}</small></span></a></li>`; }).join('')}</ul>` : '<p class="ed-hint">目前沒有草稿。</p>')}
+    ${sec('sh-archive', 'archive', `封存（${S.archive.length}）`, '暫時不用、但可能還會用到的頁面。會一直保留，不會自動清掉；按「放回目錄」就回到原本的位置。',
+      S.archive.length ? `<ul class="ed-list ed-trash">${S.archive.map((x, i) => `<li class="ed-item">${taken(x, '封存')}<span class="ed-row-acts">
+        <button type="button" class="ed-btn" data-act="unarchive" data-i="${i}">${ic('restore')}放回目錄</button>
+        <button type="button" class="ed-btn ed-del" data-act="archive-del" data-i="${i}">${ic('trash')}刪除</button></span></li>`).join('')}</ul>` : '<p class="ed-hint">沒有封存的頁面。在「頁面」按垃圾桶，可以選擇封存。</p>')}
+    ${sec('sh-trash', 'trash', `最近刪除（${S.trash.length}）`, '刪掉的頁面先放在這裡，按「還原」就會放回原本的位置。只保留最近 100 筆，更早的會自動清掉；想留久一點請改用封存。',
+      S.trash.length ? `<ul class="ed-list ed-trash">${S.trash.map((x, i) => `<li class="ed-item">${taken(x, '刪除')}<span class="ed-row-acts">
+        <button type="button" class="ed-btn" data-act="restore" data-i="${i}">${ic('restore')}還原</button></span></li>`).join('')}</ul>` : '<p class="ed-hint">沒有刪除的頁面。</p>')}`;
 }
-function restore(i) {
-  const x = S.trash[i];
-  if (S.pages[x.id]) { toast(`網址代號「${x.id}」已經被其他頁面用了，無法還原。`); return; }
+// 從封存或最近刪除放回原本的位置（位置不在了就放到第一個大分類）
+function putBack(where, i) {
+  const x = S[where][i];
+  if (S.pages[x.id]) { toast(`網址代號「${x.id}」已經被其他頁面用了，無法放回。`); return; }
   let l = listOf(x.key);
   if (!l || (x.row.groups && !l.top)) l = listOf('s0');
   S.pages[x.id] = x.page;
   l.arr.push(l.top ? (typeof x.row === 'string' ? { id: x.id } : x.row) : x.id);
-  S.trash.splice(i, 1);
-  addLog('還原', x.id, x.page.t);
+  S[where].splice(i, 1);
+  addLog(where === 'archive' ? '取消封存' : '還原', x.id, x.page.t);
   persist();
-  toast(`已還原「${x.page.t}」，放在「${l.label}」的最後面。`);
+  toast(`已把「${x.page.t}」放回「${placeName(l.key)}」的最後面${x.page.draft ? '（還是草稿）' : ''}。`);
   render();
 }
-// 草稿箱：還沒公開的頁面。草稿留在目錄裡的位置，說明中心看不到
-function viewDrafts() {
-  const list = Object.keys(S.pages).filter((id) => S.pages[id].draft && locate(id));
-  return `${tabs('drafts')}<div class="ed-head"><div><h1>草稿箱</h1><p class="ed-hint">還沒公開的頁面。寫好後進入頁面，取消勾選「草稿」再儲存就會出現在說明中心。新增頁面時勾選「草稿」，就會放進這裡。</p></div></div>
-    ${list.length ? `<ul class="ed-list">${list.map((id) => { const p = S.pages[id]; return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}<span class="chip ed-draft">草稿</span></b><small>${esc(locate(id).label.replace('（直接列在目錄上）', ''))}</small></span></a></li>`; }).join('')}</ul>`
-      : '<p class="ed-hint">目前沒有草稿。</p>'}`;
+function archiveToTrash(i) {
+  const x = S.archive[i];
+  if (!confirm(`確定要刪除封存的「${x.page.t}」嗎？\n會移到「最近刪除」，只保留最近 100 筆。`)) return;
+  S.archive.splice(i, 1);
+  S.trash.unshift({ ...x, at: now(), by: me.name });
+  addLog('刪除（原本封存）', x.id, x.page.t);
+  persist();
+  render();
 }
 
 // 檢查與備份：全站檢查缺圖、壞連結；正式版可以下載備份、主管理員可以從備份還原
@@ -1094,8 +1234,10 @@ function render(keepDraft) {
     return;
   }
   draft = null;
-  app.innerHTML = ({ drafts: viewDrafts, media: viewMedia, help: viewHelp, log: viewLog, trash: viewTrash, tools: viewTools, editors: viewEditors }[route] || viewPages)();
+  const shelf = ['shelf', 'drafts', 'archive', 'trash'].includes(route);
+  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
+  if (shelf && route !== 'shelf') requestAnimationFrame(() => { const s = document.getElementById(`sh-${route}`); if (s) s.scrollIntoView(); });
   document.title = '編輯後台｜moonland.ai 說明中心';
 }
 
@@ -1139,9 +1281,10 @@ document.addEventListener('click', (e) => {
       history.replaceState(null, '', location.pathname);
       lastHash = '';
       render();
-    } else if (a === 'up' || a === 'down') swap(b.dataset.key, +b.dataset.i, a === 'up' ? -1 : 1);
-    else if (a === 'del') removePage(b.dataset.id);
-    else if (a === 'restore') restore(+b.dataset.i);
+    } else if (a === 'del') askRemove(b.dataset.id);
+    else if (a === 'restore') putBack('trash', +b.dataset.i);
+    else if (a === 'unarchive') putBack('archive', +b.dataset.i);
+    else if (a === 'archive-del') archiveToTrash(+b.dataset.i);
     else if (a === 'copy-media') copyMedia(b);
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
@@ -1251,7 +1394,7 @@ async function boot() {
   if (!LIVE) loadDemo();
   else {
     me = LIVE.user;
-    S = { sections: [], pages: {}, history: {}, log: [], trash: [], editors: [], uploads: {} };
+    S = { sections: [], pages: {}, history: {}, log: [], trash: [], archive: [], editors: [], uploads: {} };
     if (me && LIVE.role) {
       try { await loadLive(); }
       catch (e) { app.innerHTML = '<p class="ed-hint">讀不到網站內容，請重新整理頁面；一直失敗請聯絡平台組。</p>'; return; }

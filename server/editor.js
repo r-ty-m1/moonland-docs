@@ -3,7 +3,8 @@
 //   本機開發沒有公司登入時，設 DEV_LOGIN=1 可以用「輸入員工編號」的假登入（有 OIDC 設定時一律關閉）
 // - 誰能編輯：server/owners.json 的員工編號永遠是主管理員；其他人看後台「編輯者名單」
 // - 內容存在 DATA_DIR（部署時是 persistence 磁碟）：
-//     content.json   目錄、頁面、版本紀錄、修改紀錄、最近刪除、編輯者名單（第一次啟動時從 data/*.js 複製）
+//     content.json   目錄、頁面、版本紀錄、修改紀錄、最近刪除、封存、編輯者名單（第一次啟動時從 data/*.js 複製）
+// - 網站程式的修改紀錄在 server/changelog.json（跟著程式更新，後台「修改紀錄 › 網站程式修改」顯示）
 //     media.json     後台上傳的圖片、影片對照表
 // - 上傳的檔案：平台有提供物件儲存（vibe.yaml 的 storage: s3，見 server/s3.js）時存在 S3 的 media/<區域>/<文章代號>-<序號>.<副檔名>；
 //   沒有時（本機直接跑）存在 DATA_DIR/media/。圖片經伺服器上傳；影片由瀏覽器直接傳到 S3（不經過網站，最大 90 MB）
@@ -18,7 +19,7 @@ const S3 = require('./s3.js');
 
 const CALLBACK_PATH = '/api/auth/callback/authentik';
 const SESSION_HOURS = 12;
-const LIMITS = { log: 500, history: 30, trash: 100 };
+const LIMITS = { log: 500, history: 30, trash: 100, archive: 500 };
 const AREAS = ['start', 'chat', 'image', 'video', 'lab', 'recipes', 'models', 'team', 'support'];
 // 影片直接從瀏覽器傳到 S3：單次上傳，留在 Cloudflare 單一請求 100 MB 的限制以內
 const VIDEO_MAX = 90 * 1024 * 1024;
@@ -57,10 +58,13 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
 
   let C = readJson('content.json');
   if (!C || !Array.isArray(C.sections)) {
-    C = { rev: 1, savedAt: new Date().toISOString(), ...Model.fromSite(site.ARTICLES, site.SECTIONS, site.DRAFTS), history: {}, log: [], trash: [], editors: [] };
+    C = { rev: 1, savedAt: new Date().toISOString(), ...Model.fromSite(site.ARTICLES, site.SECTIONS, site.DRAFTS), history: {}, log: [], trash: [], archive: [], editors: [] };
     writeJson('content.json', C);
   }
+  if (!Array.isArray(C.archive)) C.archive = [];
   let uploads = readJson('media.json') || {};
+  let CHANGES = [];
+  try { CHANGES = JSON.parse(fs.readFileSync(path.join(__dirname, 'changelog.json'), 'utf8')).changes || []; } catch (e) { console.error('讀不到 server/changelog.json', e.message); }
   const allMedia = () => ({ ...BASE_MEDIA, ...uploads });
 
   // 說明中心讀的 /content.js，內容變了才重算
@@ -229,7 +233,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
   function stateFor(user) {
-    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: C.trash, editors: C.editors, uploads };
+    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: C.trash, archive: C.archive, editors: C.editors, uploads, changes: CHANGES };
   }
   function putState(user, role, b) {
     if (!isObj(b)) return [400, { error: '資料格式不正確' }];
@@ -243,6 +247,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       history: isObj(b.history) ? b.history : {},
       log: Array.isArray(b.log) ? b.log.slice(0, LIMITS.log) : [],
       trash: Array.isArray(b.trash) ? b.trash.slice(0, LIMITS.trash) : [],
+      archive: Array.isArray(b.archive) ? b.archive.slice(0, LIMITS.archive) : C.archive,
       editors: C.editors,
     };
     for (const k of Object.keys(next.history)) {
@@ -368,7 +373,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     uploads = ups;
     writeJson('media.json', uploads);
     const c = b.content;
-    C = { rev: C.rev + 1, savedAt: C.savedAt, sections: c.sections, pages: c.pages, history: isObj(c.history) ? c.history : {}, log: Array.isArray(c.log) ? c.log : [], trash: Array.isArray(c.trash) ? c.trash : [], editors: Array.isArray(c.editors) ? c.editors : [] };
+    C = { rev: C.rev + 1, savedAt: C.savedAt, sections: c.sections, pages: c.pages, history: isObj(c.history) ? c.history : {}, log: Array.isArray(c.log) ? c.log : [], trash: Array.isArray(c.trash) ? c.trash : [], archive: Array.isArray(c.archive) ? c.archive : [], editors: Array.isArray(c.editors) ? c.editors : [] };
     C.editors = keepOwners(C.editors, user);
     C.log.unshift({ at: new Date().toISOString(), by: user.name, action: `從備份還原（${String(b.at || '').slice(0, 10)}）`, id: '', t: '整個網站' });
     save();

@@ -32,6 +32,17 @@ const stray = onDisk.filter((f) => !listed.has(f));
 assert.deepEqual(stray, [], `assets/media 裡有對照表沒有的檔案：${stray.join(', ')}`);
 console.log(`✓ ${listed.size} 個媒體檔名都符合命名規則`);
 
+// --- 1c. 網站程式的修改紀錄（後台「修改紀錄 › 網站程式修改」）格式正確、由新到舊 ---
+const CHANGES = JSON.parse(fs.readFileSync(path.join(__dirname, 'changelog.json'), 'utf8')).changes;
+assert.ok(Array.isArray(CHANGES) && CHANGES.length, 'server/changelog.json 要有 changes');
+CHANGES.forEach((c, i) => {
+  assert.match(String(c.date), /^\d{4}-\d{2}-\d{2}$/, `changelog 第 ${i + 1} 筆的日期要寫成 2026-11-19`);
+  assert.ok(typeof c.text === 'string' && c.text.trim(), `changelog 第 ${i + 1} 筆沒有說明`);
+  assert.ok(!c.commit || /^[0-9a-f]{7,40}$/.test(c.commit), `changelog 第 ${i + 1} 筆的 commit 格式不對`);
+  if (i) assert.ok(CHANGES[i - 1].date >= c.date, `changelog 要由新到舊排（第 ${i + 1} 筆）`);
+});
+console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`);
+
 // --- 1b. 站內連結：[文字](#頁面代號) 要有那一頁，[文字](#h-錨點) 要在同一篇找得到 ---
 // （英文版已在 2026-10-30 移除，舊版在 git tag english-version）
 global.SNIP = {};
@@ -149,6 +160,26 @@ const base = `http://127.0.0.1:${PORT}`;
     const pub = await (await fetch(base + '/content.js')).text();
     assert.match(pub, /測試標題 ABC/, '存檔後 content.js 要馬上更新');
     assert.ok(!pub.includes('"gallery"'), '草稿不該出現在說明中心');
+
+    // 封存：從目錄拿下來、留在封存裡；說明中心看不到，重新讀取還在
+    const grp = st.sections.flatMap((s) => s.rows).find((r) => r.groups && r.groups.some((g) => g.items.length));
+    const aid = grp.groups.find((g) => g.items.length).items.shift();
+    const apage = st.pages[aid];
+    delete st.pages[aid];
+    st.archive = [{ id: aid, key: `c:${grp.id}:0`, row: aid, page: apage, at: new Date().toISOString(), by: '測試' }];
+    const sa = await put(owner, doc(st, { archive: st.archive }));
+    assert.equal(sa.status, 200, '封存要存得進去');
+    st.rev = (await sa.json()).rev;
+    assert.ok(!(await (await fetch(base + '/content.js')).text()).includes(`"${aid}":{`), '封存的頁面不該出現在說明中心');
+    const st3 = await (await owner('/api/editor/state')).json();
+    assert.equal(st3.archive[0].id, aid, '封存要存在伺服器上');
+    assert.ok(Array.isArray(st3.changes) && st3.changes.length, '後台要讀得到網站程式的修改紀錄');
+    assert.equal((await fetch(base + '/server/changelog.json')).status, 404, '修改紀錄檔不對外提供');
+    // 只送舊欄位（沒有 archive）的存檔不能把封存清掉
+    const keep = await put(owner, doc(st3));
+    assert.equal(keep.status, 200);
+    st.rev = (await keep.json()).rev;
+    assert.equal((await (await owner('/api/editor/state')).json()).archive.length, 1, '沒送封存欄位時要保留原本的封存');
 
     // 編輯者不能改名單
     const editor = as(await login('T0002', '測試編輯'));
