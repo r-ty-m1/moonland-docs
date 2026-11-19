@@ -19,7 +19,10 @@ const S3 = require('./s3.js');
 
 const CALLBACK_PATH = '/api/auth/callback/authentik';
 const SESSION_HOURS = 12;
-const LIMITS = { log: 500, history: 30, trash: 100, archive: 500 };
+const LIMITS = { log: 500, history: 30, trash: 500, archive: 500 };
+// 最近刪除保留 30 天，之後永久清掉
+const TRASH_DAYS = 30;
+const freshTrash = (arr) => (Array.isArray(arr) ? arr : []).filter((x) => x && Date.parse(x.at) > Date.now() - TRASH_DAYS * 864e5).slice(0, LIMITS.trash);
 const AREAS = ['start', 'chat', 'image', 'video', 'lab', 'recipes', 'models', 'team', 'support'];
 // 影片直接從瀏覽器傳到 S3：單次上傳，留在 Cloudflare 單一請求 100 MB 的限制以內
 const VIDEO_MAX = 90 * 1024 * 1024;
@@ -233,7 +236,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
   function stateFor(user) {
-    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: C.trash, archive: C.archive, editors: C.editors, uploads, changes: CHANGES };
+    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: freshTrash(C.trash), archive: C.archive, editors: C.editors, uploads, changes: CHANGES };
   }
   function putState(user, role, b) {
     if (!isObj(b)) return [400, { error: '資料格式不正確' }];
@@ -246,7 +249,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       pages: b.pages,
       history: isObj(b.history) ? b.history : {},
       log: Array.isArray(b.log) ? b.log.slice(0, LIMITS.log) : [],
-      trash: Array.isArray(b.trash) ? b.trash.slice(0, LIMITS.trash) : [],
+      trash: freshTrash(b.trash),
       archive: Array.isArray(b.archive) ? b.archive.slice(0, LIMITS.archive) : C.archive,
       editors: C.editors,
     };

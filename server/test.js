@@ -180,6 +180,13 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal(keep.status, 200);
     st.rev = (await keep.json()).rev;
     assert.equal((await (await owner('/api/editor/state')).json()).archive.length, 1, '沒送封存欄位時要保留原本的封存');
+    // 最近刪除只留 30 天
+    const old = new Date(Date.now() - 31 * 864e5).toISOString();
+    const st4 = await (await owner('/api/editor/state')).json();
+    const tr = await put(owner, doc(st4, { archive: st4.archive, trash: [{ ...st4.archive[0], id: 'old-x', at: old }, { ...st4.archive[0], id: 'new-x' }] }));
+    assert.equal(tr.status, 200);
+    st.rev = (await tr.json()).rev;
+    assert.deepEqual((await (await owner('/api/editor/state')).json()).trash.map((x) => x.id), ['new-x'], '超過 30 天的最近刪除要自動清掉');
 
     // 編輯者不能改名單
     const editor = as(await login('T0002', '測試編輯'));

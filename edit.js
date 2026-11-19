@@ -3,7 +3,7 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區）、#media 圖庫、
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
 //   #log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
@@ -65,10 +65,14 @@ function initialState() {
 
 let S = null;
 let me = null;
+// 最近刪除只留 30 天（伺服器存檔時也會清）
+const TRASH_DAYS = 30;
+const freshTrash = (arr) => (arr || []).filter((x) => x && Date.parse(x.at) > Date.now() - TRASH_DAYS * 864e5);
 function loadDemo() {
   try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
   if (!S || S.v !== 2) S = initialState();
   S.archive = S.archive || [];
+  S.trash = freshTrash(S.trash);
   Object.assign(MEDIA, S.uploads);
   try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
 }
@@ -80,6 +84,7 @@ async function loadLive() {
   if (!r.ok) throw new Error(`state ${r.status}`);
   S = await r.json();
   S.archive = S.archive || [];
+  S.trash = freshTrash(S.trash);
   Object.assign(MEDIA, S.uploads);
 }
 
@@ -228,11 +233,11 @@ function badge(id) {
   if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>';
   return '';
 }
-// 刪除鈕：按了會問要「封存」還是「刪除」
+// 封存鈕：從目錄拿下來放進封存（要刪除請到「草稿・封存・刪除」）
 function acts(id, canDelete) {
   const name = esc(S.pages[id].n || S.pages[id].t);
   return `<span class="ed-acts">
-    <button type="button" class="icon-btn sm ed-del" data-act="del" data-id="${id}" aria-label="封存或刪除「${name}」" title="${canDelete === true ? '封存或刪除' : esc(canDelete)}"${canDelete === true ? '' : ' disabled'}>${ic('trash')}</button>
+    <button type="button" class="icon-btn sm ed-del" data-act="del" data-id="${id}" aria-label="封存「${name}」" title="${canDelete === true ? '封存' : esc(canDelete)}"${canDelete === true ? '' : ' disabled'}>${ic('archive')}</button>
   </span>`;
 }
 // 拖曳把手：滑鼠或手指按住拖到別的位置（可以跨分類）；鍵盤聚焦後按上下鍵移動
@@ -252,7 +257,7 @@ function catLi(r) {
   const count = r.groups.reduce((n, g) => n + g.items.length, 0);
   const many = r.groups.length > 1;
   return `<li class="ed-cat" data-id="${r.id}">
-    <div class="ed-item">${grip(r.id)}<a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, count ? '分類裡還有頁面，先把頁面搬走、封存或刪除，才能處理分類' : true)}</div>
+    <div class="ed-item">${grip(r.id)}<a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, count ? '分類裡還有頁面，先把頁面搬走或封存，才能封存分類' : true)}</div>
     <div class="ed-kids">${r.groups.map((g, gi) => {
       const k = `c:${r.id}:${gi}`;
       return `${many || g.g ? `<div class="ed-sub">${esc(g.g || '（沒有小標）')}</div>` : ''}
@@ -361,32 +366,16 @@ document.addEventListener('keydown', (e) => {
   movePage(g.dataset.drag, l.key, j);
 });
 
-// 按刪除鈕：問要封存（留著，之後可以放回）還是刪除（放進最近刪除，太舊會自動清掉）
-const delDlg = document.getElementById('delDlg');
-let delId = null;
-function askRemove(id) {
-  delId = id;
-  document.getElementById('delDlgT').textContent = `要怎麼處理「${S.pages[id].t}」？`;
-  delDlg.returnValue = '';
-  delDlg.showModal();
-}
-delDlg.addEventListener('close', () => {
-  const id = delId;
-  delId = null;
-  if (!id || !S.pages[id]) return;
-  if (delDlg.returnValue === 'archive') takeDown(id, 'archive');
-  else if (delDlg.returnValue === 'delete') takeDown(id, 'trash');
-});
-// 從目錄拿下來，放進封存（archive）或最近刪除（trash）；兩邊都記得原本的位置，之後可以放回
-function takeDown(id, where) {
+// 從目錄拿下來放進封存，記得原本的位置，之後可以放回
+function takeDown(id) {
   const p = S.pages[id];
   const l = locate(id);
   const [row] = l.arr.splice(l.i, 1);
-  S[where].unshift({ id, key: l.key, row: clone(row), page: clone(p), at: now(), by: me.name });
+  S.archive.unshift({ id, key: l.key, row: clone(row), page: clone(p), at: now(), by: me.name });
   delete S.pages[id];
-  addLog(where === 'archive' ? '封存' : '刪除', id, p.t);
+  addLog('封存', id, p.t);
   persist();
-  toast(where === 'archive' ? `已封存「${p.t}」，說明中心看不到了；可以在「草稿・封存・刪除」放回目錄。` : `已刪除「${p.t}」，可以在「草稿・封存・刪除」的最近刪除找回來。`);
+  toast(`已封存「${p.t}」，說明中心看不到了；可以在「草稿・封存・刪除」放回目錄或刪除。`);
   render();
 }
 
@@ -1034,8 +1023,8 @@ function viewHelp() {
       <li>「頁面」分頁就是說明中心左側目錄的樣子，由上到下照順序排。</li>
       <li>點頁面名稱開始編輯。</li>
       <li><b>調整順序、換分類</b>：按住頁面左邊的 ${ic('grip', 'ic sm')} 拖到想放的位置再放開，可以拖進別的分類或小標底下（手機一樣用手指按住拖）。拖到一半想取消就按 Esc。用鍵盤的話，按 Tab 移到 ${ic('grip', 'ic sm')} 再按上下鍵。也可以進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
-      <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存或刪除，要先把頁面搬走。</li>
-      <li><b>垃圾桶</b>：會問你要「封存」還是「刪除」。<b>封存</b>是暫時拿下來、長期保留，之後可以放回；<b>刪除</b>是不要了，只保留最近 100 筆。</li>
+      <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存，要先把頁面搬走。</li>
+      <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿・封存・刪除」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
       <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
       <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿・封存・刪除」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
@@ -1064,7 +1053,7 @@ function viewHelp() {
       <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；上傳時會自動照規則命名。</li></ul>`)}
     ${sec('7. 改錯了怎麼辦', `<ul>
       <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
-      <li><b>草稿・封存・刪除</b>：封存的頁面按「放回目錄」、刪掉的頁面按「還原」，都會回到原本的位置。</li>
+      <li><b>草稿・封存・刪除</b>：封存和最近刪除都可以勾選多篇（或全選）一起處理。封存按「放回目錄」回到原本的位置；最近刪除按「還原到封存」放回封存。誰在什麼時候封存、刪除，都記在修改紀錄裡。</li>
       <li><b>修改紀錄</b>：「內容修改」是誰在什麼時候改了哪一頁；「網站程式修改」是網站本身的版面、功能改了什麼（工程師更新程式時記的）。</li>
       <li><b>檢查與備份</b>：一次檢查全站的圖片和連結；下載整個網站的備份檔。網站的儲存空間不是備份，建議每個月、或大改之前下載一次，存到公司雲端硬碟。主管理員可以用備份檔還原整個網站。</li>
       <li>兩個人同時改內容時，後存的人會看到「其他人剛剛也改了內容」，畫面會換成最新版本；正在編輯的文字還在，再按一次儲存就好。</li></ul>`)}
@@ -1113,44 +1102,97 @@ function viewLog(sub) {
 // 草稿・封存・刪除：說明中心看不到的頁面放在同一頁
 // - 草稿：還在目錄裡的原位置，只是不公開；寫好取消勾選「草稿」就公開
 // - 封存：從目錄拿下來長期保留（不會自動清掉），可以放回原位置
-// - 最近刪除：只留最近 100 筆，太舊的自動清掉
+// - 最近刪除：從封存刪掉的頁面，保留 30 天後自動清掉，可以還原回封存
+// 封存與最近刪除可以勾選多筆（或全選）一起處理
+const picked = { archive: new Set(), trash: new Set() };
+const pickKey = (x) => `${x.id}@${x.at}`;
+function pickList(where, verb, btns) {
+  const arr = S[where];
+  const keys = new Set(arr.map(pickKey));
+  for (const k of [...picked[where]]) if (!keys.has(k)) picked[where].delete(k);
+  const n = picked[where].size;
+  const all = n && n === arr.length;
+  return `<div class="ed-bulk" data-bulk="${where}">
+      <label class="ed-check"><input type="checkbox" data-pick-all="${where}"${all ? ' checked' : ''}><span>全選</span></label>
+      <span class="ed-hint" data-pick-n>${n ? `已選 ${n} 篇` : '勾選要處理的頁面'}</span>
+      <span class="ed-row-acts">${btns.map(([act, icon, label, cls]) => `<button type="button" class="ed-btn${cls ? ' ' + cls : ''}" data-act="${act}"${n ? '' : ' disabled'}>${ic(icon)}${label}</button>`).join('')}</span>
+    </div>
+    <ul class="ed-list ed-trash">${arr.map((x) => { const k = pickKey(x); return `<li class="ed-item"><label class="ed-pick"><input type="checkbox" data-pick="${where}" value="${esc(k)}" aria-label="選取「${esc(x.page.t)}」"${picked[where].has(k) ? ' checked' : ''}></label>${taken(x, verb)}</li>`; }).join('')}</ul>`;
+}
+// 勾選改變時只更新數字和按鈕，不重畫整頁
+function syncPick(where) {
+  const box = app.querySelector(`[data-bulk="${where}"]`);
+  if (!box) return;
+  const n = picked[where].size;
+  box.querySelector('[data-pick-n]').textContent = n ? `已選 ${n} 篇` : '勾選要處理的頁面';
+  box.querySelectorAll('button').forEach((b) => { b.disabled = !n; });
+  const all = box.querySelector('[data-pick-all]');
+  all.checked = !!n && n === S[where].length;
+  all.indeterminate = !!n && n < S[where].length;
+}
+const taken = (x, verb) => `<span class="ed-name">${ic(x.page.icon || 'file')}<span><b>${esc(x.page.t)}</b><small>${esc(x.by)} 在 ${fmt(x.at)} ${verb}・原本在「${esc(listOf(x.key) ? placeName(x.key) : '已經不在的位置')}」${verb === '刪除' ? `・${daysLeft(x)}` : ''}</small></span></span>`;
+const daysLeft = (x) => { const d = Math.ceil((Date.parse(x.at) + TRASH_DAYS * 864e5 - Date.now()) / 864e5); return d <= 1 ? '明天前自動清除' : `${d} 天後自動清除`; };
 function viewShelf(route) {
   const drafts = Object.keys(S.pages).filter((id) => S.pages[id].draft && locate(id));
   const sec = (id, icon, title, hint, body) => `<section class="ed-sec" id="${id}" aria-labelledby="${id}-h"><div class="ed-sec-head"><h2 id="${id}-h">${ic(icon)}${title}</h2></div><p class="ed-hint">${hint}</p>${body}</section>`;
-  const taken = (x, verb) => `<span class="ed-name">${ic(x.page.icon || 'file')}<span><b>${esc(x.page.t)}</b><small>${esc(x.by)} 在 ${fmt(x.at)} ${verb}・原本在「${esc(listOf(x.key) ? placeName(x.key) : '已經不在的位置')}」</small></span></span>`;
   return `${tabs('shelf')}<div class="ed-head"><div><h1>草稿・封存・刪除</h1><p class="ed-hint">說明中心看不到的頁面都在這裡。</p></div></div>
     <nav class="ed-jump" aria-label="跳到">${[['drafts', '草稿', drafts.length], ['archive', '封存', S.archive.length], ['trash', '最近刪除', S.trash.length]].map(([k, t, n]) => `<a href="#${k}"${route === k ? ' aria-current="true"' : ''}>${t}<span class="chip">${n}</span></a>`).join('')}</nav>
     ${sec('sh-drafts', 'pencil', `草稿（${drafts.length}）`, '還沒寫完、先不公開的頁面，留在目錄裡原本的位置。寫好後進入頁面，取消勾選「草稿」再儲存就會公開。',
       drafts.length ? `<ul class="ed-list">${drafts.map((id) => { const p = S.pages[id]; return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}<span class="chip ed-draft">草稿</span></b><small>${esc(placeName(locate(id).key))}</small></span></a></li>`; }).join('')}</ul>` : '<p class="ed-hint">目前沒有草稿。</p>')}
-    ${sec('sh-archive', 'archive', `封存（${S.archive.length}）`, '暫時不用、但可能還會用到的頁面。會一直保留，不會自動清掉；按「放回目錄」就回到原本的位置。',
-      S.archive.length ? `<ul class="ed-list ed-trash">${S.archive.map((x, i) => `<li class="ed-item">${taken(x, '封存')}<span class="ed-row-acts">
-        <button type="button" class="ed-btn" data-act="unarchive" data-i="${i}">${ic('restore')}放回目錄</button>
-        <button type="button" class="ed-btn ed-del" data-act="archive-del" data-i="${i}">${ic('trash')}刪除</button></span></li>`).join('')}</ul>` : '<p class="ed-hint">沒有封存的頁面。在「頁面」按垃圾桶，可以選擇封存。</p>')}
-    ${sec('sh-trash', 'trash', `最近刪除（${S.trash.length}）`, '刪掉的頁面先放在這裡，按「還原」就會放回原本的位置。只保留最近 100 筆，更早的會自動清掉；想留久一點請改用封存。',
-      S.trash.length ? `<ul class="ed-list ed-trash">${S.trash.map((x, i) => `<li class="ed-item">${taken(x, '刪除')}<span class="ed-row-acts">
-        <button type="button" class="ed-btn" data-act="restore" data-i="${i}">${ic('restore')}還原</button></span></li>`).join('')}</ul>` : '<p class="ed-hint">沒有刪除的頁面。</p>')}`;
+    ${sec('sh-archive', 'archive', `封存（${S.archive.length}）`, '暫時不用、但可能還會用到的頁面。會一直保留，不會自動清掉。勾選後按「放回目錄」回到原本的位置，或按「刪除」移到最近刪除。',
+      S.archive.length ? pickList('archive', '封存', [['unarchive', 'restore', '放回目錄'], ['archive-del', 'trash', '刪除', 'ed-del']]) : '<p class="ed-hint">沒有封存的頁面。在「頁面」按封存鈕，就會放到這裡。</p>')}
+    ${sec('sh-trash', 'trash', `最近刪除（${S.trash.length}）`, `從封存刪掉的頁面。保留 ${TRASH_DAYS} 天，之後自動永久清除；這段期間勾選後按「還原」會放回封存。`,
+      S.trash.length ? pickList('trash', '刪除', [['restore', 'restore', '還原到封存']]) : '<p class="ed-hint">沒有刪除的頁面。</p>')}`;
 }
-// 從封存或最近刪除放回原本的位置（位置不在了就放到第一個大分類）
-function putBack(where, i) {
-  const x = S[where][i];
-  if (S.pages[x.id]) { toast(`網址代號「${x.id}」已經被其他頁面用了，無法放回。`); return; }
-  let l = listOf(x.key);
-  if (!l || (x.row.groups && !l.top)) l = listOf('s0');
-  S.pages[x.id] = x.page;
-  l.arr.push(l.top ? (typeof x.row === 'string' ? { id: x.id } : x.row) : x.id);
-  S[where].splice(i, 1);
-  addLog(where === 'archive' ? '取消封存' : '還原', x.id, x.page.t);
-  persist();
-  toast(`已把「${x.page.t}」放回「${placeName(l.key)}」的最後面${x.page.draft ? '（還是草稿）' : ''}。`);
+// 勾選的封存或最近刪除（照畫面上的順序）
+const pickedOf = (where) => S[where].filter((x) => picked[where].has(pickKey(x)));
+const names = (xs) => xs.length === 1 ? `「${xs[0].page.t}」` : `「${xs[0].page.t}」等 ${xs.length} 篇`;
+// 封存的頁面放回原本的位置（位置不在了就放到第一個大分類）
+function unarchivePicked() {
+  const xs = pickedOf('archive');
+  if (!xs.length) return;
+  const done = [], blocked = [];
+  for (const x of xs) {
+    if (S.pages[x.id]) { blocked.push(x); continue; }
+    let l = listOf(x.key);
+    if (!l || (x.row.groups && !l.top)) l = listOf('s0');
+    S.pages[x.id] = x.page;
+    l.arr.push(l.top ? (typeof x.row === 'string' ? { id: x.id } : x.row) : x.id);
+    S.archive.splice(S.archive.indexOf(x), 1);
+    picked.archive.delete(pickKey(x));
+    addLog('取消封存', x.id, x.page.t);
+    done.push(x);
+  }
+  if (done.length) persist();
+  toast([done.length ? `已把${names(done)}放回目錄原本的位置。` : '', blocked.length ? `${names(blocked)}的網址代號已經被其他頁面用了，無法放回。` : ''].join(''));
   render();
 }
-function archiveToTrash(i) {
-  const x = S.archive[i];
-  if (!confirm(`確定要刪除封存的「${x.page.t}」嗎？\n會移到「最近刪除」，只保留最近 100 筆。`)) return;
-  S.archive.splice(i, 1);
-  S.trash.unshift({ ...x, at: now(), by: me.name });
-  addLog('刪除（原本封存）', x.id, x.page.t);
+// 封存的頁面移到最近刪除（30 天後自動清掉）
+function archiveToTrash() {
+  const xs = pickedOf('archive');
+  if (!xs.length || !confirm(`確定要刪除${names(xs)}嗎？\n會移到「最近刪除」，${TRASH_DAYS} 天內可以還原，之後自動永久清除。`)) return;
+  for (const x of xs) {
+    S.archive.splice(S.archive.indexOf(x), 1);
+    S.trash.unshift({ ...x, at: now(), by: me.name });
+    addLog('刪除', x.id, x.page.t);
+  }
+  picked.archive.clear();
   persist();
+  toast(`已刪除${names(xs)}，${TRASH_DAYS} 天內可以在「最近刪除」還原。`);
+  render();
+}
+// 最近刪除還原回封存
+function restorePicked() {
+  const xs = pickedOf('trash');
+  if (!xs.length) return;
+  for (const x of xs) {
+    S.trash.splice(S.trash.indexOf(x), 1);
+    S.archive.unshift({ ...x, at: now(), by: me.name });
+    addLog('還原到封存', x.id, x.page.t);
+  }
+  picked.trash.clear();
+  persist();
+  toast(`已把${names(xs)}還原到封存，要公開請再按「放回目錄」。`);
   render();
 }
 
@@ -1281,10 +1323,10 @@ document.addEventListener('click', (e) => {
       history.replaceState(null, '', location.pathname);
       lastHash = '';
       render();
-    } else if (a === 'del') askRemove(b.dataset.id);
-    else if (a === 'restore') putBack('trash', +b.dataset.i);
-    else if (a === 'unarchive') putBack('archive', +b.dataset.i);
-    else if (a === 'archive-del') archiveToTrash(+b.dataset.i);
+    } else if (a === 'del') takeDown(b.dataset.id);
+    else if (a === 'restore') restorePicked();
+    else if (a === 'unarchive') unarchivePicked();
+    else if (a === 'archive-del') archiveToTrash();
     else if (a === 'copy-media') copyMedia(b);
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
@@ -1340,6 +1382,13 @@ app.addEventListener('input', (e) => {
 app.addEventListener('change', (e) => {
   const f = e.target.form;
   if (f && f.id === 'pageForm') { setDirty(true); readForm(f); paintPreview(); return; }
+  const pk = e.target.dataset.pick, pa = e.target.dataset.pickAll;
+  if (pk) { picked[pk][e.target.checked ? 'add' : 'delete'](e.target.value); syncPick(pk); return; }
+  if (pa) {
+    S[pa].forEach((x) => picked[pa][e.target.checked ? 'add' : 'delete'](pickKey(x)));
+    app.querySelectorAll(`[data-pick="${pa}"]`).forEach((c) => { c.checked = e.target.checked; });
+    syncPick(pa); return;
+  }
   if (e.target.dataset.act === 'role') {
     const ed = S.editors[+e.target.dataset.i];
     ed.role = e.target.value;
