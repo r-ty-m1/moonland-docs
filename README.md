@@ -26,7 +26,7 @@
 | `assets/` | logo（深色、淺色版）與網站圖示 |
 | `server/` | 公司內部部署用的小型伺服器（`server.js`：檔案、回饋；`editor.js`：編輯後台的公司帳號登入、內容存放、上傳、備份；`owners.json`：主管理員的員工編號）與自動測試 `test.js`（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
-| `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改頁面、拖曳排序、封存、上傳圖片、「草稿・封存・刪除」、圖庫、版本紀錄、修改紀錄（內容／網站程式）、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
+| `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改頁面、拖曳排序、待辦清單與功能許願池、封存、上傳圖片、「草稿・封存・刪除」、圖庫、版本紀錄、修改紀錄（內容／網站程式）、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
 | `docs/MAINTENANCE.md` | 維護手冊：給網站負責人與平台組，含發布與回復、問題排查、上線前清單 |
 
@@ -141,7 +141,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261119b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261119c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 

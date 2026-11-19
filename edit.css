@@ -360,3 +360,38 @@ button.ed-m:hover, button.ed-m:focus-visible { border-color: var(--brand-ic); ou
 .ed-ok { display: flex; align-items: center; gap: 8px; color: var(--ok, inherit); }
 .ed-ok .ic { flex: none; }
 a.ed-btn { text-decoration: none; }
+
+/* 待辦清單與功能許願池 */
+.ed-head.has-act { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; }
+.ed-head.has-act > div { flex: 1 1 320px; }
+.ed-seg .chip { margin-left: 6px; }
+.ed-todos, .ed-wishes { margin-top: 14px; }
+.ed-todos .ed-item, .ed-wishes .ed-item { flex-wrap: wrap; padding: 10px 0; }
+.ed-todos .ed-name, .ed-wishes .ed-name { flex: 1 1 260px; }
+.ed-note-txt { white-space: pre-wrap; margin-top: 4px; color: var(--fg-2) !important; }
+.ed .ed-mini { width: auto; padding: 4px 26px 4px 10px; font-size: 0.8125rem; border-radius: 9px; }
+.ed .ed-mini[data-pri="high"] { color: var(--warn-ink); border-color: var(--warn-line); background-color: var(--warn-soft); }
+.ed .ed-mini[data-st="writing"], .ed .ed-mini[data-st="doing"], .ed .ed-mini[data-st="planned"] { color: var(--accent-ink); border-color: var(--accent-line); background-color: var(--accent-soft); }
+.ed .ed-mini[data-st="done"] { color: var(--muted); }
+.chip[data-st="planned"], .chip[data-st="doing"] { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); }
+.ed-done { margin-top: 18px; }
+.ed-done summary { cursor: pointer; color: var(--fg-2); font-size: 0.9375rem; padding: 6px 0; }
+.ed-done .ed-name b { color: var(--fg-2); }
+.ed-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.ed-tags .tag { cursor: pointer; font: inherit; font-size: 0.75rem; }
+.ed-tag-pick { margin: -4px 0 12px; }
+.ed-tagbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.ed-filter {
+  font: inherit; font-size: 0.8125rem; padding: 4px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg-2);
+}
+.ed-filter span { margin-left: 6px; color: var(--muted); }
+.ed-filter[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--fg); }
+.ed-vote {
+  flex: none; display: grid; justify-items: center; min-width: 48px; padding: 6px 8px; cursor: pointer; font: inherit; font-size: 0.75rem;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--fg-2);
+}
+.ed-vote b { font-size: 1rem; font-weight: 600; color: var(--fg); }
+.ed-vote.on { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-ink); }
+.ed-fields-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ed-empty { margin-top: 16px; }

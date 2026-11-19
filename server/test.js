@@ -180,6 +180,18 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal(keep.status, 200);
     st.rev = (await keep.json()).rev;
     assert.equal((await (await owner('/api/editor/state')).json()).archive.length, 1, '沒送封存欄位時要保留原本的封存');
+    // 待辦清單與許願池存在伺服器上；沒送這兩個欄位的存檔不會清掉
+    const st5 = await (await owner('/api/editor/state')).json();
+    const tw = await put(owner, doc(st5, { archive: st5.archive, todos: [{ id: 't1', t: '待寫的文章', status: 'todo', pri: 'high' }], wishes: [{ id: 'w1', t: '想要的功能', tags: ['新功能'], status: 'new', votes: [] }] }));
+    assert.equal(tw.status, 200);
+    st.rev = (await tw.json()).rev;
+    const st6 = await (await owner('/api/editor/state')).json();
+    assert.equal(st6.todos[0].t, '待寫的文章', '待辦要存在伺服器上');
+    assert.equal(st6.wishes[0].tags[0], '新功能', '許願池要存在伺服器上');
+    const tw2 = await put(owner, doc(st6));
+    st.rev = (await tw2.json()).rev;
+    const st7 = await (await owner('/api/editor/state')).json();
+    assert.ok(st7.todos.length === 1 && st7.wishes.length === 1, '沒送待辦欄位時要保留原本的待辦與願望');
     // 最近刪除只留 30 天
     const old = new Date(Date.now() - 31 * 864e5).toISOString();
     const st4 = await (await owner('/api/editor/state')).json();

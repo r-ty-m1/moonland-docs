@@ -3,7 +3,7 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#todo 待辦清單（#todo/wish 功能許願池）、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
 //   #log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
@@ -55,7 +55,7 @@ const fmt = (iso) => {
 let LIVE = null;   // 正式版：{ login: 'oidc'|'dev'|'none', user, role }；示範版是 null
 function initialState() {
   return {
-    v: 2, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS, window.DRAFTS), history: {}, log: [], trash: [], archive: [], uploads: {}, nextMedia: 9001,
+    v: 2, ...Model.fromSite(window.ARTICLES || {}, window.SECTIONS, window.DRAFTS), history: {}, log: [], trash: [], archive: [], todos: [], wishes: [], uploads: {}, nextMedia: 9001,
     editors: [
       { no: 'A0001', name: '王小明', role: 'owner', at: now() },
       { no: 'A0002', name: '林小華', role: 'editor', at: now() },
@@ -72,6 +72,8 @@ function loadDemo() {
   try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
   if (!S || S.v !== 2) S = initialState();
   S.archive = S.archive || [];
+  S.todos = S.todos || [];
+  S.wishes = S.wishes || [];
   S.trash = freshTrash(S.trash);
   Object.assign(MEDIA, S.uploads);
   try { me = JSON.parse(localStorage.getItem(WHO)); } catch (e) {}
@@ -84,6 +86,8 @@ async function loadLive() {
   if (!r.ok) throw new Error(`state ${r.status}`);
   S = await r.json();
   S.archive = S.archive || [];
+  S.todos = S.todos || [];
+  S.wishes = S.wishes || [];
   S.trash = freshTrash(S.trash);
   Object.assign(MEDIA, S.uploads);
 }
@@ -99,7 +103,7 @@ function persist() {
     let msg;
     try {
       const r = await api('api/editor/state', { method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ rev: S.rev, sections: S.sections, pages: S.pages, history: S.history, log: S.log, trash: S.trash, archive: S.archive, editors: S.editors }) });
+        body: JSON.stringify({ rev: S.rev, sections: S.sections, pages: S.pages, history: S.history, log: S.log, trash: S.trash, archive: S.archive, todos: S.todos, wishes: S.wishes, editors: S.editors }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok) { S.rev = j.rev; S.editors = j.editors; return true; }
       msg = r.status === 409 ? '其他人剛剛也改了內容，已載入最新的版本；你剛才的動作沒有存到，請再做一次。'
@@ -172,7 +176,8 @@ function toast(msg) {
 }
 function tabs(cur) {
   const drafts = Object.values(S.pages).filter((p) => p.draft).length;
-  const items = [['pages', '頁面'], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['tools', '檢查與備份']];
+  const todo = S.todos.filter((t) => t.status !== 'done').length;
+  const items = [['pages', '頁面'], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -303,7 +308,7 @@ app.addEventListener('pointerdown', (e) => {
   if (!g || e.button > 0 || drag) return;
   const li = g.closest('li[data-id]');
   e.preventDefault();
-  drag = { id: li.dataset.id, li, cat: li.classList.contains('ed-cat'), pid: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, started: false, timer: 0 };
+  drag = { id: li.dataset.id, li, home: li.parentElement, list: li.parentElement.dataset.list || '', cat: li.classList.contains('ed-cat'), pid: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, started: false, timer: 0 };
   try { g.setPointerCapture(e.pointerId); } catch (x) {}
 });
 function placeDrag() {
@@ -311,6 +316,7 @@ function placeDrag() {
   if (!el) return;
   let ul = el.closest('ul.ed-list[data-key]');
   if (!ul || !app.contains(ul)) return;
+  if (drag.list ? ul !== drag.home : ul.dataset.list) return;
   if (drag.cat && ul.dataset.top !== '1') ul = ul.parentElement.closest('ul.ed-list[data-top="1"]');
   // 停在分類的小標或「新增頁面」上：先不動，避免頁面在分類前後跳來跳去
   else if (!drag.cat && el.closest('.ed-kids') && !el.closest('.ed-kids ul.ed-list')) return;
@@ -351,6 +357,7 @@ function endDrag(e, cancel) {
   if (!d.started) return;
   if (cancel) { render(); return; }
   const ul = d.li.parentElement;
+  if (d.list) { moveTodo(d.id, [...ul.children].filter((c) => c.matches('li[data-id]')).indexOf(d.li)); return; }
   movePage(d.id, ul.dataset.key, [...ul.children].filter((c) => c.matches('li[data-id]')).indexOf(d.li));
 }
 document.addEventListener('pointerup', (e) => endDrag(e));
@@ -360,6 +367,7 @@ document.addEventListener('keydown', (e) => {
   const g = e.target.closest && e.target.closest('.ed-grip');
   if (!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
   e.preventDefault();
+  if (g.dataset.list) { const i = openTodos().findIndex((t) => t.id === g.dataset.drag); moveTodo(g.dataset.drag, i + (e.key === 'ArrowUp' ? -1 : 1)); return; }
   const l = locate(g.dataset.drag);
   const j = l.i + (e.key === 'ArrowUp' ? -1 : 1);
   if (j < 0 || j >= l.arr.length) return;
@@ -578,6 +586,7 @@ async function savePage(f) {
   S.history[d.id] = S.history[d.id] || [];
   S.history[d.id].unshift({ at: now(), by: me.name, page: clone(page) });
   S.history[d.id].length = Math.min(S.history[d.id].length, 30);
+  S.todos.forEach((t) => { if (t.id === d.todo || (t.page && t.page === d.origId)) t.page = d.id; });
   addLog(action, d.id, page.t);
   saving = true;
   const ok = await persist();
@@ -1027,6 +1036,12 @@ function viewHelp() {
       <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿・封存・刪除」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
       <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
       <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿・封存・刪除」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
+    ${sec('2-1. 待辦清單與功能許願池', `<ul>
+      <li><b>文章待辦</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序，按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
+      <li>每一列可以直接改<b>優先級</b>和<b>製作狀態</b>（還沒開始、撰寫中、待確認、完成）。完成的會收到下方「已完成」。</li>
+      <li>按<b>開始寫</b>會在預計的位置開一篇新頁面並帶入暫定標題，存檔後這個待辦會連到那一頁。</li>
+      <li><b>功能許願池</b>：想讓網站或編輯後台新增、修改的功能寫在這裡，可以加標籤（例如 #新功能、#修正錯誤）。點標籤只看那一類；同意別人的想法按 <b>+1</b>，票多的排前面。</li>
+      <li>願望的處理狀態由主管理員更新；自己寫的願望自己可以修改或刪除。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
@@ -1099,6 +1114,178 @@ function viewLog(sub) {
         <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
     </tbody></table></div>` : '<p class="ed-hint">還沒有任何修改。</p>'}`;
 }
+// ---------------------------------------------------------
+// 待辦清單：要寫的文章（由上往下是製作順序，可以拖曳）＋功能許願池
+// - todos：{ id, t 暫定標題, key 預計位置, where 位置名稱（位置不在了還看得懂）, pri, status, note, page 開始寫之後的頁面, by, byNo, at }
+// - wishes：{ id, t, note, tags[], status, votes[{ no, name }], by, byNo, at }
+// ---------------------------------------------------------
+const TODO_STATUS = { todo: '還沒開始', writing: '撰寫中', review: '待確認', done: '完成' };
+const PRI = { high: '高', mid: '中', low: '低' };
+const WISH_STATUS = { new: '新提出', planned: '排入計畫', doing: '製作中', done: '已完成', no: '暫不處理' };
+const WISH_CLOSED = ['done', 'no'];
+const WISH_TAGS = ['新功能', '修正錯誤', '版面', '編輯後台', '說明中心', '意見回饋'];
+let wishTag = '';
+let pendingTodo = null;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const openTodos = () => S.todos.filter((t) => t.status !== 'done');
+const placeLabel = (key, fallback) => { const l = key && listOf(key); return l ? l.label.replace('（直接列在目錄上）', '') : fallback || '還沒決定位置'; };
+const canEditWish = (w) => myRole() === 'owner' || w.byNo === me.no;
+const opts = (map, cur) => Object.entries(map).map(([k, t]) => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + t + '</option>').join('');
+function parseTags(s) {
+  return [...new Set(String(s).split(/[,，、\s]+/).map((x) => x.replace(/^#/, '').trim().slice(0, 12)).filter(Boolean))].slice(0, 6);
+}
+
+function viewTodo(sub) {
+  const wish = sub === 'wish';
+  const nOpen = openTodos().length, nWish = S.wishes.filter((w) => !WISH_CLOSED.includes(w.status)).length;
+  return `${tabs('todo')}<div class="ed-head has-act"><div><h1>待辦清單</h1><p class="ed-hint">${wish
+      ? '想讓網站或編輯後台多什麼功能、哪裡要修，都寫在這裡。同意別人的想法就按 +1，網站負責人會更新處理狀態。'
+      : '還沒寫、正在寫的文章。由上往下是預計的製作順序，按住 ' + ic('grip', 'ic sm') + ' 拖曳調整；按「開始寫」會用暫定標題開一篇新頁面。'}</p></div>
+      <button type="button" class="ed-btn ed-primary" data-act="${wish ? 'wish-add' : 'todo-add'}">${ic('plus')}${wish ? '許願' : '新增要寫的文章'}</button></div>
+    <div class="ed-seg" role="tablist" aria-label="待辦的種類">
+      <a href="#todo" role="tab" aria-selected="${!wish}"${wish ? '' : ' aria-current="page"'}>文章待辦<span class="chip">${nOpen}</span></a>
+      <a href="#todo/wish" role="tab" aria-selected="${wish}"${wish ? ' aria-current="page"' : ''}>功能許願池<span class="chip">${nWish}</span></a></div>
+    ${wish ? wishList() : todoList()}`;
+}
+function todoRow(t) {
+  const page = t.page && S.pages[t.page];
+  const done = t.status === 'done';
+  return `<li data-id="${t.id}" class="ed-todo"><div class="ed-item">
+    ${done ? '' : `<button type="button" class="icon-btn sm ed-grip" data-drag="${t.id}" data-list="todos" aria-label="拖曳調整「${esc(t.t)}」的順序（也可以按上下鍵）" title="拖曳調整順序">${ic('grip')}</button>`}
+    <span class="ed-name"><span><b>${esc(t.t)}</b><small>預計放在「${esc(placeLabel(t.key, t.where))}」・${esc(t.by)} 在 ${fmt(t.at)} 新增</small>${t.note ? `<small class="ed-note-txt">${esc(t.note)}</small>` : ''}</span></span>
+    <span class="ed-row-acts">
+      <select class="ed-mini" data-act="todo-pri" data-id="${t.id}" data-pri="${t.pri}" aria-label="「${esc(t.t)}」的優先級">${opts({ high: '優先：高', mid: '優先：中', low: '優先：低' }, t.pri)}</select>
+      <select class="ed-mini" data-act="todo-status" data-id="${t.id}" data-st="${t.status}" aria-label="「${esc(t.t)}」的製作狀態">${opts(TODO_STATUS, t.status)}</select>
+      ${page ? `<a class="ed-btn" href="#edit/${t.page}">${ic('file')}開啟頁面</a>` : !done && listOf(t.key) ? `<button type="button" class="ed-btn" data-act="todo-start" data-id="${t.id}">${ic('pencil')}開始寫</button>` : ''}
+      <button type="button" class="icon-btn sm" data-act="todo-edit" data-id="${t.id}" aria-label="修改「${esc(t.t)}」" title="修改">${ic('pencil')}</button>
+      <button type="button" class="icon-btn sm ed-del" data-act="todo-del" data-id="${t.id}" aria-label="刪除待辦「${esc(t.t)}」" title="刪除這個待辦">${ic('trash')}</button>
+    </span></div></li>`;
+}
+function todoList() {
+  const open = openTodos(), done = S.todos.filter((t) => t.status === 'done');
+  return `${open.length ? `<ul class="ed-list ed-todos" data-key="todos" data-list="todos">${open.map(todoRow).join('')}</ul>` : '<p class="ed-hint ed-empty">目前沒有待辦的文章。按「新增要寫的文章」記下想寫的主題。</p>'}
+    ${done.length ? `<details class="ed-done"><summary>已完成（${done.length}）</summary><ul class="ed-list ed-todos">${done.map(todoRow).join('')}</ul></details>` : ''}`;
+}
+// 拖曳或上下鍵：把待辦移到未完成清單的第 j 個
+function moveTodo(id, j) {
+  const open = openTodos(), done = S.todos.filter((t) => t.status === 'done');
+  const i = open.findIndex((t) => t.id === id);
+  if (i < 0 || j < 0 || j >= open.length) { render(); return; }
+  if (i !== j) { open.splice(j, 0, open.splice(i, 1)[0]); S.todos = [...open, ...done]; persist(); }
+  render();
+  const g = app.querySelector(`.ed-grip[data-drag="${id}"]`);
+  if (g) g.focus({ preventScroll: true });
+}
+function wishRow(w) {
+  const votes = w.votes || [];
+  const voted = votes.some((v) => v.no === me.no);
+  const owner = myRole() === 'owner';
+  return `<li class="ed-item ed-wish">
+    <button type="button" class="ed-vote${voted ? ' on' : ''}" data-act="wish-vote" data-id="${w.id}" aria-pressed="${voted}" aria-label="我也想要「${esc(w.t)}」，目前 ${votes.length} 票" title="${esc(votes.map((v) => v.name).join('、') || '還沒有人按')}">+1<b>${votes.length}</b></button>
+    <span class="ed-name"><span><b>${esc(w.t)}</b>
+      ${(w.tags || []).length ? `<span class="ed-tags">${w.tags.map((g) => `<button type="button" class="tag" data-act="wish-tag" data-tag="${esc(g)}" title="只看「${esc(g)}」">#${esc(g)}</button>`).join('')}</span>` : ''}
+      <small>${esc(w.by)} 在 ${fmt(w.at)} 提出</small>${w.note ? `<small class="ed-note-txt">${esc(w.note)}</small>` : ''}</span></span>
+    <span class="ed-row-acts">
+      ${owner ? `<select class="ed-mini" data-act="wish-status" data-id="${w.id}" data-st="${w.status}" aria-label="「${esc(w.t)}」的處理狀態">${opts(WISH_STATUS, w.status)}</select>` : `<span class="chip" data-st="${w.status}">${WISH_STATUS[w.status] || ''}</span>`}
+      ${canEditWish(w) ? `<button type="button" class="icon-btn sm" data-act="wish-edit" data-id="${w.id}" aria-label="修改「${esc(w.t)}」" title="修改">${ic('pencil')}</button>
+      <button type="button" class="icon-btn sm ed-del" data-act="wish-del" data-id="${w.id}" aria-label="刪除「${esc(w.t)}」" title="刪除">${ic('trash')}</button>` : ''}
+    </span></li>`;
+}
+function wishList() {
+  const count = {};
+  S.wishes.forEach((w) => (w.tags || []).forEach((g) => { count[g] = (count[g] || 0) + 1; }));
+  if (wishTag && !count[wishTag]) wishTag = '';
+  const match = (w) => !wishTag || (w.tags || []).includes(wishTag);
+  const open = S.wishes.filter((w) => !WISH_CLOSED.includes(w.status) && match(w)).sort((a, b) => (b.votes || []).length - (a.votes || []).length);
+  const closed = S.wishes.filter((w) => WISH_CLOSED.includes(w.status) && match(w));
+  const tags = Object.keys(count).sort((a, b) => count[b] - count[a]);
+  return `${tags.length ? `<div class="ed-tagbar" role="group" aria-label="依標籤篩選">
+      <button type="button" class="ed-filter" data-act="wish-tag" data-tag="" aria-pressed="${!wishTag}">全部</button>
+      ${tags.map((g) => `<button type="button" class="ed-filter" data-act="wish-tag" data-tag="${esc(g)}" aria-pressed="${wishTag === g}">#${esc(g)}<span>${count[g]}</span></button>`).join('')}</div>` : ''}
+    ${open.length ? `<ul class="ed-list ed-wishes">${open.map(wishRow).join('')}</ul>` : `<p class="ed-hint ed-empty">${wishTag ? `沒有標「${esc(wishTag)}」的願望。` : '還沒有人許願。按「許願」寫下想要的功能。'}</p>`}
+    ${closed.length ? `<details class="ed-done"><summary>已完成或暫不處理（${closed.length}）</summary><ul class="ed-list ed-wishes">${closed.map(wishRow).join('')}</ul></details>` : ''}`;
+}
+
+// 新增或修改待辦、願望的對話框
+const itemDlg = document.getElementById('itemDlg');
+const itemForm = document.getElementById('itemForm');
+let itemEdit = null;
+function openItem(kind, id) {
+  const x = id ? S[kind].find((v) => v.id === id) : null;
+  if (id && !x) return;
+  itemEdit = { kind, id };
+  const acts = '<p class="ed-err" role="alert"></p><div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">' + (x ? '儲存' : '新增') + '</button></div>';
+  if (kind === 'todos') {
+    itemForm.innerHTML = `<h2 id="itemDlgT">${x ? '修改待辦' : '新增要寫的文章'}</h2>
+      <label class="ed-f"><span>文章標題（暫定）</span><input name="t" required maxlength="80" value="${esc(x ? x.t : '')}"></label>
+      <label class="ed-f"><span>預計放在哪裡</span><select name="key"><option value="">還沒決定</option>${allLists().map((l) => `<option value="${l.key}"${x && x.key === l.key ? ' selected' : ''}>${esc(l.label)}</option>`).join('')}</select></label>
+      <div class="ed-fields-2">
+        <label class="ed-f"><span>優先級</span><select name="pri">${opts(PRI, x ? x.pri : 'mid')}</select></label>
+        <label class="ed-f"><span>製作狀態</span><select name="status">${opts(TODO_STATUS, x ? x.status : 'todo')}</select></label></div>
+      <label class="ed-f"><span>備註<small>（可不填）</small></span><textarea name="note" rows="3" maxlength="500" placeholder="要寫的重點、參考資料、誰負責…">${esc(x ? x.note || '' : '')}</textarea></label>${acts}`;
+  } else {
+    itemForm.innerHTML = `<h2 id="itemDlgT">${x ? '修改願望' : '許願：想要的功能'}</h2>
+      <label class="ed-f"><span>想要什麼</span><input name="t" required maxlength="80" placeholder="例如：圖庫可以一次上傳多張" value="${esc(x ? x.t : '')}"></label>
+      <label class="ed-f"><span>說明<small>（可不填）</small></span><textarea name="note" rows="4" maxlength="1000" placeholder="在哪裡、遇到什麼狀況、希望變成怎樣">${esc(x ? x.note || '' : '')}</textarea></label>
+      <label class="ed-f"><span>標籤<small>（用逗號或空格分開，最多 6 個）</small></span><input name="tags" maxlength="100" value="${esc(x ? (x.tags || []).join('、') : '')}"></label>
+      <div class="ed-tags ed-tag-pick">${[...new Set([...WISH_TAGS, ...S.wishes.flatMap((w) => w.tags || [])])].map((g) => `<button type="button" class="tag" data-act="add-tag" data-tag="${esc(g)}">+ ${esc(g)}</button>`).join('')}</div>
+      ${myRole() === 'owner' ? `<label class="ed-f"><span>處理狀態</span><select name="status">${opts(WISH_STATUS, x ? x.status : 'new')}</select></label>` : ''}${acts}`;
+  }
+  itemDlg.returnValue = '';
+  itemDlg.showModal();
+  itemForm.elements.t.focus();
+}
+itemDlg.addEventListener('close', () => {
+  const ed = itemEdit;
+  itemEdit = null;
+  if (itemDlg.returnValue !== 'ok' || !ed) return;
+  const el = itemForm.elements;
+  const v = { t: el.t.value.trim(), note: el.note.value.trim() };
+  if (!v.t) return;
+  if (ed.kind === 'todos') { Object.assign(v, { key: el.key.value, where: el.key.value ? placeLabel(el.key.value) : '', pri: el.pri.value, status: el.status.value }); }
+  else { v.tags = parseTags(el.tags.value); if (el.status) v.status = el.status.value; }
+  const x = ed.id && S[ed.kind].find((y) => y.id === ed.id);
+  if (x) Object.assign(x, v);
+  else {
+    const item = { id: uid(), ...v, by: me.name, byNo: me.no, at: now() };
+    if (ed.kind === 'todos') { const open = openTodos(); S.todos = [...open, item, ...S.todos.filter((t) => t.status === 'done')]; }
+    else S.wishes.unshift({ status: 'new', votes: [], ...item });
+  }
+  persist();
+  toast(x ? `已更新「${v.t}」。` : ed.kind === 'todos' ? `已加到待辦清單的最後面：「${v.t}」。` : `已許願：「${v.t}」。`);
+  render();
+});
+function todoAct(a, id) {
+  const t = S.todos.find((x) => x.id === id);
+  if (!t) return;
+  if (a === 'todo-edit') openItem('todos', id);
+  else if (a === 'todo-del') {
+    if (!confirm(`確定要刪除待辦「${t.t}」嗎？${t.page ? '\n（已經寫的頁面不會被刪掉）' : ''}`)) return;
+    S.todos.splice(S.todos.indexOf(t), 1); persist(); render();
+  } else if (a === 'todo-start') {
+    if (t.status === 'todo') { t.status = 'writing'; persist(); }
+    pendingTodo = id;
+    location.hash = `#new/${t.key}`;
+  }
+}
+function wishAct(a, id, b) {
+  if (a === 'wish-tag') { wishTag = b.dataset.tag; render(); return; }
+  const w = S.wishes.find((x) => x.id === id);
+  if (!w) return;
+  if (a === 'wish-edit') openItem('wishes', id);
+  else if (a === 'wish-del') {
+    if (!confirm(`確定要刪除「${w.t}」嗎？`)) return;
+    S.wishes.splice(S.wishes.indexOf(w), 1); persist(); render();
+  } else if (a === 'wish-vote') {
+    w.votes = w.votes || [];
+    const i = w.votes.findIndex((v) => v.no === me.no);
+    if (i >= 0) w.votes.splice(i, 1); else w.votes.push({ no: me.no, name: me.name });
+    persist(); render();
+    const nb = app.querySelector(`[data-act="wish-vote"][data-id="${id}"]`);
+    if (nb) nb.focus({ preventScroll: true });
+  }
+}
+
 // 草稿・封存・刪除：說明中心看不到的頁面放在同一頁
 // - 草稿：還在目錄裡的原位置，只是不公開；寫好取消勾選「草稿」就公開
 // - 封存：從目錄拿下來長期保留（不會自動清掉），可以放回原位置
@@ -1268,6 +1455,9 @@ function render(keepDraft) {
   document.body.classList.toggle('is-editing', route === 'edit' || route === 'new');
   if (route === 'edit' || route === 'new') {
     if (!keepDraft) draft = route === 'edit' ? startDraft(decodeURIComponent(arg || '')) : startDraft(null, decodeURIComponent(arg || ''));
+    // 從待辦按「開始寫」：帶入暫定標題，存檔後待辦會連到這頁
+    if (!keepDraft && draft && draft.isNew && pendingTodo) { const t = S.todos.find((x) => x.id === pendingTodo); if (t) { draft.t = t.t; draft.todo = t.id; } }
+    pendingTodo = null;
     if (!draft) { app.innerHTML = `${tabs('pages')}<p class="ed-hint">找不到這個頁面，可能已經被刪除。<a href="#pages">回到頁面列表</a></p>`; return; }
     app.innerHTML = viewEdit();
     paintPreview();
@@ -1277,7 +1467,7 @@ function render(keepDraft) {
   }
   draft = null;
   const shelf = ['shelf', 'drafts', 'archive', 'trash'].includes(route);
-  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : route === 'todo' ? viewTodo(arg) : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   if (shelf && route !== 'shelf') requestAnimationFrame(() => { const s = document.getElementById(`sh-${route}`); if (s) s.scrollIntoView(); });
   document.title = '編輯後台｜moonland.ai 說明中心';
@@ -1327,6 +1517,11 @@ document.addEventListener('click', (e) => {
     else if (a === 'restore') restorePicked();
     else if (a === 'unarchive') unarchivePicked();
     else if (a === 'archive-del') archiveToTrash();
+    else if (a === 'todo-add') openItem('todos');
+    else if (a === 'wish-add') openItem('wishes');
+    else if (a.startsWith('todo-')) todoAct(a, b.dataset.id);
+    else if (a.startsWith('wish-')) wishAct(a, b.dataset.id, b);
+    else if (a === 'add-tag') { const inp = itemForm.elements.tags; const tags = parseTags(inp.value); if (!tags.includes(b.dataset.tag)) inp.value = [...tags, b.dataset.tag].join('、'); }
     else if (a === 'copy-media') copyMedia(b);
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
@@ -1389,6 +1584,16 @@ app.addEventListener('change', (e) => {
     app.querySelectorAll(`[data-pick="${pa}"]`).forEach((c) => { c.checked = e.target.checked; });
     syncPick(pa); return;
   }
+  const sa = e.target.dataset.act;
+  if (sa === 'todo-pri' || sa === 'todo-status' || sa === 'wish-status') {
+    const x = S[sa === 'wish-status' ? 'wishes' : 'todos'].find((y) => y.id === e.target.dataset.id);
+    if (!x) return;
+    x[sa === 'todo-pri' ? 'pri' : 'status'] = e.target.value;
+    persist(); render();
+    const s = app.querySelector(`[data-act="${sa}"][data-id="${x.id}"]`);
+    if (s) s.focus({ preventScroll: true });
+    return;
+  }
   if (e.target.dataset.act === 'role') {
     const ed = S.editors[+e.target.dataset.i];
     ed.role = e.target.value;
@@ -1443,7 +1648,7 @@ async function boot() {
   if (!LIVE) loadDemo();
   else {
     me = LIVE.user;
-    S = { sections: [], pages: {}, history: {}, log: [], trash: [], archive: [], editors: [], uploads: {} };
+    S = { sections: [], pages: {}, history: {}, log: [], trash: [], archive: [], todos: [], wishes: [], editors: [], uploads: {} };
     if (me && LIVE.role) {
       try { await loadLive(); }
       catch (e) { app.innerHTML = '<p class="ed-hint">讀不到網站內容，請重新整理頁面；一直失敗請聯絡平台組。</p>'; return; }

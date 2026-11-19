@@ -19,7 +19,7 @@ const S3 = require('./s3.js');
 
 const CALLBACK_PATH = '/api/auth/callback/authentik';
 const SESSION_HOURS = 12;
-const LIMITS = { log: 500, history: 30, trash: 500, archive: 500 };
+const LIMITS = { log: 500, history: 30, trash: 500, archive: 500, todos: 500, wishes: 500 };
 // 最近刪除保留 30 天，之後永久清掉
 const TRASH_DAYS = 30;
 const freshTrash = (arr) => (Array.isArray(arr) ? arr : []).filter((x) => x && Date.parse(x.at) > Date.now() - TRASH_DAYS * 864e5).slice(0, LIMITS.trash);
@@ -65,6 +65,8 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     writeJson('content.json', C);
   }
   if (!Array.isArray(C.archive)) C.archive = [];
+  if (!Array.isArray(C.todos)) C.todos = [];
+  if (!Array.isArray(C.wishes)) C.wishes = [];
   let uploads = readJson('media.json') || {};
   let CHANGES = [];
   try { CHANGES = JSON.parse(fs.readFileSync(path.join(__dirname, 'changelog.json'), 'utf8')).changes || []; } catch (e) { console.error('讀不到 server/changelog.json', e.message); }
@@ -236,7 +238,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
   function stateFor(user) {
-    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: freshTrash(C.trash), archive: C.archive, editors: C.editors, uploads, changes: CHANGES };
+    return { rev: C.rev, savedAt: C.savedAt, sections: C.sections, pages: C.pages, history: C.history, log: C.log, trash: freshTrash(C.trash), archive: C.archive, todos: C.todos, wishes: C.wishes, editors: C.editors, uploads, changes: CHANGES };
   }
   function putState(user, role, b) {
     if (!isObj(b)) return [400, { error: '資料格式不正確' }];
@@ -251,6 +253,8 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       log: Array.isArray(b.log) ? b.log.slice(0, LIMITS.log) : [],
       trash: freshTrash(b.trash),
       archive: Array.isArray(b.archive) ? b.archive.slice(0, LIMITS.archive) : C.archive,
+      todos: Array.isArray(b.todos) ? b.todos.slice(0, LIMITS.todos) : C.todos,
+      wishes: Array.isArray(b.wishes) ? b.wishes.slice(0, LIMITS.wishes) : C.wishes,
       editors: C.editors,
     };
     for (const k of Object.keys(next.history)) {
@@ -376,7 +380,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     uploads = ups;
     writeJson('media.json', uploads);
     const c = b.content;
-    C = { rev: C.rev + 1, savedAt: C.savedAt, sections: c.sections, pages: c.pages, history: isObj(c.history) ? c.history : {}, log: Array.isArray(c.log) ? c.log : [], trash: Array.isArray(c.trash) ? c.trash : [], archive: Array.isArray(c.archive) ? c.archive : [], editors: Array.isArray(c.editors) ? c.editors : [] };
+    C = { rev: C.rev + 1, savedAt: C.savedAt, sections: c.sections, pages: c.pages, history: isObj(c.history) ? c.history : {}, log: Array.isArray(c.log) ? c.log : [], trash: Array.isArray(c.trash) ? c.trash : [], archive: Array.isArray(c.archive) ? c.archive : [], todos: Array.isArray(c.todos) ? c.todos : [], wishes: Array.isArray(c.wishes) ? c.wishes : [], editors: Array.isArray(c.editors) ? c.editors : [] };
     C.editors = keepOwners(C.editors, user);
     C.log.unshift({ at: new Date().toISOString(), by: user.name, action: `從備份還原（${String(b.at || '').slice(0, 10)}）`, id: '', t: '整個網站' });
     save();
