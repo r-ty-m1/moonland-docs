@@ -68,6 +68,13 @@ view.addEventListener('submit', (e) => {
 // 舊版 Safari（iOS 13 以前）的 matchMedia 沒有 addEventListener
 const onMediaChange = (mq, fn) => (mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn));
 const toc = document.getElementById('toc');
+// 窄螢幕看不到右側的本頁目錄，改成右下角的按鈕，點了展開清單
+const tocBtn = document.getElementById('tocBtn');
+function toggleToc(open) {
+  document.body.classList.toggle('toc-open', open);
+  tocBtn.setAttribute('aria-expanded', open);
+  if (open) { const on = toc.querySelector('a.on') || toc.querySelector('a'); if (on) on.focus({ preventScroll: true }); }
+}
 // 「付費」（登月幣）用紫色，和一般標籤（新手等）分開
 const PAID = '付費';
 const tagHtml = (tag) => (tag ? `<span class="tag${tag === PAID ? ' paid' : ''}">${esc(tag)}</span>` : '');
@@ -324,6 +331,8 @@ function buildToc() {
   toc.innerHTML = hs.length > 1
     ? `<div class="toc-label">${T('本頁目錄')}</div>` + hs.map((h) => `<a href="#" data-to="${h.id}">${esc([...h.childNodes].filter((n) => !(n.classList && n.classList.contains('chip'))).map((n) => n.textContent).join('').trim())}</a>`).join('')
     : '';
+  tocBtn.hidden = hs.length < 2;
+  toggleToc(false);
   spy();
 }
 function spy() {
@@ -667,6 +676,13 @@ view.addEventListener('click', async (e) => {
 // ---------------------------------------------------------
 // 回到頂端
 // ---------------------------------------------------------
+tocBtn.innerHTML = ic('menu');
+tocBtn.setAttribute('aria-label', T('本頁目錄'));
+tocBtn.title = T('本頁目錄');
+tocBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleToc(!document.body.classList.contains('toc-open')); });
+// 點清單外面、點了某一節、按 Esc 都會收起來
+document.addEventListener('click', (e) => { if (document.body.classList.contains('toc-open') && (!toc.contains(e.target) || e.target.closest('a[data-to]'))) toggleToc(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('toc-open')) { toggleToc(false); tocBtn.focus(); } });
 const toTop = document.getElementById('toTop');
 toTop.innerHTML = ic('up');
 const syncToTop = () => toTop.classList.toggle('show', scrollY > 600);
