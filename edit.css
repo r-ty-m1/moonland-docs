@@ -373,6 +373,8 @@ a.ed-btn { text-decoration: none; }
 .ed .ed-mini[data-pri="high"] { color: var(--warn-ink); border-color: var(--warn-line); background-color: var(--warn-soft); }
 .ed .ed-mini[data-st="writing"], .ed .ed-mini[data-st="doing"], .ed .ed-mini[data-st="planned"] { color: var(--accent-ink); border-color: var(--accent-line); background-color: var(--accent-soft); }
 .ed .ed-mini[data-st="done"] { color: var(--muted); }
+/* 展開的選項用系統配色，不跟著選單的顏色（不然淺色選單上的綠字看不清楚） */
+.ed .ed-mini option { color: CanvasText; background-color: Canvas; }
 .chip[data-st="planned"], .chip[data-st="doing"] { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); }
 .ed-done { margin-top: 18px; }
 .ed-done summary { cursor: pointer; color: var(--fg-2); font-size: 0.9375rem; padding: 6px 0; }

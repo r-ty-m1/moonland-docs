@@ -1156,7 +1156,7 @@ function todoRow(t) {
     <span class="ed-row-acts">
       <select class="ed-mini" data-act="todo-pri" data-id="${t.id}" data-pri="${t.pri}" aria-label="「${esc(t.t)}」的優先級">${opts({ high: '優先：高', mid: '優先：中', low: '優先：低' }, t.pri)}</select>
       <select class="ed-mini" data-act="todo-status" data-id="${t.id}" data-st="${t.status}" aria-label="「${esc(t.t)}」的製作狀態">${opts(TODO_STATUS, t.status)}</select>
-      ${page ? `<a class="ed-btn" href="#edit/${t.page}">${ic('file')}開啟頁面</a>` : !done && listOf(t.key) ? `<button type="button" class="ed-btn" data-act="todo-start" data-id="${t.id}">${ic('pencil')}開始寫</button>` : ''}
+      ${page ? `<a class="ed-btn" href="#edit/${t.page}">${ic('file')}開啟頁面</a>` : !done ? `<button type="button" class="ed-btn" data-act="todo-start" data-id="${t.id}" title="在預計的位置開一篇新頁面，帶入暫定標題">${ic('pencil')}開始寫</button>` : ''}
       <button type="button" class="icon-btn sm" data-act="todo-edit" data-id="${t.id}" aria-label="修改「${esc(t.t)}」" title="修改">${ic('pencil')}</button>
       <button type="button" class="icon-btn sm ed-del" data-act="todo-del" data-id="${t.id}" aria-label="刪除待辦「${esc(t.t)}」" title="刪除這個待辦">${ic('trash')}</button>
     </span></div></li>`;
@@ -1263,6 +1263,8 @@ function todoAct(a, id) {
     if (!confirm(`確定要刪除待辦「${t.t}」嗎？${t.page ? '\n（已經寫的頁面不會被刪掉）' : ''}`)) return;
     S.todos.splice(S.todos.indexOf(t), 1); persist(); render();
   } else if (a === 'todo-start') {
+    // 還沒決定位置：先打開修改視窗選位置
+    if (!listOf(t.key)) { openItem('todos', id); itemForm.elements.key.focus(); itemForm.querySelector('.ed-err').textContent = '先選「預計放在哪裡」並儲存，再按「開始寫」。'; return; }
     if (t.status === 'todo') { t.status = 'writing'; persist(); }
     pendingTodo = id;
     location.hash = `#new/${t.key}`;
