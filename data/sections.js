@@ -7,7 +7,6 @@ window.SECTIONS = [
     { id: 'quick-start', icon: 'rocket', tag: '新手' },
     { id: 'credits', icon: 'coin' },
     { id: 'credit-tools', icon: 'planet' },
-    { id: 'pricing', icon: 'tag', tag: '新' },
     { id: 'trial-login', icon: 'key' },
     { id: 'gallery', icon: 'grid' },
   ] },

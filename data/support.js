@@ -112,7 +112,6 @@ LoRA 太多或權重太高。最多同時 3 到 4 個，主要的權重 1、次�
 | E-mail | support@moonland.ai |
 | 電話 | (+886) 02-2785-3069 |
 | LINE 社群 | ID：@588katjx・[加入社群](https://lin.ee/PpA769D) |
-| 價目表 | [方案與價格](#pricing)・[官網價目表](https://moonland.ai/pricing?direct) |
 
 歡迎加入 LINE 社群，和其他使用者交流、提供意見回饋。也可以用下方的表單直接寫信給我們。
 `},
