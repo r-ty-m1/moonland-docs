@@ -26,7 +26,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。瀏覽器一律先 POST 到 `api/feedback`（2026-11-18 起）：伺服器存一份、`config.js` 的 `googleScriptUrl` 有值時轉存 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）、文字回饋用 Zulip 私訊 `FEEDBACK_NOTIFY_EMAIL`（`server/notify.js`，照 mason 的 zulip-notify：只寫類型／頁面／後台連結、每小時最多 20 則、`ZULIP_DELIVERY=dry-run` 本機不發）。伺服器回 404/405（GitHub Pages）時，有 Google 網址就直接送過去，沒有就存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
 - 「聯絡我們」頁下方的寫信表單（2026-11-10）是程式產生的（`script.js` 的 `mailForm`），不在文章內容裡：按「寄出」用 `mailto:` 開啟使用者的郵件程式寄到 support@moonland.ai（使用者選的做法，網站本身不寄信），並顯示可複製的內容作為備案。
-- **吉吉與訪客問卷**（2026-11-20 使用者要求）：說明中心右下角的小黑貓「吉吉」（使用者決定的名字與形象，目前是 `script.js` 的 `CAT_SVG` 簡單圖，使用者之後會補黑貓圖）。第一次來的訪客自動打開，問身分、AI 經驗與工具、用過 moonland 沒、得知管道、為什麼來（題目由使用者指定，在 `survey.js`），答完推薦文章；之後點吉吉是「你想做什麼？」問答選單（不是 AI，使用者決定先做選單式；真的 AI 助手要公司提供 AI 服務，見對話紀錄）。答案存 `DATA_DIR/survey.jsonl`，後台「訪客問卷」看統計。
+- **吉吉與訪客問卷**（2026-11-20 使用者要求）：說明中心右下角的小黑貓「吉吉」（使用者決定的名字與形象，圖是使用者提供的像素黑貓，左右翻轉後轉成向量，放在 `script.js` 的 `CAT_SVG`）。第一次來的訪客自動打開，問身分、AI 經驗與工具、用過 moonland 沒、得知管道、為什麼來（題目由使用者指定，在 `survey.js`），答完推薦文章；之後點吉吉是「你想做什麼？」問答選單（不是 AI，使用者決定先做選單式；真的 AI 助手要公司提供 AI 服務，見對話紀錄）。答案存 `DATA_DIR/survey.jsonl`，後台「訪客問卷」看統計。
 - **首頁縮圖**（2026-11-20）：預設值是 AI 依文章圖片挑的（`markup.js` 的 `HOME_THUMBS`），使用者會上線替換不適合的。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
