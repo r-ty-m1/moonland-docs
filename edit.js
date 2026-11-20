@@ -31,6 +31,8 @@ Object.assign(ICONS, {
   grip: 'M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
   listadd: 'M9 6h11 M9 12h11 M9 18h4 M5 6v.01 M5 12v.01 M5 18v.01 M18 15v6 M15 18h6',
   archive: 'M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10 M10 12l4 0',
+  megaphone: 'M18 8a3 3 0 0 1 0 6 M10 8v11a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1v-5 M12 8h0l4.524 -3.77a.9 .9 0 0 1 1.476 .692v12.156a.9 .9 0 0 1 -1.476 .692l-4.524 -3.77h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h8',
+  pin: 'M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4 M9 15l-4.5 4.5 M14.5 4l5.5 5.5',
 });
 
 const STORE = 'ml-editor-demo';
@@ -178,7 +180,8 @@ function toast(msg) {
 function tabs(cur) {
   const drafts = Object.values(S.pages).filter((p) => p.draft).length;
   const todo = S.todos.filter((t) => t.status !== 'done').length;
-  const items = [['pages', '頁面'], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['survey', '訪客問卷'], ['tools', '檢查與備份']];
+  const bn = boardNew();
+  const items = [['pages', '頁面'], ['board', `布告欄${bn ? `<span class="ed-newn" aria-label="${bn} 則新內容">${bn}</span>` : ''}`], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['survey', '訪客問卷'], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -286,7 +289,7 @@ function catLi(r) {
 }
 function viewPages() {
   const changed = Object.keys(S.history).filter((k) => S.pages[k] && S.history[k].length).length;
-  return `${tabs('pages')}
+  return `${tabs('pages')}${noticeBar()}
     <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。按 ${ic('listadd', 'ic sm')} 記下某篇要修改的地方。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
     <div class="ed-pagebar">
       <label class="ed-pageq">${ic('search')}<span class="vh">找頁面</span><input type="search" id="pageQ" placeholder="找頁面：輸入標題或網址代號" value="${esc(pageQuery)}" autocomplete="off"></label>
@@ -1122,6 +1125,16 @@ function viewHelp() {
       <li>之後點吉吉，可以從「你想做什麼？」選單找文章，或重新回答問卷。</li>
       <li><b>訪客問卷</b>分頁是統計結果：每個選項幾個人、占幾成，可以只看最近 7、30、90 天，也能按「下載 CSV」用 Excel 打開。同一台電腦重填只算最後一次。</li>
       <li>題目、選項和吉吉推薦哪些文章寫在程式裡（<code>survey.js</code>），要改請找負責網站程式的人。</li></ul>`)}
+    ${sec('2-3. 布告欄', `<ul>
+      <li><b>布告欄</b>是編輯者互相交流的地方：哪篇文章缺什麼、哪裡可以再調整、有什麼問題，都可以按「發起討論」寫下來，選類別和相關頁面，其他人可以回覆。</li>
+      <li>主管理員可以發<b>公告</b>：公告會置頂，也會顯示在「頁面」最上方，每個人按「知道了」後就不再顯示（有新公告才會再出現）。主管理員也可以把任何一則置頂或取消置頂。</li>
+      <li>別人發的新內容或新回覆，分頁上會出現數字；打開布告欄後就算看過了。</li>
+      <li>討論出要做的事，按「加到修改待辦」會帶著標題和內容開一筆待辦（有相關頁面就是修改文章）。處理好按「標成已處理」。</li>
+      <li>自己發的可以修改、刪除；主管理員可以刪除任何一則。回覆框按 Ctrl+Enter 也能送出。</li></ul>`)}
+    ${sec('2-4. 閱讀流量', `<ul>
+      <li>說明中心會記錄每篇文章被看了幾次、看了多久、有沒有讀到最後、讀者從哪裡來，以及大家在搜尋框打了什麼卻找不到。不記個人資料、不存網路位址（IP）。</li>
+      <li>統計在<a href="admin.html#views" target="_blank" rel="noopener">回饋後台的「閱讀流量」</a>，用編輯後台的公司帳號登入就能看。</li>
+      <li>在這台瀏覽器登入過編輯後台的人，之後看說明中心不會算進去（可以勾選「包含編輯者自己看的」）。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
@@ -1621,6 +1634,194 @@ function viewEditors() {
 }
 
 // ---------------------------------------------------------
+// 7c. 布告欄：主管理員的公告（置頂、頁面列表上方也會顯示），大家討論哪篇缺什麼、哪裡可以調整
+//     正式版存在伺服器的 board.json（server/board.js），和文章內容分開；示範版存在這台電腦（S.board）
+// ---------------------------------------------------------
+const BOARD_TAGS = { missing: '缺什麼文章', adjust: '可以調整', question: '想問問題', other: '其他' };
+const BOARD_SEEN = 'ml-board-seen';
+const BOARD_HIDE = 'ml-board-hide';
+let posts = null;          // null 還沒讀、'err' 讀取失敗、陣列
+let boardEdit = null;      // 正在寫或修改的那一則：{ id?, kind, t, body, tag, page }
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (x) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (x) {} };
+function loadBoard(force) {
+  if (!LIVE) { S.board = S.board || []; posts = S.board; return; }
+  if (loadBoard.p || (Array.isArray(posts) && !force)) return loadBoard.p;
+  loadBoard.p = api('api/editor/board').then((r) => (r.ok ? r.json() : Promise.reject())).then((j) => { posts = j.posts || []; })
+    .catch(() => { if (!Array.isArray(posts)) posts = 'err'; }).then(() => {
+      loadBoard.p = null;
+      const h = location.hash || '#pages';
+      if (!draft && (/^#board/.test(h) || isPagesHash(h))) render();
+      else { const t = app.querySelector('.ed-tabs'); if (t) t.outerHTML = tabs(((h.match(/^#(\w+)/) || [])[1]) || 'pages'); }
+    });
+  return loadBoard.p;
+}
+// 送到伺服器（示範版直接改 S.board）；成功回傳 true
+async function boardCall(act, body) {
+  if (!LIVE) {
+    const P = S.board = S.board || [];
+    const p = P.find((x) => x.id === body.id);
+    const owner = myRole() === 'owner';
+    const mineX = (x) => owner || x.byNo === me.no;
+    if (act === 'create') P.unshift({ id: uid(), kind: body.kind === 'notice' && owner ? 'notice' : 'post', t: body.t, body: body.body, tag: body.tag, page: body.page, by: me.name, byNo: me.no, at: now(), replies: [], ...(body.kind === 'notice' && owner ? { pinned: true } : {}) });
+    else if (!p) { toast('找不到這則，可能已經被刪除。'); return false; }
+    else if (act === 'reply') p.replies.push({ id: uid(), body: body.body, by: me.name, byNo: me.no, at: now() });
+    else if (act === 'update') {
+      if ('pinned' in body && owner) p.pinned = body.pinned;
+      if ('done' in body && mineX(p)) p.done = body.done;
+      if ('t' in body && mineX(p)) { Object.assign(p, { t: body.t, body: body.body, tag: body.tag, page: body.page, editedAt: now() }); }
+    } else if (act === 'delete') {
+      if (body.reply) p.replies = p.replies.filter((r) => r.id !== body.reply);
+      else S.board = P.filter((x) => x !== p);
+    }
+    posts = S.board;
+    return persist();
+  }
+  try {
+    const r = await api('api/editor/board/' + act, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(r.status === 401 ? '登入已經過期，請重新整理頁面再登入一次。' : (j.error || '沒有送出成功，請再試一次。')); if (r.status === 404) { posts = null; loadBoard(true); } return false; }
+    posts = j.posts;
+    return true;
+  } catch (x) { toast('連不到伺服器，請確認網路後再試一次。'); return false; }
+}
+const lastAct = (p) => p.replies.reduce((m, r) => (r.at > m ? r.at : m), p.at);
+// 別人發的、我還沒看過的則數（新的一則或新的回覆都算）
+function boardNew() {
+  if (!Array.isArray(posts) || !me) return 0;
+  const seen = lsGet(BOARD_SEEN, '');
+  let n = 0;
+  for (const p of posts) {
+    if (p.at > seen && p.byNo !== me.no) n++;
+    for (const r of p.replies) if (r.at > seen && r.byNo !== me.no) n++;
+  }
+  return n;
+}
+// 頁面列表上方：置頂的公告（按「知道了」就收起來，有新公告才會再出現）
+function noticeBar() {
+  if (!Array.isArray(posts)) return '';
+  const hide = lsGet(BOARD_HIDE, []);
+  const list = posts.filter((p) => p.kind === 'notice' && p.pinned && !hide.includes(p.id));
+  if (!list.length) return '';
+  return `<div class="ed-notices" role="region" aria-label="公告">${list.map((p) => `<div class="ed-notice">${ic('megaphone')}
+    <span><b>${esc(p.t)}</b>${p.body ? `<small>${esc(p.body.length > 140 ? p.body.slice(0, 140) + '…' : p.body)}</small>` : ''}<small class="ed-notice-by">${esc(p.by)}・${fmt(p.at)}</small></span>
+    <span class="ed-row-acts"><a class="ed-btn sm" href="#board/notice">看公告</a><button type="button" class="ed-btn sm" data-act="notice-hide" data-id="${p.id}">知道了</button></span></div>`).join('')}</div>`;
+}
+const BOARD_SUBS = [['', '全部'], ['notice', '公告'], ['post', '討論'], ['open', '還沒處理']];
+function viewBoard(sub) {
+  loadBoard();
+  sub = BOARD_SUBS.some(([k]) => k === sub) ? sub : '';
+  const owner = myRole() === 'owner';
+  const head = `${tabs('board')}<div class="ed-head has-act"><div><h1>布告欄</h1><p class="ed-hint">主管理員發的公告會置頂，也會顯示在「頁面」上方。大家可以在這裡討論哪篇文章缺什麼、哪裡可以再調整，或提出問題；討論出要做的事，可以按「加到修改待辦」。</p></div>
+    <button type="button" class="ed-btn ed-primary" data-act="board-new">${ic('plus')}${owner ? '發公告或討論' : '發起討論'}</button></div>`;
+  if (posts === null) return `${head}<p class="ed-hint">讀取中…</p>`;
+  if (posts === 'err') return `${head}<p class="ed-hint ed-empty">讀不到布告欄，請重新整理頁面再試一次。</p>`;
+  const cnt = { '': posts.length, notice: posts.filter((p) => p.kind === 'notice').length, post: posts.filter((p) => p.kind !== 'notice').length, open: posts.filter((p) => p.kind !== 'notice' && !p.done).length };
+  const list = posts.filter((p) => (sub === 'notice' ? p.kind === 'notice' : sub === 'post' ? p.kind !== 'notice' : sub === 'open' ? p.kind !== 'notice' && !p.done : true))
+    .slice().sort((a, b) => (!!b.pinned - !!a.pinned) || lastAct(b).localeCompare(lastAct(a)));
+  const seen = lsGet(BOARD_SEEN, '');
+  // 看過了：下次分頁上的「新」從現在算起
+  setTimeout(() => { lsSet(BOARD_SEEN, now()); const t = app.querySelector('.ed-tabs'); if (t && /^#board/.test(location.hash)) t.outerHTML = tabs('board'); }, 1500);
+  return `${head}
+    <nav class="ed-seg" aria-label="篩選">${BOARD_SUBS.map(([k, t]) => `<a href="#board${k ? '/' + k : ''}"${k === sub ? ' aria-current="page"' : ''}>${t}<span class="chip">${cnt[k]}</span></a>`).join('')}</nav>
+    ${boardEdit && !boardEdit.id ? boardForm() : ''}
+    ${list.length ? `<ul class="ed-board">${list.map((p) => postCard(p, seen)).join('')}</ul>` : `<p class="ed-hint ed-empty">${posts.length ? '這裡沒有符合的內容。' : '還沒有人發文。有想討論的事，按右上角的按鈕開始。'}</p>`}`;
+}
+function boardForm() {
+  const e = boardEdit;
+  const owner = myRole() === 'owner';
+  return `<form class="ed-boardform" id="boardForm">
+    <h2>${e.id ? '修改' : '發文'}</h2>
+    ${owner && !e.id ? `<fieldset class="ed-f ed-radios"><legend>類型</legend><label><input type="radio" name="kind" value="post"${e.kind !== 'notice' ? ' checked' : ''}> 討論</label><label><input type="radio" name="kind" value="notice"${e.kind === 'notice' ? ' checked' : ''}> 公告（會置頂，所有編輯者打開後台就會看到）</label></fieldset>` : ''}
+    <label class="ed-f"><span>標題<em>必填</em></span><input name="t" maxlength="80" value="${esc(e.t || '')}" required></label>
+    <div class="ed-boardrow">
+      <label class="ed-f" data-not-notice${e.kind === 'notice' ? ' hidden' : ''}><span>類別</span><select name="tag">${opts(BOARD_TAGS, e.tag || 'adjust')}</select></label>
+      <label class="ed-f"><span>相關頁面<small>選填</small></span><select name="page"><option value="">（沒有特定頁面）</option>${pageChoices(e.page)}</select></label>
+    </div>
+    <label class="ed-f"><span>內容</span><textarea name="body" rows="5" maxlength="4000">${esc(e.body || '')}</textarea></label>
+    <p class="ed-err" role="alert"></p>
+    <div class="ed-dlg-acts"><button type="button" class="ed-btn" data-act="board-cancel">取消</button><button type="submit" class="ed-btn ed-primary">${e.id ? '儲存' : '送出'}</button></div>
+  </form>`;
+}
+function postCard(p, seen) {
+  const owner = myRole() === 'owner';
+  const mineP = owner || p.byNo === me.no;
+  const isNew = (x) => x.at > seen && x.byNo !== me.no;
+  const page = p.page && S.pages[p.page];
+  if (boardEdit && boardEdit.id === p.id) return `<li class="ed-post">${boardForm()}</li>`;
+  return `<li class="ed-post${p.kind === 'notice' ? ' is-notice' : ''}${p.pinned ? ' is-pinned' : ''}${p.done ? ' is-done' : ''}" id="post-${p.id}">
+    <div class="ed-post-h">
+      ${p.kind === 'notice' ? `<span class="chip brand">${ic('megaphone', 'ic sm')}公告</span>` : `<span class="chip">${esc(BOARD_TAGS[p.tag] || BOARD_TAGS.other)}</span>`}
+      ${p.pinned ? `<span class="chip">${ic('pin', 'ic sm')}置頂</span>` : ''}${p.done ? '<span class="chip" data-st="done">已處理</span>' : ''}${isNew(p) ? '<span class="chip ed-new">新</span>' : ''}
+      <b>${esc(p.t)}</b>
+    </div>
+    <small class="ed-post-by">${esc(p.by)}・${fmt(p.at)}${p.editedAt ? '・已修改' : ''}${p.page ? `・相關頁面：${page ? `<a href="#edit/${esc(p.page)}">${esc(page.t)}</a>` : `${esc(p.page)}（已不在）`}` : ''}</small>
+    ${p.body ? `<p class="ed-post-b">${esc(p.body)}</p>` : ''}
+    <div class="ed-row-acts ed-post-acts">
+      ${owner ? `<button type="button" class="ed-btn sm" data-act="board-pin" data-id="${p.id}">${ic('pin')}${p.pinned ? '取消置頂' : '置頂'}</button>` : ''}
+      ${p.kind !== 'notice' && mineP ? `<button type="button" class="ed-btn sm" data-act="board-done" data-id="${p.id}">${ic('check')}${p.done ? '重新打開' : '標成已處理'}</button>` : ''}
+      ${p.kind !== 'notice' ? `<button type="button" class="ed-btn sm" data-act="board-todo" data-id="${p.id}">${ic('listadd')}加到${p.page && page ? '修改' : '新增'}待辦</button>` : ''}
+      ${mineP ? `<button type="button" class="icon-btn sm" data-act="board-edit" data-id="${p.id}" aria-label="修改「${esc(p.t)}」" title="修改">${ic('pencil')}</button><button type="button" class="icon-btn sm ed-del" data-act="board-del" data-id="${p.id}" aria-label="刪除「${esc(p.t)}」" title="刪除">${ic('trash')}</button>` : ''}
+    </div>
+    ${p.replies.length ? `<ul class="ed-replies">${p.replies.map((r) => `<li${isNew(r) ? ' class="is-new"' : ''}><small><b>${esc(r.by)}</b>・${fmt(r.at)}${isNew(r) ? ' <span class="chip ed-new">新</span>' : ''}</small><p>${esc(r.body)}</p>
+      ${owner || r.byNo === me.no ? `<button type="button" class="icon-btn sm ed-del" data-act="board-rdel" data-id="${p.id}" data-reply="${r.id}" aria-label="刪除這則回覆" title="刪除回覆">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : ''}
+    <form class="ed-reply" data-id="${p.id}"><label class="vh" for="rp-${p.id}">回覆「${esc(p.t)}」</label><textarea id="rp-${p.id}" name="body" rows="1" maxlength="2000" placeholder="回覆…（Ctrl+Enter 送出）"></textarea><button type="submit" class="ed-btn sm">回覆</button></form>
+  </li>`;
+}
+async function boardAct(a, b) {
+  const id = b.dataset.id;
+  const p = Array.isArray(posts) && posts.find((x) => x.id === id);
+  if (a === 'board-new') { boardEdit = { kind: 'post', tag: 'adjust' }; render(); const f = document.getElementById('boardForm'); if (f) f.elements.t.focus(); return; }
+  if (a === 'board-cancel') { boardEdit = null; render(); return; }
+  if (a === 'notice-hide') { lsSet(BOARD_HIDE, [...lsGet(BOARD_HIDE, []), id].slice(-200)); const n = b.closest('.ed-notice'); if (n) n.remove(); return; }
+  if (!p) return;
+  if (a === 'board-edit') { boardEdit = { id, kind: p.kind, t: p.t, body: p.body, tag: p.tag, page: p.page }; render(); return; }
+  if (a === 'board-pin') { if (await boardCall('update', { id, pinned: !p.pinned })) render(); return; }
+  if (a === 'board-done') { if (await boardCall('update', { id, done: !p.done })) render(); return; }
+  if (a === 'board-del') { if (confirm(`確定要刪除「${p.t}」${p.replies.length ? `和底下 ${p.replies.length} 則回覆` : ''}嗎？刪除後無法復原。`) && await boardCall('delete', { id })) { render(); toast('已刪除。'); } return; }
+  if (a === 'board-rdel') { if (confirm('確定要刪除這則回覆嗎？') && await boardCall('delete', { id, reply: b.dataset.reply })) render(); return; }
+  if (a === 'board-todo') {
+    // 帶著這則的標題開新的待辦；有相關頁面就是「修改文章」
+    const page = p.page && S.pages[p.page] ? p.page : null;
+    openItem('todos', null, page || undefined);
+    const f = itemForm.elements;
+    if (f.t && !f.t.value) f.t.value = p.t.slice(0, 60);
+    if (f.note && !f.note.value) f.note.value = `布告欄：${p.t}${p.body ? `\n${p.body}` : ''}`.slice(0, 500);
+  }
+}
+async function boardSubmit(f) {
+  const e = boardEdit;
+  const el = f.elements;
+  const t = el.t.value.trim();
+  const err = f.querySelector('.ed-err');
+  if (!t) { err.textContent = '請寫標題。'; el.t.focus(); return; }
+  const kind = el.kind ? el.kind.value : e.kind;
+  const body = { t, body: el.body.value.trim(), tag: kind === 'notice' ? 'other' : el.tag.value, page: el.page.value };
+  const btn = f.querySelector('[type="submit"]');
+  btn.disabled = true;
+  const ok = e.id ? await boardCall('update', { id: e.id, ...body }) : await boardCall('create', { kind, ...body });
+  btn.disabled = false;
+  if (!ok) return;
+  boardEdit = null;
+  if (!e.id) lsSet(BOARD_SEEN, now());
+  render();
+  toast(e.id ? '已儲存。' : kind === 'notice' ? '公告已發出，所有編輯者打開後台就會看到。' : '已發出。');
+}
+async function replySubmit(f) {
+  const body = f.elements.body.value.trim();
+  if (!body) { f.elements.body.focus(); return; }
+  const btn = f.querySelector('[type="submit"]');
+  btn.disabled = true;
+  const ok = await boardCall('reply', { id: f.dataset.id, body });
+  btn.disabled = false;
+  if (!ok) return;
+  lsSet(BOARD_SEEN, now());
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+}
+
+// ---------------------------------------------------------
 // 8. 切換畫面
 // ---------------------------------------------------------
 let skipGuard = false;
@@ -1641,6 +1842,8 @@ function render(keepDraft) {
   paintWho();
   if (!me) { app.innerHTML = viewLogin(); return; }
   if (!myRole()) { app.innerHTML = viewDenied(); return; }
+  // 這台瀏覽器是編輯者在用：說明中心的閱讀流量標成編輯者，回饋後台預設不算
+  try { localStorage.setItem('ml-staff', '1'); } catch (x) {}
   const [, route, arg] = (location.hash || '#pages').match(/^#(\w+)(?:\/(.+))?$/) || [];
   document.body.classList.toggle('is-editing', route === 'edit' || route === 'new');
   if (route === 'edit' || route === 'new') {
@@ -1658,7 +1861,7 @@ function render(keepDraft) {
   }
   draft = null;
   const shelf = ['shelf', 'drafts', 'archive', 'trash'].includes(route);
-  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : route === 'todo' ? viewTodo(arg) : route === 'survey' ? viewSurvey() : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : route === 'todo' ? viewTodo(arg) : route === 'survey' ? viewSurvey() : route === 'board' ? viewBoard(arg) : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
   if (app.querySelector('#pageQ')) filterPages(); else app.classList.remove('is-searching');
   if (shelf && route !== 'shelf') requestAnimationFrame(() => { const s = document.getElementById(`sh-${route}`); if (s) s.scrollIntoView(); });
@@ -1721,6 +1924,7 @@ document.addEventListener('click', (e) => {
     else if (a === 'copy-media') copyMedia(b);
     else if (a === 'survey-days') { surveyDays = +b.dataset.days; render(); }
     else if (a === 'survey-csv') surveyCsv();
+    else if (a.startsWith('board-') || a === 'notice-hide') boardAct(a, b);
     else if (a === 'fold') setFold([b.dataset.fold], !folded.has(b.dataset.fold));
     else if (a === 'fold-all' || a === 'unfold-all') setFold([...app.querySelectorAll('[data-fold-box]')].map((x) => x.dataset.foldBox), a === 'fold-all');
     else if (a === 'jump') {
@@ -1782,6 +1986,7 @@ app.addEventListener('input', (e) => {
 });
 app.addEventListener('change', (e) => {
   const f = e.target.form;
+  if (f && f.id === 'boardForm' && e.target.name === 'kind') { f.querySelectorAll('[data-not-notice]').forEach((x) => { x.hidden = e.target.value === 'notice'; }); return; }
   if (f && f.id === 'pageForm') { setDirty(true); readForm(f); paintPreview(); return; }
   const pk = e.target.dataset.pick, pa = e.target.dataset.pickAll;
   if (pk) { picked[pk][e.target.checked ? 'add' : 'delete'](e.target.value); syncPick(pk); return; }
@@ -1812,6 +2017,8 @@ app.addEventListener('submit', (e) => {
   const f = e.target;
   if (f.id === 'pageForm') { savePage(f); return; }
   if (f.id === 'restoreForm') { restoreBackup(f); return; }
+  if (f.id === 'boardForm') { boardSubmit(f); return; }
+  if (f.classList.contains('ed-reply')) { replySubmit(f); return; }
   if (f.id === 'addEditor') {
     const el = f.elements;
     const no = el.no.value.trim().toUpperCase(), name = el.name.value.trim();
@@ -1834,6 +2041,12 @@ document.addEventListener('keydown', (e) => {
   if (!line.trim().startsWith('|')) return;
   e.preventDefault();
   insertAt('<br>');
+});
+// 布告欄的回覆框：Ctrl+Enter 送出
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+  const f = e.target.form;
+  if (f && (f.classList.contains('ed-reply') || f.id === 'boardForm')) { e.preventDefault(); f.requestSubmit(); }
 });
 // Ctrl+S 儲存
 document.addEventListener('keydown', (e) => {
@@ -1860,12 +2073,12 @@ async function boot() {
     if (r.ok && (r.headers.get('content-type') || '').includes('json')) LIVE = await r.json();
   } catch (e) {}
   document.body.classList.toggle('is-live', !!LIVE);
-  if (!LIVE) loadDemo();
+  if (!LIVE) { loadDemo(); loadBoard(); }
   else {
     me = LIVE.user;
     S = { sections: [], pages: {}, history: {}, log: [], trash: [], archive: [], todos: [], wishes: [], editors: [], uploads: {} };
     if (me && LIVE.role) {
-      try { await loadLive(); }
+      try { await loadLive(); loadBoard(); }
       catch (e) { app.innerHTML = '<p class="ed-hint">讀不到網站內容，請重新整理頁面；一直失敗請聯絡平台組。</p>'; return; }
     }
   }
@@ -1874,6 +2087,6 @@ async function boot() {
 // 切回這個分頁時，順便讀一次最新內容（別人可能剛改過）；編輯到一半時不讀
 document.addEventListener('visibilitychange', async () => {
   if (!LIVE || !LIVE.role || document.hidden || draft || dirty) return;
-  try { await loadLive(); render(); } catch (e) {}
+  try { await loadLive(); await loadBoard(true); render(); } catch (e) {}
 });
 boot();

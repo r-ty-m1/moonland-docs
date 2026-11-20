@@ -10,6 +10,8 @@
 //   沒有時（本機直接跑）存在 DATA_DIR/media/。圖片經伺服器上傳；影片由瀏覽器直接傳到 S3（不經過網站，最大 90 MB）
 //     session-secret 登入 cookie 的簽章金鑰（自動產生）
 //     survey.jsonl   訪客問卷（server.js 寫入，後台「訪客問卷」讀取）
+//     board.json     布告欄：公告與討論（server/board.js）
+//     views/         閱讀流量（server/views.js，回饋後台「閱讀流量」讀取）
 // - 說明中心從 /content.js 讀內容，存檔後立刻生效
 const fs = require('node:fs');
 const path = require('node:path');
@@ -17,6 +19,7 @@ const crypto = require('node:crypto');
 const vm = require('node:vm');
 const Model = require('../model.js');
 const S3 = require('./s3.js');
+const Board = require('./board.js');
 
 const CALLBACK_PATH = '/api/auth/callback/authentik';
 const SESSION_HOURS = 12;
@@ -35,6 +38,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   const file = (f) => path.join(DATA_DIR, f);
   const MEDIA_DIR = file('media');
   const store = S3.create();
+  const board = Board(DATA_DIR);
   console.log(store ? '上傳的圖片與影片存在物件儲存（S3）' : '沒有 S3 設定：上傳的圖片存在 DATA_DIR/media，不能上傳影片');
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
@@ -381,7 +385,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     for (const [rel] of Object.values(uploads)) {
       try { files[rel] = (await readFile(rel)).toString('base64'); } catch (e) { console.error('備份時讀不到', rel, e.message); }
     }
-    return { kind: 'moonland-docs-backup', version: 1, at: new Date().toISOString(), content: C, uploads, files };
+    return { kind: 'moonland-docs-backup', version: 1, at: new Date().toISOString(), content: C, uploads, files, board: board.dump() };
   }
   async function restoreBackup(user, b) {
     if (!isObj(b) || b.kind !== 'moonland-docs-backup' || !isObj(b.content)) return [400, { error: '這不是說明中心的備份檔' }];
@@ -396,6 +400,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     }
     uploads = ups;
     writeJson('media.json', uploads);
+    if (isObj(b.board)) board.load(b.board);
     const c = b.content;
     C = { rev: C.rev + 1, savedAt: C.savedAt, sections: c.sections, pages: c.pages, history: isObj(c.history) ? c.history : {}, log: Array.isArray(c.log) ? c.log : [], trash: Array.isArray(c.trash) ? c.trash : [], archive: Array.isArray(c.archive) ? c.archive : [], todos: Array.isArray(c.todos) ? c.todos : [], wishes: Array.isArray(c.wishes) ? c.wishes : [], editors: Array.isArray(c.editors) ? c.editors : [] };
     C.editors = keepOwners(C.editors, user);
@@ -453,6 +458,12 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       else if (pathname === '/api/editor/video/start' && req.method === 'POST') out = videoStart(url);
       else if (pathname === '/api/editor/video/finish' && req.method === 'POST') out = await videoFinish(JSON.parse((await readBody(req, 4096)).toString() || 'null'));
       else if (pathname === '/api/editor/survey' && req.method === 'GET') out = [200, { entries: surveyEntries() }];
+      else if (pathname === '/api/editor/board' && req.method === 'GET') out = board.list();
+      else if (pathname.startsWith('/api/editor/board/') && req.method === 'POST') {
+        const b = JSON.parse((await readBody(req, 64e3)).toString() || 'null') || {};
+        const act = pathname.slice(18);
+        out = act === 'create' ? board.create(user, role, b) : act === 'reply' ? board.reply(user, b) : act === 'update' ? board.update(user, role, b) : act === 'delete' ? board.remove(user, role, b) : [404, { error: 'Not found' }];
+      }
       else if (pathname === '/api/editor/check' && req.method === 'GET') out = [200, { problems: Model.checkAll(C.pages, allMedia()) }];
       else if (pathname === '/api/editor/backup' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="moonland-docs-backup-${new Date().toISOString().slice(0, 10)}.json"` });
@@ -482,5 +493,16 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     return f.startsWith(MEDIA_DIR + path.sep) && fs.existsSync(f) ? { file: f } : null;
   }
 
-  return { handle, uploadedMedia, LOGIN };
+  // 說明中心目前公開的頁面（回饋後台「閱讀流量」列出沒人看的頁面用）
+  function publicPages() {
+    const { ARTICLES, SECTIONS } = Model.toSite(C.sections, C.pages);
+    const out = [{ id: 'home', t: '首頁' }];
+    const seen = new Set(['home']);
+    for (const sec of SECTIONS || []) for (const r of sec.rows || []) if (!seen.has(r.id) && C.pages[r.id]) { seen.add(r.id); out.push({ id: r.id, t: C.pages[r.id].t }); }
+    for (const [id, a] of Object.entries(ARTICLES || {})) if (!seen.has(id)) { seen.add(id); out.push({ id, t: a.t }); }
+    return out;
+  }
+  // 有沒有登入編輯後台（編輯者或主管理員）：回饋後台的「閱讀流量」用公司帳號登入就能看
+  function isEditor(req) { const u = userOf(req); return !!(u && roleOf(u.no)); }
+  return { handle, uploadedMedia, publicPages, isEditor, LOGIN };
 };

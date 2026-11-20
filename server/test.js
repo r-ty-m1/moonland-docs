@@ -243,6 +243,56 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.deepEqual((await (await owner('/api/editor/check')).json()).problems, [], '全站檢查不該有問題');
     assert.equal((await fetch(base + '/model.js')).status, 200, 'model.js 要能讀到');
     console.log('✓ 編輯後台：登入、權限、存檔、版本衝突、上傳命名、備份還原都正常');
+
+    // --- 4b. 閱讀流量：收紀錄、擋格式不對與機器人、同一次閱讀只算一次、搜尋找不到的字、讀取要登入 ---
+    const pv = (body, ua) => fetch(base + '/api/view', { method: 'POST', headers: { 'content-type': 'text/plain', 'user-agent': ua || 'Mozilla/5.0', 'x-forwarded-for': '198.51.100.20' }, body: JSON.stringify(body) });
+    const v1 = { kind: 'view', page: 'quick-start', t: '5 分鐘快速入門', view: 'aaaa1111', vid: 'reader1', sec: 12, depth: 40, src: 'google' };
+    assert.equal((await pv(v1)).status, 204);
+    assert.equal((await pv({ ...v1, sec: 30, depth: 95 })).status, 204, '同一次閱讀可以再送（切回分頁後）');
+    assert.equal((await pv({ ...v1, view: 'bbbb2222', vid: 'reader2', sec: 5, depth: 10, src: 'jiji', staff: true })).status, 204);
+    assert.equal((await pv({ ...v1, view: 'cccc3333', sec: 2 })).status, 400, '不到 3 秒的不收');
+    assert.equal((await pv({ ...v1, view: 'dddd4444', src: 'evil<script>' })).status, 400, '來源格式不對要拒絕');
+    assert.equal((await pv({ ...v1, view: 'eeee5555' }, 'Googlebot/2.1')).status, 204, '機器人回 204 但不存');
+    assert.equal((await pv({ kind: 'miss', q: '  量子 糖果機  ', vid: 'reader1' })).status, 204);
+    assert.equal((await fetch(base + '/api/views')).status, 401, '沒登入、沒密碼不能看閱讀流量');
+    const vs = await (await owner('/api/views?days=7')).json();
+    assert.equal(vs.totals.views, 1, '編輯者自己看的預設不算，同一次閱讀只算一次，機器人不算');
+    assert.equal(vs.pages[0].id, 'quick-start');
+    assert.equal(vs.pages[0].avgSec, 30, '同一次閱讀取秒數最多的那筆');
+    assert.equal(vs.pages[0].endPct, 100);
+    assert.deepEqual(vs.sources, [{ k: 'google', n: 1 }]);
+    assert.deepEqual(vs.misses.map((m) => m.q), ['量子 糖果機']);
+    assert.ok(vs.unread.some((p) => p.id === 'credits') && !vs.unread.some((p) => p.id === 'quick-start'), '要列出沒人看的頁面');
+    const vs2 = await (await fetch(base + '/api/views?days=0&staff=1', { headers: { authorization: 'Bearer test-token' } })).json();
+    assert.equal(vs2.totals.views, 2, '勾「包含編輯者」要算進去；後台密碼也能讀');
+    const vfiles = fs.readdirSync(path.join(DATA_DIR, 'views'));
+    const vraw = fs.readFileSync(path.join(DATA_DIR, 'views', vfiles[0]), 'utf8');
+    assert.ok(!vraw.includes('198.51.100.20') && !vraw.includes('Mozilla'), '閱讀紀錄不能存 IP 或瀏覽器資訊');
+    console.log('✓ 閱讀流量：收紀錄、去重、擋機器人、搜尋找不到的字、讀取權限都正常');
+
+    // --- 4c. 布告欄：公告只有主管理員能發與置頂；修改、刪除限本人或主管理員 ---
+    const ed = as(await login('T0002', '測試編輯'));
+    const bp = (who, act, body) => who('/api/editor/board/' + act, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await fetch(base + '/api/editor/board')).status, 401, '沒登入不能讀布告欄');
+    assert.equal((await bp(ed, 'create', { kind: 'notice', t: '我想發公告' })).status, 403, '編輯者不能發公告');
+    assert.equal((await bp(ed, 'create', { kind: 'post', t: '' })).status, 400, '沒有標題要拒絕');
+    let bj = await (await bp(ed, 'create', { kind: 'post', t: '頭尾幀缺範例', body: '第 2 步看不懂', tag: 'missing', page: 'v-frames', by: '冒名' })).json();
+    const bpost = bj.posts[0];
+    assert.equal(bpost.by, '測試編輯', '發文者的名字由伺服器決定');
+    bj = await (await bp(owner, 'create', { kind: 'notice', t: '下週整理影片分類' })).json();
+    const notice = bj.posts[0];
+    assert.equal(notice.pinned, true, '公告預設置頂');
+    assert.equal((await bp(ed, 'update', { id: bpost.id, pinned: true })).status, 403, '編輯者不能置頂');
+    assert.equal((await bp(ed, 'update', { id: notice.id, t: '改別人的' })).status, 403, '不能改別人的');
+    assert.equal((await bp(ed, 'reply', { id: notice.id, body: '收到' })).status, 200, '大家都能回覆');
+    assert.equal((await bp(ed, 'update', { id: bpost.id, done: true })).status, 200);
+    assert.equal((await bp(ed, 'delete', { id: notice.id })).status, 403, '不能刪別人的');
+    bj = await (await (await owner('/api/editor/board')).json());
+    assert.equal(bj.posts.find((p) => p.id === notice.id).replies[0].by, '測試編輯');
+    assert.equal(bj.posts.find((p) => p.id === bpost.id).done, true);
+    assert.equal((await bp(owner, 'delete', { id: bpost.id })).status, 200, '主管理員可以刪任何一則');
+    assert.ok(fs.existsSync(path.join(DATA_DIR, 'board.json')), '布告欄存在 board.json');
+    console.log('✓ 布告欄：發文、公告、置頂、回覆、權限都正常');
   } finally {
     child.kill('SIGTERM');
     fs.rmSync(DATA_DIR, { recursive: true, force: true });

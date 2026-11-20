@@ -41,6 +41,8 @@ server/server.js（Node 22，只用內建模組）
   ├─ GET  /healthz          健康檢查（平台與 Docker HEALTHCHECK 用）
   ├─ POST/GET /api/feedback 收回饋（存一份、轉存 Google 試算表、用 Zulip 通知負責人）、讀回饋
   ├─ POST /api/survey       收訪客問卷（吉吉問的匿名問卷，題目在 survey.js；後台「訪客問卷」讀取）
+  ├─ POST /api/view         收閱讀紀錄（server/views.js）；GET /api/views 回饋後台「閱讀流量」讀統計（要登入編輯後台）
+  ├─ /api/editor/board      編輯後台的布告欄（server/board.js）
   ├─ server/notify.js       Zulip 通知
   └─ server/editor.js       編輯後台：公司帳號登入、/api/editor/*（讀寫內容、上傳、備份、還原）
         server/s3.js           物件儲存（S3）的存取與簽章
@@ -51,7 +53,9 @@ server/server.js（Node 22，只用內建模組）
         ├─ media.json       後台上傳的圖片、影片對照表（檔案本身在物件儲存，見下方）
         ├─ session-secret   登入 cookie 的簽章金鑰（自動產生，刪掉會讓所有人登出）
         ├─ feedback.jsonl   回饋（一定會存一份；有 Google 試算表時另外轉存）
-        └─ survey.jsonl     訪客問卷（只存答案、時間與瀏覽器隨機代號，不存 IP）
+        ├─ survey.jsonl     訪客問卷（只存答案、時間與瀏覽器隨機代號，不存 IP）
+        ├─ board.json       編輯後台的布告欄（公告、討論、回覆）
+        └─ views/年-月.jsonl 閱讀流量（保存 13 個月，自動刪舊的；不存 IP）
 ```
 
 ### 內容以伺服器為準（重要）

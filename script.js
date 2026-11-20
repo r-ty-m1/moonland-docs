@@ -723,7 +723,21 @@ jiji.className = 'jiji';
 jiji.id = 'jiji';
 jiji.hidden = true;
 jiji.setAttribute('aria-label', '吉吉');
-document.body.append(jiji, jijiBtn);
+// 問卷（打招呼、作答、推薦）放在畫面中間，後面蓋一層半透明底；點底色等於「先不用」
+const jijiBack = document.createElement('div');
+jijiBack.className = 'jiji-back';
+jijiBack.hidden = true;
+document.body.append(jijiBack, jiji, jijiBtn);
+const jijiCenter = () => ['hello', 'q', 'done'].includes(jj.step);
+function placeJiji() {
+  const c = !jiji.hidden && jijiCenter();
+  jiji.classList.toggle('center', c);
+  jijiBack.hidden = !c;
+  jiji.setAttribute('role', c ? 'dialog' : 'region');
+  if (c) jiji.setAttribute('aria-modal', 'true'); else jiji.removeAttribute('aria-modal');
+  document.body.classList.toggle('jiji-modal', c);
+}
+jijiBack.addEventListener('click', () => { closeJiji(); });
 
 let jj = { step: 'menu', i: 0, a: {} };   // 目前畫面：hello 打招呼、q 問卷第 i 題、done 推薦、menu 選單、topic 某個選單項目
 const qList = () => Survey.QUESTIONS.filter((q) => Survey.shown(q, jj.a));
@@ -763,6 +777,7 @@ function paintJiji() {
     body = say('喵～你想做什麼？') + `<div class="jiji-opts col">${Survey.MENU.map(([label], i) => `<button type="button" class="jiji-opt" data-jj="topic" data-i="${i}">${esc(label)}</button>`).join('')}</div>`
       + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="search">${ic('search', 'ic sm')}自己搜尋</button><span class="jiji-sp"></span><button type="button" class="jiji-ghost" data-jj="start">${(jijiState() || {}).done ? '重新回答問卷' : '回答問卷，讓我推薦'}</button></div>`;
   }
+  setTimeout(placeJiji);
   jiji.innerHTML = `<header class="jiji-head"><span class="jiji-ava">${CAT_SVG}</span><span><b>吉吉</b><small>幫你找文章的小黑貓</small></span>
     <button type="button" class="icon-btn" data-jj="close" aria-label="關閉吉吉">${ic('x')}</button></header><div class="jiji-body" aria-live="polite">${body}</div>`;
 }
@@ -770,6 +785,7 @@ function openJiji(step) {
   if (step) jj = { step, i: 0, a: step === 'q' ? {} : jj.a };
   paintJiji();
   jiji.hidden = false;
+  placeJiji();
   jijiBtn.setAttribute('aria-expanded', 'true');
   document.body.classList.add('jiji-open');
   const f = jiji.querySelector('.jiji-body button, .jiji-body a');
@@ -780,6 +796,7 @@ function closeJiji() {
   // 問卷答到一半就關掉：當成略過，不再自動打開
   if (!jijiState() && (jj.step === 'hello' || jj.step === 'q')) saveJiji({ skipped: true });
   jiji.hidden = true;
+  placeJiji();
   jijiBtn.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('jiji-open');
 }
@@ -793,7 +810,7 @@ async function sendSurvey() {
 jijiBtn.addEventListener('click', (e) => { e.stopPropagation(); if (jiji.hidden) openJiji(jj.step === 'q' || jj.step === 'hello' ? undefined : 'menu'); else closeJiji(); });
 jiji.addEventListener('input', (e) => { const k = e.target.dataset.other; if (k) jj.a[k] = e.target.value; });
 jiji.addEventListener('click', (e) => {
-  if (e.target.closest('a.jiji-link')) { closeJiji(); return; }
+  if (e.target.closest('a.jiji-link')) { viewFrom = 'jiji'; closeJiji(); return; }
   const b = e.target.closest('[data-jj]');
   if (!b) return;
   const act = b.dataset.jj;
@@ -826,8 +843,72 @@ jiji.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !jiji.hidden) { closeJiji(); jijiBtn.focus(); } });
 // 換到別頁（例如點了目錄）就收起來，問卷答到一半不算略過，點吉吉可以接著答
 addEventListener('hashchange', () => { if (!jiji.hidden && jj.step !== 'hello' && jj.step !== 'q') closeJiji(); });
-// 第一次來：等畫面穩定一下再打招呼（問卷、推薦都在右下角，不擋文章）
-if (!jijiState()) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 1500);
+// 第一次來：畫面載入後，吉吉在畫面中間打招呼、問問卷（使用者 2026-11-20 要求要主動、明顯）；答完或略過就不再出現
+if (!jijiState()) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
+
+// ---------------------------------------------------------
+// 8. 閱讀流量：記每篇被看了多久、捲到多深、從哪裡來（回饋後台「閱讀流量」看統計）
+// - 不存 IP、不用 cookie，只有瀏覽器隨機代號（和意見回饋、問卷同一個）；不用外部統計服務
+// - 停留不到 3 秒不記；切到別頁、切走分頁或關掉時送出，同一次閱讀再送會覆蓋前一筆（用 view 代號）
+// - 在這台瀏覽器登入過編輯後台（localStorage ml-staff）的會標記 staff，後台預設不算
+// - 站內搜尋找不到結果時，記下搜尋的字（停下來 1.5 秒才算一次）
+// ---------------------------------------------------------
+let viewFrom = '';   // 下一次換頁的來源：jiji、search，其他站內點擊是 internal
+let reading = null;
+const landingFrom = (() => {
+  let h = '';
+  try { h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; } catch (e) {}
+  if (!h) return 'direct';
+  if (h === location.hostname) return 'internal';
+  if (/(^|\.)moonland\.ai$/.test(h)) return 'platform';
+  if (/(^|\.)google\./.test(h)) return 'google';
+  if (/(^|\.)(bing\.com|yahoo\.|duckduckgo\.com|baidu\.com)/.test(h)) return 'engine';
+  return 'other:' + h.slice(0, 60);
+})();
+const isStaff = () => { try { return localStorage.getItem('ml-staff') === '1'; } catch (e) { return false; } };
+function beacon(data) {
+  const body = JSON.stringify({ ...data, vid: visitorId(), staff: isStaff() || undefined });
+  try { if (navigator.sendBeacon && navigator.sendBeacon('api/view', new Blob([body], { type: 'text/plain' }))) return; } catch (e) {}
+  fetch('api/view', { method: 'POST', body, keepalive: true }).catch(() => {});
+}
+const depthNow = () => {
+  const h = document.documentElement.scrollHeight - innerHeight;
+  return h <= 0 ? 100 : Math.min(100, Math.round((scrollY / h) * 100));
+};
+function startReading(id) {
+  reading = { id, t: PAGES[id] ? PAGES[id].t : id, view: Math.random().toString(36).slice(2, 12), ms: 0, since: document.hidden ? 0 : Date.now(), depth: depthNow(), src: reading ? (viewFrom || 'internal') : landingFrom };
+  viewFrom = '';
+}
+function flushReading() {
+  const r = reading;
+  if (!r) return;
+  if (r.since) { r.ms += Date.now() - r.since; r.since = document.hidden ? 0 : Date.now(); }
+  const sec = Math.round(r.ms / 1000);
+  if (sec < 3) return;
+  beacon({ kind: 'view', page: r.id, t: r.t, view: r.view, sec, depth: r.depth, src: r.src });
+}
+addEventListener('scroll', () => { if (reading) reading.depth = Math.max(reading.depth, depthNow()); }, { passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (!reading) return;
+  if (document.hidden) flushReading();
+  else reading.since = Date.now();
+});
+addEventListener('pagehide', flushReading);
+results.addEventListener('click', (e) => { if (e.target.closest('a')) viewFrom = 'search'; });
+let missTimer = 0;
+q.addEventListener('input', () => {
+  clearTimeout(missTimer);
+  const s = q.value.trim();
+  if (!s || results.querySelector('a')) return;
+  missTimer = setTimeout(() => { if (q.value.trim() === s && !results.querySelector('a')) beacon({ kind: 'miss', q: s.slice(0, 60) }); }, 1500);
+});
+addEventListener('hashchange', () => {
+  const id = currentId();
+  if (reading && reading.id === id) return;
+  flushReading();
+  startReading(id);
+});
+startReading(currentId());
 
 // 啟動
 document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', ic(el.dataset.icon)));

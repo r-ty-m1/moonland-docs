@@ -25,7 +25,7 @@
 | `data/snippets.js` | 多篇文章共用的長段落（例如歌詞） |
 | `data/drafts.js` | 還沒公開的草稿（`window.DRAFTS`）。只有編輯後台載入，說明中心看不到；格式和文章一樣，另外用 `in`、`after` 指定位置 |
 | `assets/` | logo（深色、淺色版）與網站圖示 |
-| `server/` | 公司內部部署用的小型伺服器（`server.js`：檔案、回饋；`editor.js`：編輯後台的公司帳號登入、內容存放、上傳、備份；`owners.json`：主管理員的員工編號）與自動測試 `test.js`（GitHub Pages 用不到） |
+| `server/` | 公司內部部署用的小型伺服器（`server.js`：檔案、回饋、問卷、閱讀流量；`editor.js`：編輯後台的公司帳號登入、內容存放、上傳、備份；`views.js`：閱讀流量的紀錄與統計；`board.js`：編輯後台的布告欄；`owners.json`：主管理員的員工編號）與自動測試 `test.js`（GitHub Pages 用不到） |
 | `admin.html`、`admin.js`、`admin.css` | 回饋後台：統計、各頁回饋、意見列表、匯出 CSV |
 | `edit.html`、`edit.js`、`edit.css` | 編輯後台：新增／修改頁面、拖曳排序、找頁面與收合、待辦清單（新增文章／修改文章）與功能許願池、首頁縮圖、訪客問卷統計、封存、上傳圖片、「草稿・封存・刪除」、圖庫、版本紀錄、修改紀錄（內容／網站程式）、檢查與備份、編輯者名單、給同事看的「使用說明」。公司網站上是正式版，GitHub Pages 上是示範版 |
 | `Dockerfile`、`compose.yaml`、`vibe.yaml`、`.gitea/workflows/ci.yaml` | 部署到 MoonShine 內部環境的設定 |
@@ -142,7 +142,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261120b`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261120c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -177,6 +177,8 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 - **待辦清單**：`content.json` 的 `todos` 分兩種：`kind: 'edit'` 是「修改文章」（`page` 是要改的頁面，頁面列表會顯示「待修改」，編輯那頁時上方列出），沒有 `kind` 的是「新增文章」。`wishes` 是功能許願池。
 - **首頁縮圖**：首頁卡片的圖。預設值在 `markup.js` 的 `HOME_THUMBS`（頁面代號 → 圖片編號）；後台在那幾頁的「首頁縮圖」填了編號就存在頁面的 `thumb`，優先使用。
 - **訪客問卷（吉吉）**：說明中心右下角的小黑貓，第一次來的訪客會被問幾題匿名問卷，答案 POST 到 `/api/survey`，存在 `DATA_DIR/survey.jsonl`（只存答案、時間與瀏覽器隨機代號，不存 IP）。後台「訪客問卷」分頁讀 `/api/editor/survey` 看統計、下載 CSV。題目與推薦規則在 `survey.js`；**選項的代號存進資料，改文字可以，改代號會讓舊統計對不起來**。
+- **布告欄**：編輯後台「布告欄」分頁，主管理員發公告（置頂，也顯示在「頁面」上方），大家發起討論、回覆。存在 `DATA_DIR/board.json`（`server/board.js`），和 `content.json` 分開，發文不會和別人存文章互相衝突；備份檔會一起帶著。
+- **閱讀流量**：說明中心（`script.js` 第 8 段）在讀者換頁、切走分頁或關掉時用 `sendBeacon` 送一筆到 `/api/view`：頁面、看了幾秒（停留不到 3 秒不記）、捲到多深、來源（平台、Google、吉吉、站內搜尋…），搜尋找不到結果時也記下關鍵字。存在 `DATA_DIR/views/年-月.jsonl`，保存 13 個月；不存 IP 和瀏覽器資訊，搜尋引擎機器人不記。回饋後台「閱讀流量」（`admin.html#views`）讀 `/api/views`，用編輯後台登入（或回饋後台密碼）才看得到。登入過編輯後台的瀏覽器（`localStorage ml-staff`）會標成編輯者，預設不算。
 - **儲存前檢查**：儲存單頁時檢查缺圖與壞連結（`model.js`），「檢查與備份」分頁可以檢查全站。
 - **兩人同時修改**：每次存檔都帶版本號，版本不對伺服器回 409，後台會載入最新內容、請使用者再做一次（正在編輯的文字會保留）。
 - **備份**：「檢查與備份」分頁下載整個網站（內容＋上傳的圖片）的 JSON 檔；主管理員可以用它還原。persistence 不是備份。

@@ -21,6 +21,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, '.data'));
 const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.jsonl');
 const SURVEY_FILE = path.join(DATA_DIR, 'survey.jsonl');
+const Views = require('./views.js')(DATA_DIR);
 // 讀取回饋的密碼。沒設定時只有本機（127.0.0.1）能讀，方便在自己電腦預覽
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
@@ -176,6 +177,37 @@ function postSurvey(req, res) {
   });
 }
 
+// 閱讀流量（server/views.js）：說明中心用 sendBeacon 送（text/plain JSON），量比回饋大，額度另外算
+const viewHits = new Map();
+function tooManyViews(ip) {
+  const now = Date.now();
+  const h = viewHits.get(ip);
+  if (!h || h.reset < now) { viewHits.set(ip, { n: 1, reset: now + 600000 }); return false; }
+  return ++h.n > 600;
+}
+setInterval(() => { const now = Date.now(); for (const [k, h] of viewHits) if (h.reset < now) viewHits.delete(k); }, 600000).unref();
+function postView(req, res) {
+  if (tooManyViews(visitorOf(req))) return sendJson(res, 429, { error: '送出太頻繁' });
+  let body = '';
+  req.setEncoding('utf8');
+  req.on('data', (c) => { body += c; if (body.length > 2048) { sendJson(res, 413, { error: '內容太長' }); req.destroy(); } });
+  req.on('end', () => {
+    if (res.headersSent) return;
+    let ok = false;
+    try { ok = Views.add(JSON.parse(body), req.headers['user-agent']); } catch { ok = false; }
+    if (ok === 'bot') { res.writeHead(204); return res.end(); }
+    if (!ok) return sendJson(res, 400, { error: '資料格式不正確' });
+    res.writeHead(204);
+    res.end();
+  });
+}
+// 編輯後台登入的人（公司帳號）或有回饋後台密碼的都能看
+function getViews(req, res, url) {
+  if (!editor.isEditor(req) && !canReadFeedback(req)) return sendJson(res, 401, { error: '請先登入編輯後台' });
+  const days = [0, 7, 30, 90].includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 30;
+  sendJson(res, 200, Views.stats({ days, staff: url.searchParams.get('staff') === '1', pages: editor.publicPages() }));
+}
+
 function getFeedback(req, res) {
   if (!canReadFeedback(req)) return sendJson(res, 401, { error: '需要後台密碼' });
   let lines = [];
@@ -234,6 +266,14 @@ const server = http.createServer(async (req, res) => {
   try { url = new URL(req.url, 'http://x'); pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Bad request'); }
   if (await editor.handle(req, res, pathname, url)) return;
 
+  if (pathname === '/api/view') {
+    if (req.method === 'POST') return postView(req, res);
+    return send(res, 405, 'Method not allowed');
+  }
+  if (pathname === '/api/views') {
+    if (req.method === 'GET') return getViews(req, res, url);
+    return send(res, 405, 'Method not allowed');
+  }
   if (pathname === '/api/survey') {
     if (req.method === 'POST') return postSurvey(req, res);
     return send(res, 405, 'Method not allowed');

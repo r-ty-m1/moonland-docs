@@ -27,6 +27,10 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 回饋：「這篇有幫助嗎？」投票與「意見回饋」頁（`VIEWS.feedback`）。瀏覽器一律先 POST 到 `api/feedback`（2026-11-18 起）：伺服器存一份、`config.js` 的 `googleScriptUrl` 有值時轉存 Google Apps Script（`google-apps-script/Code.gs`，存進公司 Google 試算表，body 用 text/plain 避免跨網域預檢）、文字回饋用 Zulip 私訊 `FEEDBACK_NOTIFY_EMAIL`（`server/notify.js`，照 mason 的 zulip-notify：只寫類型／頁面／後台連結、每小時最多 20 則、`ZULIP_DELIVERY=dry-run` 本機不發）。伺服器回 404/405（GitHub Pages）時，有 Google 網址就直接送過去，沒有就存 localStorage `ml-feedback-preview`。後台 `admin.html` 依同樣順序讀取，讀不到就進預覽模式（示範資料＋本機資料）。回饋類型的代號（stuck／unclear／suggest／other）在 `script.js`、`admin.js`、`server/server.js`、`google-apps-script/Code.gs` 四處要一致。改了 `Code.gs` 要提醒使用者在 Apps Script 重新部署新版本。2026-10-29 使用者還沒建立試算表，`googleScriptUrl` 仍是空的。
 - 「聯絡我們」頁下方的寫信表單（2026-11-10）是程式產生的（`script.js` 的 `mailForm`），不在文章內容裡：按「寄出」用 `mailto:` 開啟使用者的郵件程式寄到 support@moonland.ai（使用者選的做法，網站本身不寄信），並顯示可複製的內容作為備案。
 - **吉吉與訪客問卷**（2026-11-20 使用者要求）：說明中心右下角的小黑貓「吉吉」（使用者決定的名字與形象，圖是使用者提供的像素黑貓，左右翻轉後轉成向量，放在 `script.js` 的 `CAT_SVG`）。第一次來的訪客自動打開，問身分、AI 經驗與工具、用過 moonland 沒、得知管道、為什麼來（題目由使用者指定，在 `survey.js`），答完推薦文章；之後點吉吉是「你想做什麼？」問答選單（不是 AI，使用者決定先做選單式；真的 AI 助手要公司提供 AI 服務，見對話紀錄）。答案存 `DATA_DIR/survey.jsonl`，後台「訪客問卷」看統計。
+- **吉吉問卷改成畫面中間的視窗**（2026-11-20 使用者要求「主動明顯出現」）：第一次來的訪客，打招呼、作答、推薦都在畫面中間（後面半透明底），答完或略過就不再出現；之後點右下角吉吉的選單仍是右下角小視窗。
+- **閱讀流量**（2026-11-20 使用者要求）：放在回饋後台的「閱讀流量」分頁（使用者指定回饋後台）。不用外部統計服務；記瀏覽、閱讀時間、捲動深度、來源、搜尋找不到的字；編輯者自己看的預設不算。正式站沒有設 `ADMIN_TOKEN`（回饋存在 Google 試算表），所以閱讀流量改用編輯後台的公司帳號登入來看。
+- **布告欄**（2026-11-20 使用者要求）：編輯後台「布告欄」，主管理員的公告置頂且顯示在頁面列表上方，大家討論文章缺什麼、可以調整什麼。
+- **新編輯器（Notion 式）暫停中**：半成品在本機分支 `editor-rich`（沒有推上去），使用者說暫緩；要繼續時從那個分支接著做（剩下：樣式、瀏覽器實測、試用開關上線）。
 - **首頁縮圖**（2026-11-20）：預設值是 AI 依文章圖片挑的（`markup.js` 的 `HOME_THUMBS`），使用者會上線替換不適合的。
 - 英文版已在 2026-10-30 移除（使用者決定），網站只有中文。舊的英文版在 git tag `english-version`。介面文字仍包 `T()`（markup.js），不要再建 `data/en/`；使用者沒要求就不要加回英文。
 
