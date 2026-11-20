@@ -129,8 +129,15 @@ function crumb(id) {
   const parts = p.crumb.map((c, i) => (i === 1 && p.cat ? `<a href="#${p.cat}">${esc(c)}</a>` : `<span>${esc(c)}</span>`));
   return `<nav class="crumb" aria-label="${T('目前位置')}">${parts.join('<span class="sep">/</span>')}</nav>`;
 }
-const card = (href, icon, title, desc, tag) =>
-  `<a class="card" href="${href}"><span class="tile">${ic(icon)}</span><b>${esc(title)}${tagHtml(tag)}</b><span class="d">${esc(desc)}</span></a>`;
+// 首頁卡片的縮圖：編輯後台填的「首頁縮圖」優先，沒填用 markup.js 的 HOME_THUMBS；找不到圖就只放圖示
+function thumbOf(id) {
+  const n = (ARTICLES[id] && ARTICLES[id].thumb) || (CATS[id] && CATS[id].thumb) || HOME_THUMBS[id];
+  return n && mediaUrl(n) ? mediaUrl(n) : '';
+}
+const card = (href, icon, title, desc, tag) => {
+  const src = thumbOf(href.slice(1));
+  return `<a class="card${src ? ' has-thumb' : ''}" href="${href}">${src ? `<span class="thumb"><img src="${src}" alt="" loading="lazy" decoding="async"></span>` : ''}<span class="card-t"><span class="tile">${ic(icon)}</span><b>${esc(title)}${tagHtml(tag)}</b></span><span class="d">${esc(desc)}</span></a>`;
+};
 
 function metaHtml(a) {
   const chips = [];
@@ -691,6 +698,135 @@ toTop.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   view.focus({ preventScroll: true });
 });
+
+// ---------------------------------------------------------
+// 吉吉：說明中心的小黑貓嚮導（題目、選單與推薦規則在 survey.js）
+// - 第一次來的訪客會自動打開，問幾題匿名問卷（身分、AI 經驗、怎麼知道我們、為什麼來），再推薦文章
+// - 答完或略過就不再自動打開（localStorage ml-jiji）；之後點右下角的吉吉，可以從「你想做什麼？」找文章或重新回答
+// - 答案送到 api/survey（伺服器存起來，編輯後台「訪客問卷」看統計）；GitHub Pages 預覽版送不出去也沒關係
+// ---------------------------------------------------------
+const JIJI_KEY = 'ml-jiji';
+const CAT_SVG = '<svg class="jiji-cat" viewBox="0 0 64 64" aria-hidden="true"><path fill="#18181b" d="M12 8l13 13a22 22 0 0 1 14 0L52 8l1 22a21 21 0 1 1 -42 0z"/><ellipse cx="24" cy="36" rx="5" ry="6" fill="#f7d046"/><ellipse cx="40" cy="36" rx="5" ry="6" fill="#f7d046"/><ellipse cx="24" cy="37" rx="1.8" ry="4.5" fill="#18181b"/><ellipse cx="40" cy="37" rx="1.8" ry="4.5" fill="#18181b"/><path d="M29.5 45h5l-2.5 2.5z" fill="#f29bb0"/></svg>';
+const jijiState = () => { try { return JSON.parse(localStorage.getItem(JIJI_KEY) || 'null'); } catch (e) { return null; } };
+const saveJiji = (v) => { try { localStorage.setItem(JIJI_KEY, JSON.stringify({ ...v, at: new Date().toISOString() })); } catch (e) {} };
+const jijiBtn = document.createElement('button');
+jijiBtn.className = 'jiji-btn';
+jijiBtn.type = 'button';
+jijiBtn.setAttribute('aria-label', '問吉吉：幫你找文章');
+jijiBtn.setAttribute('aria-expanded', 'false');
+jijiBtn.setAttribute('aria-controls', 'jiji');
+jijiBtn.title = '問吉吉';
+jijiBtn.innerHTML = CAT_SVG;
+const jiji = document.createElement('section');
+jiji.className = 'jiji';
+jiji.id = 'jiji';
+jiji.hidden = true;
+jiji.setAttribute('aria-label', '吉吉');
+document.body.append(jiji, jijiBtn);
+
+let jj = { step: 'menu', i: 0, a: {} };   // 目前畫面：hello 打招呼、q 問卷第 i 題、done 推薦、menu 選單、topic 某個選單項目
+const qList = () => Survey.QUESTIONS.filter((q) => Survey.shown(q, jj.a));
+// 說明和標題差不多時就不重複顯示
+const pageLink = ([id, why]) => (PAGES[id] ? `<a class="jiji-link" href="#${id}"><b>${esc(PAGES[id].t)}</b>${why && !PAGES[id].t.startsWith(why) ? `<small>${esc(why)}</small>` : ''}${ic('chev', 'ic chev')}</a>` : '');
+const say = (html) => `<div class="jiji-say">${html}</div>`;
+
+function paintJiji() {
+  let body = '';
+  if (jj.step === 'hello') {
+    body = say('喵～我是<b>吉吉</b>，說明中心的小黑貓。<br>回答幾個小問題（大約 30 秒、不記名），我幫你挑最適合的文章！')
+      + `<div class="jiji-acts"><button type="button" class="jiji-main" data-jj="start">好啊</button><button type="button" class="jiji-ghost" data-jj="skip">先不用</button></div>`;
+  } else if (jj.step === 'q') {
+    const list = qList();
+    const q = list[jj.i];
+    const v = jj.a[q.id];
+    const multi = q.type === 'multi';
+    const picked = (code) => (multi ? (v || []).includes(code) : v === code);
+    const others = Object.entries(q.other || {}).filter(([code]) => picked(code));
+    body = `<div class="jiji-prog" aria-label="第 ${jj.i + 1} 題，共 ${list.length} 題"><span style="width:${((jj.i + 1) / list.length) * 100}%"></span></div>`
+      + say(`<b>${esc(q.q)}</b>${q.hint ? `<small>${esc(q.hint)}</small>` : ''}`)
+      + `<div class="jiji-opts" role="group" aria-label="${esc(q.q)}">${q.options.map(([code, label]) => `<button type="button" class="jiji-opt" data-jj="pick" data-code="${code}" aria-pressed="${picked(code)}">${esc(label)}</button>`).join('')}</div>`
+      + others.map(([code, label]) => `<label class="jiji-other"><span>${esc(label)}</span><input data-other="${q.id}_${code}" maxlength="60" value="${esc(jj.a[`${q.id}_${code}`] || '')}"></label>`).join('')
+      // 單選又不用填字：點選項就直接到下一題，不需要「下一題」鈕；還沒答才顯示「略過這題」
+      + `<div class="jiji-acts">${jj.i ? '<button type="button" class="jiji-ghost" data-jj="back">上一步</button>' : ''}<span class="jiji-sp"></span>`
+      + `${v && v.length ? '' : '<button type="button" class="jiji-ghost" data-jj="next">略過這題</button>'}`
+      + `${multi || others.length ? `<button type="button" class="jiji-main" data-jj="next">${jj.i === list.length - 1 ? '完成' : '下一題'}</button>` : ''}</div>`;
+  } else if (jj.step === 'done') {
+    const recs = Survey.recommend(jj.a).map(pageLink).join('');
+    body = say('謝謝你！喵～依你的回答，建議先看這幾篇：') + `<div class="jiji-links">${recs}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">我想找別的</button></div>`;
+  } else if (jj.step === 'topic') {
+    const [label, items] = Survey.MENU[jj.i];
+    body = say(`「${esc(label)}」的話，可以看這幾篇：`) + `<div class="jiji-links">${items.map(pageLink).join('')}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">← 回到選單</button></div>`;
+  } else {
+    body = say('喵～你想做什麼？') + `<div class="jiji-opts col">${Survey.MENU.map(([label], i) => `<button type="button" class="jiji-opt" data-jj="topic" data-i="${i}">${esc(label)}</button>`).join('')}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="search">${ic('search', 'ic sm')}自己搜尋</button><span class="jiji-sp"></span><button type="button" class="jiji-ghost" data-jj="start">${(jijiState() || {}).done ? '重新回答問卷' : '回答問卷，讓我推薦'}</button></div>`;
+  }
+  jiji.innerHTML = `<header class="jiji-head"><span class="jiji-ava">${CAT_SVG}</span><span><b>吉吉</b><small>幫你找文章的小黑貓</small></span>
+    <button type="button" class="icon-btn" data-jj="close" aria-label="關閉吉吉">${ic('x')}</button></header><div class="jiji-body" aria-live="polite">${body}</div>`;
+}
+function openJiji(step) {
+  if (step) jj = { step, i: 0, a: step === 'q' ? {} : jj.a };
+  paintJiji();
+  jiji.hidden = false;
+  jijiBtn.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('jiji-open');
+  const f = jiji.querySelector('.jiji-body button, .jiji-body a');
+  if (f) f.focus({ preventScroll: true });
+}
+function closeJiji() {
+  if (jiji.hidden) return;
+  // 問卷答到一半就關掉：當成略過，不再自動打開
+  if (!jijiState() && (jj.step === 'hello' || jj.step === 'q')) saveJiji({ skipped: true });
+  jiji.hidden = true;
+  jijiBtn.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('jiji-open');
+}
+async function sendSurvey() {
+  saveJiji({ done: true });
+  try {
+    const r = await fetch('api/survey', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
+    jj.sent = r.ok;
+  } catch (e) { jj.sent = false; }
+}
+jijiBtn.addEventListener('click', (e) => { e.stopPropagation(); if (jiji.hidden) openJiji(jj.step === 'q' || jj.step === 'hello' ? undefined : 'menu'); else closeJiji(); });
+jiji.addEventListener('input', (e) => { const k = e.target.dataset.other; if (k) jj.a[k] = e.target.value; });
+jiji.addEventListener('click', (e) => {
+  if (e.target.closest('a.jiji-link')) { closeJiji(); return; }
+  const b = e.target.closest('[data-jj]');
+  if (!b) return;
+  const act = b.dataset.jj;
+  if (act === 'close') { closeJiji(); jijiBtn.focus(); return; }
+  if (act === 'skip') { saveJiji({ skipped: true }); jj.step = 'menu'; }
+  else if (act === 'start') { jj = { step: 'q', i: 0, a: {} }; }
+  else if (act === 'menu') jj.step = 'menu';
+  else if (act === 'search') { closeJiji(); openSearch(); return; }
+  else if (act === 'topic') { jj.step = 'topic'; jj.i = +b.dataset.i; }
+  else if (act === 'back') jj.i = Math.max(0, jj.i - 1);
+  else if (act === 'pick' || act === 'next') {
+    const q = qList()[jj.i];
+    if (act === 'pick') {
+      const code = b.dataset.code;
+      if (q.type === 'multi') { const s = new Set(jj.a[q.id] || []); s.has(code) ? s.delete(code) : s.add(code); jj.a[q.id] = [...s]; }
+      else jj.a[q.id] = code;
+      // 單選、而且不用再填字：直接下一題
+      const needText = q.other && q.other[code];
+      if (q.type === 'multi' || needText) { paintJiji(); const t = jiji.querySelector(needText ? `[data-other="${q.id}_${code}"]` : `[data-code="${code}"]`); if (t) t.focus(); return; }
+    }
+    // 答案改了，後面不該出現的題目（例如沒用過 AI 就不問用過哪些工具）要清掉
+    for (const x of Survey.QUESTIONS) if (!Survey.shown(x, jj.a)) delete jj.a[x.id];
+    if (jj.i + 1 < qList().length) jj.i++;
+    else { jj.step = 'done'; sendSurvey(); }
+  }
+  paintJiji();
+  const f = jiji.querySelector('.jiji-body .jiji-opt, .jiji-body a, .jiji-body .jiji-main');
+  if (f) f.focus({ preventScroll: true });
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !jiji.hidden) { closeJiji(); jijiBtn.focus(); } });
+// 換到別頁（例如點了目錄）就收起來，問卷答到一半不算略過，點吉吉可以接著答
+addEventListener('hashchange', () => { if (!jiji.hidden && jj.step !== 'hello' && jj.step !== 'q') closeJiji(); });
+// 第一次來：等畫面穩定一下再打招呼（問卷、推薦都在右下角，不擋文章）
+if (!jijiState()) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 1500);
 
 // 啟動
 document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', ic(el.dataset.icon)));

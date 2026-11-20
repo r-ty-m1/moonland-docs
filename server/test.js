@@ -192,6 +192,17 @@ const base = `http://127.0.0.1:${PORT}`;
     st.rev = (await tw2.json()).rev;
     const st7 = await (await owner('/api/editor/state')).json();
     assert.ok(st7.todos.length === 1 && st7.wishes.length === 1, '沒送待辦欄位時要保留原本的待辦與願望');
+    // 訪客問卷：只收認得的答案；同一個訪客重填只算最後一次；只有編輯者讀得到
+    const sv = (body, ip) => fetch(base + '/api/survey', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip || '198.51.100.7' }, body: JSON.stringify(body) });
+    assert.equal((await sv({ answers: { role: 'stu-rel', source: ['school', 'hack'], reason: 'first', email: 'a@b.c' }, vid: 's1' })).status, 201);
+    assert.equal((await sv({ answers: { role: 'work-other', 'role_work-other': '建築', ai: 'none' }, vid: 's1' })).status, 201);
+    assert.equal((await sv({ answers: { role: 'boss' }, vid: 's2' })).status, 400, '沒有認得的答案要拒收');
+    assert.equal((await fetch(base + '/api/editor/survey')).status, 401, '沒登入不能讀問卷');
+    const svs = (await (await owner('/api/editor/survey')).json()).entries;
+    assert.equal(svs.length, 1, '同一個訪客重填只算最後一次');
+    assert.equal(svs[0]['role_work-other'], '建築');
+    assert.equal(svs[0].email, undefined, '不認得的欄位不該存下來');
+    assert.equal(svs[0].ip, undefined, '不存訪客位址');
     // 最近刪除只留 30 天
     const old = new Date(Date.now() - 31 * 864e5).toISOString();
     const st4 = await (await owner('/api/editor/state')).json();

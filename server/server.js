@@ -5,12 +5,14 @@
 // - index.html 裡的 css / js 網址改成內容雜湊，部署新版時瀏覽器與 Cloudflare 一定抓新檔
 // - /api/feedback：POST 收回饋（任何人）；GET 讀全部回饋（後台用，見 canReadFeedback）
 //   收到後存一份在伺服器；config.js 有填 Google 試算表網址時再轉存過去；文字回饋另用 Zulip 通知負責人（server/notify.js）
+// - /api/survey：POST 收訪客問卷（任何人，匿名）；存在 DATA_DIR/survey.jsonl，編輯後台「訪客問卷」用 /api/editor/survey 讀（server/editor.js）
 // - 編輯後台（公司帳號登入、內容存放、上傳）在 server/editor.js；說明中心的內容從 /content.js 讀
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { notifyFeedback } = require('./notify.js');
+const Survey = require('../survey.js');
 
 const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, '..'));
 const PORT = Number(process.env.PORT || 8080);
@@ -18,6 +20,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 // 回饋存成一行一筆的 JSON。部署時要指到會保留的磁碟（vibe.yaml 的 persistence），否則重新部署就不見
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, '.data'));
 const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.jsonl');
+const SURVEY_FILE = path.join(DATA_DIR, 'survey.jsonl');
 // 讀取回饋的密碼。沒設定時只有本機（127.0.0.1）能讀，方便在自己電腦預覽
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
@@ -39,7 +42,7 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?!drafts\.js$)[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model|survey)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?!drafts\.js$)[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
@@ -150,6 +153,29 @@ function postFeedback(req, res) {
   });
 }
 
+// 訪客問卷：只存認得的答案、時間與訪客隨機代號（vid），不存 IP
+function postSurvey(req, res) {
+  if (tooMany(visitorOf(req))) return sendJson(res, 429, { error: '送出太頻繁，請稍後再試' });
+  let body = '';
+  req.setEncoding('utf8');
+  req.on('data', (c) => { body += c; if (body.length > 4096) { sendJson(res, 413, { error: '內容太長' }); req.destroy(); } });
+  req.on('end', () => {
+    if (res.headersSent) return;
+    let b = null, answers = null;
+    try { b = JSON.parse(body); answers = Survey.clean(b && b.answers); } catch {}
+    if (!answers) return sendJson(res, 400, { error: '資料格式不正確' });
+    const entry = { id: crypto.randomUUID(), at: new Date().toISOString(), vid: str(b.vid, 40), ...answers };
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.appendFileSync(SURVEY_FILE, JSON.stringify(entry) + '\n');
+    } catch (e) {
+      console.error('寫入問卷失敗', e.message);
+      return sendJson(res, 503, { error: '暫時無法儲存' });
+    }
+    sendJson(res, 201, { ok: true });
+  });
+}
+
 function getFeedback(req, res) {
   if (!canReadFeedback(req)) return sendJson(res, 401, { error: '需要後台密碼' });
   let lines = [];
@@ -208,6 +234,10 @@ const server = http.createServer(async (req, res) => {
   try { url = new URL(req.url, 'http://x'); pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Bad request'); }
   if (await editor.handle(req, res, pathname, url)) return;
 
+  if (pathname === '/api/survey') {
+    if (req.method === 'POST') return postSurvey(req, res);
+    return send(res, 405, 'Method not allowed');
+  }
   if (pathname === '/api/feedback') {
     if (req.method === 'POST') return postFeedback(req, res);
     if (req.method === 'GET') return getFeedback(req, res);

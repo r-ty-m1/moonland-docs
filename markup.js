@@ -65,11 +65,17 @@ function mediaUrl(n) {
 }
 const mediaRatio = (n) => (MEDIA[n] && MEDIA[n][1]) || 0;
 
+// 首頁卡片的縮圖：頁面代號 → 圖片編號（預設值，從各篇文章裡的圖挑的）
+// 編輯後台每頁的「首頁縮圖」有填就用填的（頁面欄位 thumb），沒填用這裡的
+const HOME_THUMBS = { 'quick-start': 503, chat: 522, image: 251, video: 422, lab: 358, 'music-3d': 278, models: 560, admin: 284, pvc: 565, logo: 515, outfit: 499 };
+
 // ---------------------------------------------------------
 // 3. 文章標記語法 → HTML（語法說明見 README.md）
 // ---------------------------------------------------------
 function inline(s) {
   let h = esc(s);
+  // 寫 <br> 強制換行（表格格子裡也可以用）
+  h = h.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   // {{最常用}} 這類小標誌（10 個字以內）
   h = h.replace(/\{\{([^{}]{1,10})\}\}/g, '<span class="chip pick">$1</span>');
@@ -181,7 +187,13 @@ function blocks(lines) {
   let i = 0;
   while (i < lines.length) {
     const t = lines[i].trim();
-    if (!t) { i++; continue; }
+    // 連續空兩行以上：每多空一行就多留一行空間
+    if (!t) {
+      let k = 0;
+      while (i < lines.length && !lines[i].trim()) { k++; i++; }
+      if (out && i < lines.length) for (let x = 1; x < k; x++) out += '<div class="gap" aria-hidden="true"></div>';
+      continue;
+    }
 
     if (/^:::\w/.test(t)) {
       const [, type, arg] = t.match(/^:::(\w+)\s*(.*)$/);
@@ -246,6 +258,7 @@ const plainText = (src) => String(src)
   .replace(/\[(i|v|a|3d|embed)\s[^\]]*\]/g, ' ')
   .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')
   .replace(/\{\{([^{}]{1,10})\}\}/g, ' $1 ')
+  .replace(/<br\s*\/?>/gi, ' ')
   .replace(/[*#>|:@?]/g, ' ');
 
 // ---------------------------------------------------------

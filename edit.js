@@ -3,8 +3,8 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#todo 待辦清單（#todo/wish 功能許願池）、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
-//   #log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#todo 待辦清單（#todo 新增文章、#todo/edit 修改文章、#todo/wish 功能許願池）、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
+//   #survey 訪客問卷（吉吉問的匿名問卷統計）、#log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
 Object.assign(ICONS, {
@@ -29,6 +29,7 @@ Object.assign(ICONS, {
   file: 'M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
   lock: 'M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 M8 11v-4a4 4 0 1 1 8 0v4',
   grip: 'M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+  listadd: 'M9 6h11 M9 12h11 M9 18h4 M5 6v.01 M5 12v.01 M5 18v.01 M18 15v6 M15 18h6',
   archive: 'M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10 M10 12l4 0',
 });
 
@@ -177,7 +178,7 @@ function toast(msg) {
 function tabs(cur) {
   const drafts = Object.values(S.pages).filter((p) => p.draft).length;
   const todo = S.todos.filter((t) => t.status !== 'done').length;
-  const items = [['pages', '頁面'], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['tools', '檢查與備份']];
+  const items = [['pages', '頁面'], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['survey', '訪客問卷'], ['tools', '檢查與備份']];
   if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
   items.push(['help', '使用說明']);
   return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
@@ -241,7 +242,10 @@ function badge(id) {
 // 封存鈕：從目錄拿下來放進封存（要刪除請到「草稿・封存・刪除」）
 function acts(id, canDelete) {
   const name = esc(S.pages[id].n || S.pages[id].t);
+  const n = fixesFor(id).length;
   return `<span class="ed-acts">
+    ${n ? `<a class="chip ed-fixn" href="#todo/edit" title="這頁有 ${n} 個還沒完成的修改待辦">待修改 ${n}</a>` : ''}
+    ${S.pages[id].system ? '' : `<button type="button" class="icon-btn sm" data-act="todo-fix" data-id="${id}" aria-label="記下「${name}」要修改的地方" title="記下要修改的地方（加進待辦清單）">${ic('listadd')}</button>`}
     <button type="button" class="icon-btn sm ed-del" data-act="del" data-id="${id}" aria-label="封存「${name}」" title="${canDelete === true ? '封存' : esc(canDelete)}"${canDelete === true ? '' : ' disabled'}>${ic('archive')}</button>
   </span>`;
 }
@@ -257,12 +261,21 @@ function itemLi(id) {
   }
   return `<li class="ed-item" data-id="${id}">${grip(id)}<a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}${tagHtml(p.tag)}${badge(id)}</b>${p.n && p.n !== p.t ? `<small>${esc(p.t)}</small>` : ''}</span></a>${acts(id, true)}</li>`;
 }
+// 摺疊：記在這台電腦（sec:大分類序號、cat:分類代號），搜尋時全部展開
+const FOLD = 'ml-editor-fold';
+let folded = new Set();
+try { folded = new Set(JSON.parse(localStorage.getItem(FOLD) || '[]')); } catch (x) {}
+function saveFold() { try { localStorage.setItem(FOLD, JSON.stringify([...folded])); } catch (x) {} }
+const foldBtn = (key, label) => `<button type="button" class="ed-fold" data-act="fold" data-fold="${key}" aria-expanded="${!folded.has(key)}" aria-label="${folded.has(key) ? '展開' : '收合'}「${esc(label)}」" title="${folded.has(key) ? '展開' : '收合'}">${ic('chev')}</button>`;
+let pageQuery = '';
+let pagesScroll = 0;
 function catLi(r) {
   const p = S.pages[r.id];
   const count = r.groups.reduce((n, g) => n + g.items.length, 0);
   const many = r.groups.length > 1;
-  return `<li class="ed-cat" data-id="${r.id}">
-    <div class="ed-item">${grip(r.id)}<a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, count ? '分類裡還有頁面，先把頁面搬走或封存，才能封存分類' : true)}</div>
+  const fk = `cat:${r.id}`;
+  return `<li class="ed-cat${folded.has(fk) ? ' is-folded' : ''}" data-id="${r.id}" data-fold-box="${fk}">
+    <div class="ed-item">${grip(r.id)}${foldBtn(fk, p.t)}<a class="ed-name" href="#edit/${r.id}">${ic(p.icon || 'folder')}<span><b>${esc(p.t)}<span class="chip">分類・${count} 頁</span>${tagHtml(p.tag)}${badge(r.id)}</b></span></a>${acts(r.id, count ? '分類裡還有頁面，先把頁面搬走或封存，才能封存分類' : true)}</div>
     <div class="ed-kids">${r.groups.map((g, gi) => {
       const k = `c:${r.id}:${gi}`;
       return `${many || g.g ? `<div class="ed-sub">${esc(g.g || '（沒有小標）')}</div>` : ''}
@@ -274,14 +287,47 @@ function catLi(r) {
 function viewPages() {
   const changed = Object.keys(S.history).filter((k) => S.pages[k] && S.history[k].length).length;
   return `${tabs('pages')}
-    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
-    ${S.sections.map((sec, si) => `<section class="ed-sec" aria-labelledby="sec${si}">
-      <div class="ed-sec-head"><h2 id="sec${si}">${esc(sec.label)}</h2>
+    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。按 ${ic('listadd', 'ic sm')} 記下某篇要修改的地方。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
+    <div class="ed-pagebar">
+      <label class="ed-pageq">${ic('search')}<span class="vh">找頁面</span><input type="search" id="pageQ" placeholder="找頁面：輸入標題或網址代號" value="${esc(pageQuery)}" autocomplete="off"></label>
+      <span class="ed-row-acts"><button type="button" class="ed-btn" data-act="fold-all">全部收合</button><button type="button" class="ed-btn" data-act="unfold-all">全部展開</button></span>
+      <nav class="ed-jump" aria-label="跳到大分類">${S.sections.map((sec, si) => `<button type="button" class="ed-filter" data-act="jump" data-si="${si}">${esc(sec.label)}</button>`).join('')}</nav>
+    </div>
+    <p class="ed-hint ed-noresult" id="pageNone" hidden>找不到符合的頁面。</p>
+    ${S.sections.map((sec, si) => `<section class="ed-sec${folded.has(`sec:${si}`) ? ' is-folded' : ''}" id="psec${si}" aria-labelledby="sec${si}" data-fold-box="sec:${si}">
+      <div class="ed-sec-head">${foldBtn(`sec:${si}`, sec.label)}<h2 id="sec${si}">${esc(sec.label)}</h2>
         <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button></div>
+      <div class="ed-sec-body">
       <ul class="ed-list" data-key="s${si}" data-top="1">${sec.rows.map((r) => (r.groups ? catLi(r) : itemLi(r.id))).join('')}</ul>
       <div class="ed-adds"><a class="ed-add" href="#new/s${si}">${ic('plus')}新增頁面</a><button type="button" class="ed-add" data-act="add-cat" data-si="${si}">${ic('folder')}新增分類</button></div>
+      </div>
     </section>`).join('')}
     <p class="ed-hint ed-count">${changed ? `目前有 ${changed} 頁${LIVE ? '在後台改過' : '在這台電腦上改過'}。` : ''}</p>`;
+}
+// 找頁面：只留下標題、目錄名稱或網址代號符合的頁面（分類符合就整個分類都留）
+function filterPages() {
+  const q = pageQuery.trim().toLowerCase();
+  app.classList.toggle('is-searching', !!q);
+  let hits = 0;
+  const match = (id) => { const p = S.pages[id]; return !!p && [p.t, p.n, id].some((v) => v && String(v).toLowerCase().includes(q)); };
+  app.querySelectorAll('.ed-sec').forEach((sec) => {
+    let secHit = 0;
+    sec.querySelectorAll(':scope > .ed-sec-body > ul > li[data-id]').forEach((li) => {
+      if (li.classList.contains('ed-cat')) {
+        const catHit = !q || match(li.dataset.id);
+        let kid = 0;
+        li.querySelectorAll('.ed-kids li[data-id]').forEach((k) => { const ok = catHit || match(k.dataset.id); k.hidden = !ok; if (ok) kid++; });
+        li.hidden = !(catHit || kid);
+        if (!li.hidden) { secHit++; hits += q ? (catHit ? 1 : 0) + kid : 1; }
+      } else {
+        li.hidden = !!q && !match(li.dataset.id);
+        if (!li.hidden) { secHit++; hits++; }
+      }
+    });
+    sec.hidden = !!q && !secHit;
+  });
+  const none = document.getElementById('pageNone');
+  if (none) none.hidden = !q || hits > 0;
 }
 
 // 把頁面搬到某個位置（key 見 allLists）的第 i 個。分類只能放在大分類底下
@@ -367,7 +413,7 @@ document.addEventListener('keydown', (e) => {
   const g = e.target.closest && e.target.closest('.ed-grip');
   if (!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
   e.preventDefault();
-  if (g.dataset.list) { const i = openTodos().findIndex((t) => t.id === g.dataset.drag); moveTodo(g.dataset.drag, i + (e.key === 'ArrowUp' ? -1 : 1)); return; }
+  if (g.dataset.list) { const t = S.todos.find((x) => x.id === g.dataset.drag); const i = t ? openTodos(todoKind(t)).indexOf(t) : -1; moveTodo(g.dataset.drag, i + (e.key === 'ArrowUp' ? -1 : 1)); return; }
   const l = locate(g.dataset.drag);
   const j = l.i + (e.key === 'ArrowUp' ? -1 : 1);
   if (j < 0 || j >= l.arr.length) return;
@@ -431,6 +477,7 @@ function viewEdit() {
     </div>
     <form id="pageForm" class="ed-form" novalidate>
       <h1 class="ed-title">${d.isNew ? '新增頁面' : `編輯「${esc(S.pages[d.origId].t)}」`}${d.groups ? '<span class="chip">分類</span>' : ''}</h1>
+      ${d.isNew ? '' : fixBox(d.origId)}
       <div class="ed-fields">
         <label class="ed-f"><span>標題<em>必填</em></span><input name="t" maxlength="60" value="${esc(d.t)}" required></label>
         <label class="ed-f"><span>目錄上顯示的名稱<small>選填，標題太長時用</small></span><input name="n" maxlength="30" value="${esc(d.n)}"></label>
@@ -445,6 +492,8 @@ function viewEdit() {
           <div class="ed-groups">${d.groups.map((g, gi) => `<div class="ed-group"><input name="g${gi}" maxlength="20" value="${esc(g.g)}" aria-label="第 ${gi + 1} 組小標" placeholder="（沒有小標）"><small>${g.n} 頁</small>
             <button type="button" class="icon-btn sm" data-act="del-group" data-gi="${gi}" aria-label="刪除第 ${gi + 1} 組" title="${g.n ? '這組還有頁面，不能刪除' : '刪除這組'}"${g.n || d.groups.length === 1 ? ' disabled' : ''}>${ic('trash')}</button></div>`).join('')}
             <button type="button" class="ed-add" data-act="add-group">${ic('plus')}新增一組小標</button></div></fieldset>` : ''}
+        ${!d.isNew && HOME_THUMBS[d.origId] ? `<div class="ed-f wide"><span>首頁縮圖<small>首頁卡片上的圖片編號；空白就用預設的 #${HOME_THUMBS[d.origId]}</small></span>
+          <div class="ed-thumbrow"><img class="ed-thumbpv" id="thumbPv" alt=""><input name="thumb" inputmode="numeric" pattern="[0-9]+" maxlength="6" value="${esc(d.thumb || '')}" placeholder="${HOME_THUMBS[d.origId]}" aria-label="首頁縮圖的圖片編號"><button type="button" class="ed-btn" data-pick-for="thumb">從圖庫挑選</button><small class="ed-hint" id="thumbMsg"></small></div></div>` : ''}
         <details class="ed-more wide"><summary>進階設定</summary>
           <label class="ed-f"><span>網址代號<small>只能用英文小寫、數字和 -；其他頁面連到這頁時會用到</small></span><input name="slug" maxlength="40" value="${esc(d.id)}" pattern="[a-z0-9-]+" spellcheck="false" autocapitalize="off"></label>
           ${d.groups ? '' : `<label class="ed-f"><span>相關模型<small>選填，用逗號分開，會顯示在標題下方</small></span><input name="models" maxlength="120" value="${esc(d.models)}"></label>`}
@@ -468,6 +517,12 @@ function viewEdit() {
       <p class="ed-err" id="formErr" role="alert"></p>
     </form>`;
 }
+// 編輯頁上方：這頁還沒完成的修改待辦，改好按「完成」
+function fixBox(id) {
+  const list = fixesFor(id);
+  if (!list.length) return '';
+  return `<div class="ed-fixbox"><b>${ic('listadd')}這頁的修改待辦</b><ul>${list.map((t) => `<li><span><b>${esc(t.t)}</b>${t.note ? `<small>${esc(t.note)}</small>` : ''}</span><button type="button" class="ed-btn" data-act="todo-done" data-id="${t.id}">${ic('check')}完成</button></li>`).join('')}</ul></div>`;
+}
 function cheatSheet() {
   const rows = [
     ['## 小標題', '段落標題，會出現在右側「本頁目錄」'],
@@ -475,6 +530,8 @@ function cheatSheet() {
     ['{{最常用}}', '小標誌，例如放在模型名稱後面'],
     ['[文字](#頁面代號)', '連到說明中心的其他頁面'],
     ['- 項目', '清單，一行一項'],
+    ['（空兩行）', '想多留一段空白：中間空兩行以上，每多空一行就多一行空白'],
+    ['文字<br>文字', '強制換行；表格格子裡也能用（在表格那一行按 Shift+Enter 會自動插入）'],
     [':::steps … :::', '步驟；每一步用「@ 」開頭'],
     [':::tip 標題 … :::', '綠色提示框；:::warn 是黃色注意框'],
     ['> 提示詞', '可以一鍵複製的提示詞框'],
@@ -528,12 +585,23 @@ function readForm(f) {
   if (f.elements.level) d.level = f.elements.level.value;
   if (f.elements.minutes) d.minutes = f.elements.minutes.value;
   if (f.elements.models) d.models = f.elements.models.value;
+  if (f.elements.thumb) d.thumb = f.elements.thumb.value.trim();
   d.draft = f.elements.draft.checked;
   const icon = f.querySelector('input[name="icon"]:checked');
   if (icon) d.icon = icon.value;
   if (d.groups) d.groups.forEach((g, gi) => { if (f.elements[`g${gi}`]) g.g = f.elements[`g${gi}`].value.trim(); });
 }
-const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'body', 'draft'];
+const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'thumb', 'body', 'draft'];
+// 首頁縮圖：顯示目前會用的圖（沒填就是預設的那張）
+function paintThumb() {
+  const img = document.getElementById('thumbPv');
+  if (!img || !draft) return;
+  const n = draft.thumb || HOME_THUMBS[draft.origId];
+  const src = /^[0-9]+$/.test(String(n)) ? mediaUrl(n) : '';
+  img.hidden = !src;
+  if (src) img.src = src;
+  document.getElementById('thumbMsg').textContent = src ? (draft.thumb ? '' : '目前用預設的圖') : '找不到這個圖片編號，首頁會用預設的圖';
+}
 
 let saving = false;
 async function savePage(f) {
@@ -623,17 +691,21 @@ document.getElementById('histList').addEventListener('click', (e) => {
 function insertAt(text, selectFrom, selectLen) {
   const ta = document.getElementById('body');
   const s = ta.selectionStart, e = ta.selectionEnd;
-  ta.setRangeText(text, s, e, 'end');
-  if (selectFrom != null) ta.setSelectionRange(s + selectFrom, s + selectFrom + selectLen);
   ta.focus();
-  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  // 用瀏覽器的「輸入文字」插入，Ctrl+Z 才復原得了；不支援時才直接改內容（這時無法復原）
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (x) {}
+  if (!ok || ta.value.slice(s, s + text.length) !== text) { ta.setRangeText(text, s, e, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); }
+  if (selectFrom != null) ta.setSelectionRange(s + selectFrom, s + selectFrom + selectLen);
 }
 function insertBlock(text, sel) {
   const ta = document.getElementById('body');
   const before = ta.value.slice(0, ta.selectionStart);
+  const after = ta.value.slice(ta.selectionEnd);
   const pre = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const post = after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
   const i = sel ? text.indexOf(sel) : -1;
-  insertAt(`${pre}${text}\n\n`, i >= 0 ? pre.length + i : null, sel ? sel.length : 0);
+  insertAt(`${pre}${text}${post}`, i >= 0 ? pre.length + i : null, sel ? sel.length : 0);
 }
 function wrapSel(mark, ph) {
   const ta = document.getElementById('body');
@@ -1030,24 +1102,34 @@ function viewHelp() {
       <li>用完記得按右上角的登出。</li></ul>`, true)}
     ${sec('2. 頁面與目錄', `<ul>
       <li>「頁面」分頁就是說明中心左側目錄的樣子，由上到下照順序排。</li>
-      <li>點頁面名稱開始編輯。</li>
+      <li>點頁面名稱開始編輯。編輯完回到列表，會停在剛才看到的位置。</li>
+      <li><b>找頁面</b>：在上方輸入標題或網址代號，只會留下符合的頁面。點大分類的名稱按鈕可以直接跳過去；大分類和分類左邊的 ${ic('chev', 'ic sm')} 可以收合或展開（這台電腦會記住），也可以按「全部收合」「全部展開」。</li>
       <li><b>調整順序、換分類</b>：按住頁面左邊的 ${ic('grip', 'ic sm')} 拖到想放的位置再放開，可以拖進別的分類或小標底下（手機一樣用手指按住拖）。拖到一半想取消就按 Esc。用鍵盤的話，按 Tab 移到 ${ic('grip', 'ic sm')} 再按上下鍵。也可以進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
       <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存，要先把頁面搬走。</li>
       <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿・封存・刪除」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
       <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
       <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿・封存・刪除」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('2-1. 待辦清單與功能許願池', `<ul>
-      <li><b>文章待辦</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序，按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
+      <li>待辦分成<b>新增文章</b>和<b>修改文章</b>兩類，用上方的切換鈕切換。</li>
+      <li><b>新增文章</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序，按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
       <li>每一列可以直接改<b>優先級</b>和<b>製作狀態</b>（還沒開始、撰寫中、待確認、完成）。完成的會收到下方「已完成」。</li>
       <li>按<b>開始寫</b>會在預計的位置開一篇新頁面並帶入暫定標題，存檔後這個待辦會連到那一頁。</li>
+      <li><b>修改文章</b>：已經有的文章想改但還沒空改，在「頁面」列表那篇右邊按 ${ic('listadd', 'ic sm')}，寫下要改什麼就加進待辦；有待辦的頁面會顯示「待修改」。打開那篇編輯時，上方會列出它的修改待辦，改好按「完成」。</li>
       <li><b>功能許願池</b>：想讓網站或編輯後台新增、修改的功能寫在這裡，可以加標籤（例如 #新功能、#修正錯誤）。點標籤只看那一類；同意別人的想法按 <b>+1</b>，票多的排前面。</li>
       <li>願望的處理狀態由主管理員更新；自己寫的願望自己可以修改或刪除。</li></ul>`)}
+    ${sec('2-2. 訪客問卷與吉吉', `<ul>
+      <li>說明中心右下角的小黑貓是<b>吉吉</b>。訪客第一次來時，吉吉會問幾題不記名的問卷（身分、用過哪些 AI、從哪裡知道 moonland.ai、為什麼來看手冊），答完推薦適合的文章；每題都可以略過，答完或略過就不會再自動跳出來。</li>
+      <li>之後點吉吉，可以從「你想做什麼？」選單找文章，或重新回答問卷。</li>
+      <li><b>訪客問卷</b>分頁是統計結果：每個選項幾個人、占幾成，可以只看最近 7、30、90 天，也能按「下載 CSV」用 Excel 打開。同一台電腦重填只算最後一次。</li>
+      <li>題目、選項和吉吉推薦哪些文章寫在程式裡（<code>survey.js</code>），要改請找負責網站程式的人。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
       <li>右邊（手機上切到「預覽」）就是讀者會看到的樣子。</li>
       <li>按<b>儲存</b>（或 Ctrl+S），說明中心馬上就會更新。還沒儲存就離開，會先問你。</li>
-      <li>儲存時會自動檢查有沒有找不到的圖片、點不開的連結，有的話會先提醒你。</li></ol>
+      <li>儲存時會自動檢查有沒有找不到的圖片、點不開的連結，有的話會先提醒你。</li>
+      <li>內文的 Ctrl+Z 可以復原，用工具列插入的格式也一樣。想多留一段空白就空兩行以上；表格的格子裡要換行，在那一行按 Shift+Enter。</li>
+      <li><b>首頁縮圖</b>：放在首頁卡片上的頁面（例如「交談」「PVC 公仔風格」）會多一個「首頁縮圖」欄位，填圖片編號或按「從圖庫挑選」；空白就用預設的圖。</li></ol>
       <p>不確定格式怎麼寫，按工具列最後的「寫法說明」，或看下面的速查表：</p>
       <div class="ed-cheat">${cheatSheet()}</div>
       <p>小提醒：連到別的頁面請用「連結」按鈕挑選，不要自己打網址；改了頁面的「網址代號」，其他頁面的連結會自動跟著改。</p>`)}
@@ -1115,6 +1197,60 @@ function viewLog(sub) {
     </tbody></table></div>` : '<p class="ed-hint">還沒有任何修改。</p>'}`;
 }
 // ---------------------------------------------------------
+// 訪客問卷：說明中心的吉吉問的匿名問卷（題目在 survey.js），這裡看統計、下載 CSV
+// 同一個訪客重填只算最後一次（伺服器 /api/editor/survey 已經處理）
+// ---------------------------------------------------------
+let surveyRows = null;   // null 還沒讀、'err' 讀取失敗、陣列
+let surveyDays = 0;      // 0 全部、7、30、90
+function loadSurvey(force) {
+  if (!LIVE || loadSurvey.p || (surveyRows && !force)) return;
+  loadSurvey.p = api('api/editor/survey').then((r) => (r.ok ? r.json() : Promise.reject())).then((j) => { surveyRows = j.entries || []; })
+    .catch(() => { surveyRows = 'err'; }).then(() => { loadSurvey.p = null; if (/^#survey/.test(location.hash)) render(); });
+}
+const surveyLabel = (q, code) => { const o = q.options.find((x) => x[0] === code); return o ? o[1] : code; };
+function viewSurvey() {
+  loadSurvey();
+  const head = `${tabs('survey')}<div class="ed-head has-act"><div><h1>訪客問卷</h1><p class="ed-hint">說明中心的小黑貓「吉吉」會在訪客第一次來時，問幾題不記名的問卷（身分、AI 經驗、從哪裡知道我們、為什麼來），再推薦文章。這裡是統計結果；同一台電腦重填只算最後一次，每一題都可以略過，所以各題人數不一定一樣。</p></div>
+    ${Array.isArray(surveyRows) && surveyRows.length ? '<button type="button" class="ed-btn" data-act="survey-csv">' + ic('down') + '下載 CSV</button>' : ''}</div>`;
+  if (!LIVE) return `${head}<p class="ed-hint ed-empty">示範版沒有伺服器，看不到問卷結果。正式網站上訪客填的答案會出現在這裡。</p>`;
+  if (surveyRows === 'err') return `${head}<p class="ed-hint ed-empty">讀不到問卷資料，請重新整理頁面。</p>`;
+  if (!surveyRows) return `${head}<p class="ed-hint ed-empty">讀取中…</p>`;
+  const since = surveyDays ? Date.now() - surveyDays * 864e5 : 0;
+  const rows = surveyRows.filter((x) => !since || Date.parse(x.at) >= since);
+  const range = `<div class="ed-tagbar" role="group" aria-label="時間範圍">${[[0, '全部'], [7, '最近 7 天'], [30, '最近 30 天'], [90, '最近 90 天']].map(([d, t]) => `<button type="button" class="ed-filter" data-act="survey-days" data-days="${d}" aria-pressed="${surveyDays === d}">${t}</button>`).join('')}</div>`;
+  if (!rows.length) return `${head}${range}<p class="ed-hint ed-empty">${surveyRows.length ? '這段時間沒有人填問卷。' : '還沒有人填問卷。'}</p>`;
+  const blocks = Survey.QUESTIONS.map((q) => {
+    const answered = rows.filter((x) => (q.type === 'multi' ? (x[q.id] || []).length : x[q.id]));
+    const count = {};
+    answered.forEach((x) => [].concat(x[q.id]).forEach((c) => { count[c] = (count[c] || 0) + 1; }));
+    const max = Math.max(1, ...Object.values(count));
+    const texts = Object.keys(q.other || {}).flatMap((code) => rows.map((x) => x[`${q.id}_${code}`]).filter(Boolean).map((t) => `${surveyLabel(q, code)}：${t}`));
+    return `<section class="ed-sv"><h2>${esc(q.q)}</h2><p class="ed-hint">${answered.length} 人回答${q.type === 'multi' ? '（可複選，百分比是回答的人裡有幾成選了）' : ''}</p>
+      <ul class="ed-bars">${q.options.map(([code, label]) => { const n = count[code] || 0; const pct = answered.length ? Math.round((n / answered.length) * 100) : 0;
+        return `<li><span class="ed-svb-t">${esc(label)}</span><span class="ed-svb" aria-hidden="true"><span style="width:${(n / max) * 100}%"></span></span><span class="ed-svb-n">${n} 人・${pct}%</span></li>`; }).join('')}</ul>
+      ${texts.length ? `<details class="ed-done"><summary>填寫的文字（${texts.length}）</summary><ul class="ed-sv-txt">${texts.slice(0, 300).map((t) => `<li>${esc(t)}</li>`).join('')}</ul></details>` : ''}</section>`;
+  }).join('');
+  return `${head}${range}<p class="ed-sv-total"><b>${rows.length}</b> 份問卷${surveyDays ? `（最近 ${surveyDays} 天）` : ''}・最新一份在 ${fmt(rows[0].at)}</p>${blocks}`;
+}
+// 下載 CSV（Excel 開啟不會亂碼：前面加 BOM）
+function surveyCsv() {
+  const cols = ['填寫時間'];
+  const getters = [(x) => fmt(x.at)];
+  Survey.QUESTIONS.forEach((q) => {
+    cols.push(q.q);
+    getters.push((x) => [].concat(x[q.id] || []).map((c) => surveyLabel(q, c)).join('、'));
+    Object.entries(q.other || {}).forEach(([code, label]) => { cols.push(`${q.q}（${surveyLabel(q, code)}：${label}）`); getters.push((x) => x[`${q.id}_${code}`] || ''); });
+  });
+  const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+  const csv = [cols.map(cell).join(','), ...surveyRows.map((x) => getters.map((g) => cell(g(x))).join(','))].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `moonland-docs-survey-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// ---------------------------------------------------------
 // 待辦清單：要寫的文章（由上往下是製作順序，可以拖曳）＋功能許願池
 // - todos：{ id, t 暫定標題, key 預計位置, where 位置名稱（位置不在了還看得懂）, pri, status, note, page 開始寫之後的頁面, by, byNo, at }
 // - wishes：{ id, t, note, tags[], status, votes[{ no, name }], by, byNo, at }
@@ -1127,7 +1263,17 @@ const WISH_TAGS = ['新功能', '修正錯誤', '版面', '編輯後台', '說�
 let wishTag = '';
 let pendingTodo = null;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const openTodos = () => S.todos.filter((t) => t.status !== 'done');
+// 待辦分兩種：kind 'new' 新增文章（舊資料沒有 kind，也算這種）、'edit' 修改文章（page 是要改的頁面）
+const todoKind = (t) => (t.kind === 'edit' ? 'edit' : 'new');
+const openTodos = (kind) => S.todos.filter((t) => t.status !== 'done' && (!kind || todoKind(t) === kind));
+const fixesFor = (id) => S.todos.filter((t) => t.status !== 'done' && todoKind(t) === 'edit' && t.page === id);
+// 可以選來修改的頁面（照目錄順序，不含系統頁面）
+function pageChoices(cur) {
+  const ids = [];
+  S.sections.forEach((sec) => sec.rows.forEach((r) => { ids.push(r.id); (r.groups || []).forEach((g) => g.items.forEach((x) => ids.push(idOf(x)))); }));
+  return ids.filter((id) => S.pages[id] && !S.pages[id].system)
+    .map((id) => `<option value="${id}"${id === cur ? ' selected' : ''}>${esc(S.pages[id].t)}</option>`).join('');
+}
 const placeLabel = (key, fallback) => { const l = key && listOf(key); return l ? l.label.replace('（直接列在目錄上）', '') : fallback || '還沒決定位置'; };
 const canEditWish = (w) => myRole() === 'owner' || w.byNo === me.no;
 const opts = (map, cur) => Object.entries(map).map(([k, t]) => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + t + '</option>').join('');
@@ -1137,41 +1283,58 @@ function parseTags(s) {
 
 function viewTodo(sub) {
   const wish = sub === 'wish';
-  const nOpen = openTodos().length, nWish = S.wishes.filter((w) => !WISH_CLOSED.includes(w.status)).length;
-  return `${tabs('todo')}<div class="ed-head has-act"><div><h1>待辦清單</h1><p class="ed-hint">${wish
-      ? '想讓網站或編輯後台多什麼功能、哪裡要修，都寫在這裡。同意別人的想法就按 +1，網站負責人會更新處理狀態。'
-      : '還沒寫、正在寫的文章。由上往下是預計的製作順序，按住 ' + ic('grip', 'ic sm') + ' 拖曳調整；按「開始寫」會用暫定標題開一篇新頁面。'}</p></div>
-      <button type="button" class="ed-btn ed-primary" data-act="${wish ? 'wish-add' : 'todo-add'}">${ic('plus')}${wish ? '許願' : '新增要寫的文章'}</button></div>
+  const kind = sub === 'edit' ? 'edit' : 'new';
+  const nNew = openTodos('new').length, nEdit = openTodos('edit').length, nWish = S.wishes.filter((w) => !WISH_CLOSED.includes(w.status)).length;
+  const hint = wish
+    ? '想讓網站或編輯後台多什麼功能、哪裡要修，都寫在這裡。同意別人的想法就按 +1，網站負責人會更新處理狀態。'
+    : kind === 'edit'
+      ? '已經有的文章要改什麼，先記在這裡，有空再改。在「頁面」列表每篇文章右邊按 ' + ic('listadd', 'ic sm') + ' 也能直接加。按住 ' + ic('grip', 'ic sm') + ' 拖曳調整順序。'
+      : '還沒寫、正在寫的文章。由上往下是預計的製作順序，按住 ' + ic('grip', 'ic sm') + ' 拖曳調整；按「開始寫」會用暫定標題開一篇新頁面。';
+  const add = wish ? ['wish-add', '許願'] : kind === 'edit' ? ['todo-fix', '新增要修改的文章'] : ['todo-add', '新增要寫的文章'];
+  const seg = (href, on, label, n) => `<a href="${href}" role="tab" aria-selected="${on}"${on ? ' aria-current="page"' : ''}>${label}<span class="chip">${n}</span></a>`;
+  return `${tabs('todo')}<div class="ed-head has-act"><div><h1>待辦清單</h1><p class="ed-hint">${hint}</p></div>
+      <button type="button" class="ed-btn ed-primary" data-act="${add[0]}">${ic('plus')}${add[1]}</button></div>
     <div class="ed-seg" role="tablist" aria-label="待辦的種類">
-      <a href="#todo" role="tab" aria-selected="${!wish}"${wish ? '' : ' aria-current="page"'}>文章待辦<span class="chip">${nOpen}</span></a>
-      <a href="#todo/wish" role="tab" aria-selected="${wish}"${wish ? ' aria-current="page"' : ''}>功能許願池<span class="chip">${nWish}</span></a></div>
-    ${wish ? wishList() : todoList()}`;
+      ${seg('#todo', !wish && kind === 'new', '新增文章', nNew)}${seg('#todo/edit', !wish && kind === 'edit', '修改文章', nEdit)}${seg('#todo/wish', wish, '功能許願池', nWish)}</div>
+    ${wish ? wishList() : todoList(kind)}`;
 }
 function todoRow(t) {
+  const fix = todoKind(t) === 'edit';
   const page = t.page && S.pages[t.page];
   const done = t.status === 'done';
+  const where = fix
+    ? (page ? `要修改「${esc(page.n || page.t)}」` : '要修改的頁面已經不在目錄上')
+    : `預計放在「${esc(placeLabel(t.key, t.where))}」`;
   return `<li data-id="${t.id}" class="ed-todo"><div class="ed-item">
     ${done ? '' : `<button type="button" class="icon-btn sm ed-grip" data-drag="${t.id}" data-list="todos" aria-label="拖曳調整「${esc(t.t)}」的順序（也可以按上下鍵）" title="拖曳調整順序">${ic('grip')}</button>`}
-    <span class="ed-name"><span><b>${esc(t.t)}</b><small>預計放在「${esc(placeLabel(t.key, t.where))}」・${esc(t.by)} 在 ${fmt(t.at)} 新增</small>${t.note ? `<small class="ed-note-txt">${esc(t.note)}</small>` : ''}</span></span>
+    <span class="ed-name"><span><b>${esc(t.t)}</b><small>${where}・${esc(t.by)} 在 ${fmt(t.at)} 新增</small>${t.note ? `<small class="ed-note-txt">${esc(t.note)}</small>` : ''}</span></span>
     <span class="ed-row-acts">
       <select class="ed-mini" data-act="todo-pri" data-id="${t.id}" data-pri="${t.pri}" aria-label="「${esc(t.t)}」的優先級">${opts({ high: '優先：高', mid: '優先：中', low: '優先：低' }, t.pri)}</select>
       <select class="ed-mini" data-act="todo-status" data-id="${t.id}" data-st="${t.status}" aria-label="「${esc(t.t)}」的製作狀態">${opts(TODO_STATUS, t.status)}</select>
-      ${page ? `<a class="ed-btn" href="#edit/${t.page}">${ic('file')}開啟頁面</a>` : !done ? `<button type="button" class="ed-btn" data-act="todo-start" data-id="${t.id}" title="在預計的位置開一篇新頁面，帶入暫定標題">${ic('pencil')}開始寫</button>` : ''}
-      <button type="button" class="icon-btn sm" data-act="todo-edit" data-id="${t.id}" aria-label="修改「${esc(t.t)}」" title="修改">${ic('pencil')}</button>
+      ${page ? `<a class="ed-btn" href="#edit/${t.page}">${ic(fix ? 'pencil' : 'file')}${fix ? '去修改' : '開啟頁面'}</a>` : !done && !fix ? `<button type="button" class="ed-btn" data-act="todo-start" data-id="${t.id}" title="在預計的位置開一篇新頁面，帶入暫定標題">${ic('pencil')}開始寫</button>` : ''}
+      <button type="button" class="icon-btn sm" data-act="todo-edit" data-id="${t.id}" aria-label="修改待辦「${esc(t.t)}」" title="修改這個待辦">${ic('pencil')}</button>
       <button type="button" class="icon-btn sm ed-del" data-act="todo-del" data-id="${t.id}" aria-label="刪除待辦「${esc(t.t)}」" title="刪除這個待辦">${ic('trash')}</button>
     </span></div></li>`;
 }
-function todoList() {
-  const open = openTodos(), done = S.todos.filter((t) => t.status === 'done');
-  return `${open.length ? `<ul class="ed-list ed-todos" data-key="todos" data-list="todos">${open.map(todoRow).join('')}</ul>` : '<p class="ed-hint ed-empty">目前沒有待辦的文章。按「新增要寫的文章」記下想寫的主題。</p>'}
+function todoList(kind) {
+  const open = openTodos(kind), done = S.todos.filter((t) => t.status === 'done' && todoKind(t) === kind);
+  const empty = kind === 'edit' ? '目前沒有要修改的文章。按「新增要修改的文章」，或在「頁面」列表文章右邊的按鈕記下要改的地方。' : '目前沒有待辦的文章。按「新增要寫的文章」記下想寫的主題。';
+  return `${open.length ? `<ul class="ed-list ed-todos" data-key="todos" data-list="todos">${open.map(todoRow).join('')}</ul>` : `<p class="ed-hint ed-empty">${empty}</p>`}
     ${done.length ? `<details class="ed-done"><summary>已完成（${done.length}）</summary><ul class="ed-list ed-todos">${done.map(todoRow).join('')}</ul></details>` : ''}`;
 }
-// 拖曳或上下鍵：把待辦移到未完成清單的第 j 個
+// 拖曳或上下鍵：把待辦移到同一種（新增／修改）未完成清單的第 j 個，另一種的順序不變
 function moveTodo(id, j) {
-  const open = openTodos(), done = S.todos.filter((t) => t.status === 'done');
-  const i = open.findIndex((t) => t.id === id);
+  const t = S.todos.find((x) => x.id === id);
+  const kind = t ? todoKind(t) : 'new';
+  const open = openTodos(kind);
+  const i = open.findIndex((x) => x.id === id);
   if (i < 0 || j < 0 || j >= open.length) { render(); return; }
-  if (i !== j) { open.splice(j, 0, open.splice(i, 1)[0]); S.todos = [...open, ...done]; persist(); }
+  if (i !== j) {
+    open.splice(j, 0, open.splice(i, 1)[0]);
+    let k = 0;
+    S.todos = S.todos.map((x) => (x.status !== 'done' && todoKind(x) === kind ? open[k++] : x));
+    persist();
+  }
   render();
   const g = app.querySelector(`.ed-grip[data-drag="${id}"]`);
   if (g) g.focus({ preventScroll: true });
@@ -1210,12 +1373,24 @@ function wishList() {
 const itemDlg = document.getElementById('itemDlg');
 const itemForm = document.getElementById('itemForm');
 let itemEdit = null;
-function openItem(kind, id) {
+function openItem(kind, id, fixPage) {
   const x = id ? S[kind].find((v) => v.id === id) : null;
   if (id && !x) return;
-  itemEdit = { kind, id };
+  const fix = kind === 'todos' && (x ? todoKind(x) === 'edit' : fixPage !== undefined);
+  itemEdit = { kind, id, fix };
   const acts = '<p class="ed-err" role="alert"></p><div class="ed-dlg-acts"><button class="ed-btn" value="cancel" formnovalidate>取消</button><button class="ed-btn ed-primary" value="ok">' + (x ? '儲存' : '新增') + '</button></div>';
-  if (kind === 'todos') {
+  if (fix) {
+    const cur = x ? x.page : fixPage;
+    const others = cur ? fixesFor(cur).filter((t) => !x || t.id !== x.id) : [];
+    itemForm.innerHTML = `<h2 id="itemDlgT">${x ? '修改待辦' : '記下要修改的地方'}</h2>
+      <label class="ed-f"><span>要修改的頁面</span><select name="page" required>${cur && S.pages[cur] ? '' : '<option value="">請選擇</option>'}${pageChoices(cur)}</select></label>
+      ${others.length ? `<p class="ed-hint">這頁已經有 ${others.length} 個修改待辦：${others.map((t) => `「${esc(t.t)}」`).join('、')}</p>` : ''}
+      <label class="ed-f"><span>要改什麼</span><input name="t" required maxlength="80" placeholder="例如：第二步的截圖換成新版介面" value="${esc(x ? x.t : '')}"></label>
+      <div class="ed-fields-2">
+        <label class="ed-f"><span>優先級</span><select name="pri">${opts(PRI, x ? x.pri : 'mid')}</select></label>
+        <label class="ed-f"><span>製作狀態</span><select name="status">${opts(TODO_STATUS, x ? x.status : 'todo')}</select></label></div>
+      <label class="ed-f"><span>備註<small>（可不填）</small></span><textarea name="note" rows="3" maxlength="500" placeholder="在哪一段、要改成怎樣、參考資料…">${esc(x ? x.note || '' : '')}</textarea></label>${acts}`;
+  } else if (kind === 'todos') {
     itemForm.innerHTML = `<h2 id="itemDlgT">${x ? '修改待辦' : '新增要寫的文章'}</h2>
       <label class="ed-f"><span>文章標題（暫定）</span><input name="t" required maxlength="80" value="${esc(x ? x.t : '')}"></label>
       <label class="ed-f"><span>預計放在哪裡</span><select name="key"><option value="">還沒決定</option>${allLists().map((l) => `<option value="${l.key}"${x && x.key === l.key ? ' selected' : ''}>${esc(l.label)}</option>`).join('')}</select></label>
@@ -1242,7 +1417,8 @@ itemDlg.addEventListener('close', () => {
   const el = itemForm.elements;
   const v = { t: el.t.value.trim(), note: el.note.value.trim() };
   if (!v.t) return;
-  if (ed.kind === 'todos') { Object.assign(v, { key: el.key.value, where: el.key.value ? placeLabel(el.key.value) : '', pri: el.pri.value, status: el.status.value }); }
+  if (ed.fix) { if (!S.pages[el.page.value]) return; Object.assign(v, { kind: 'edit', page: el.page.value, pri: el.pri.value, status: el.status.value }); }
+  else if (ed.kind === 'todos') { Object.assign(v, { key: el.key.value, where: el.key.value ? placeLabel(el.key.value) : '', pri: el.pri.value, status: el.status.value }); }
   else { v.tags = parseTags(el.tags.value); if (el.status) v.status = el.status.value; }
   const x = ed.id && S[ed.kind].find((y) => y.id === ed.id);
   if (x) Object.assign(x, v);
@@ -1252,7 +1428,7 @@ itemDlg.addEventListener('close', () => {
     else S.wishes.unshift({ status: 'new', votes: [], ...item });
   }
   persist();
-  toast(x ? `已更新「${v.t}」。` : ed.kind === 'todos' ? `已加到待辦清單的最後面：「${v.t}」。` : `已許願：「${v.t}」。`);
+  toast(x ? `已更新「${v.t}」。` : ed.fix ? `已加到「修改文章」待辦：「${v.t}」。` : ed.kind === 'todos' ? `已加到待辦清單的最後面：「${v.t}」。` : `已許願：「${v.t}」。`);
   render();
 });
 function todoAct(a, id) {
@@ -1448,6 +1624,18 @@ function viewEditors() {
 // 8. 切換畫面
 // ---------------------------------------------------------
 let skipGuard = false;
+const isPagesHash = (h) => { const m = (h || '#pages').match(/^#(\w+)/); return !m || m[1] === 'pages'; };
+// 收合或展開（不重畫整頁）
+function setFold(keys, fold) {
+  keys.forEach((k) => {
+    if (fold) folded.add(k); else folded.delete(k);
+    const box = app.querySelector('[data-fold-box="' + k + '"]');
+    if (box) box.classList.toggle('is-folded', fold);
+    const btn = app.querySelector('[data-fold="' + k + '"]');
+    if (btn) { btn.setAttribute('aria-expanded', String(!fold)); btn.title = fold ? '展開' : '收合'; btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace(/^(展開|收合)/, fold ? '展開' : '收合')); }
+  });
+  saveFold();
+}
 let lastHash = location.hash;
 function render(keepDraft) {
   paintWho();
@@ -1463,14 +1651,16 @@ function render(keepDraft) {
     if (!draft) { app.innerHTML = `${tabs('pages')}<p class="ed-hint">找不到這個頁面，可能已經被刪除。<a href="#pages">回到頁面列表</a></p>`; return; }
     app.innerHTML = viewEdit();
     paintPreview();
+    paintThumb();
     if (!keepDraft) setDirty(false); else setDirty(dirty);
     document.title = `${draft.isNew ? '新增頁面' : `編輯「${draft.t}」`}｜編輯後台`;
     return;
   }
   draft = null;
   const shelf = ['shelf', 'drafts', 'archive', 'trash'].includes(route);
-  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : route === 'todo' ? viewTodo(arg) : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
+  app.innerHTML = shelf ? viewShelf(route) : route === 'log' ? viewLog(arg) : route === 'todo' ? viewTodo(arg) : route === 'survey' ? viewSurvey() : ({ media: viewMedia, help: viewHelp, tools: viewTools, editors: viewEditors }[route] || viewPages)();
   if (route === 'media') wakeMedia(app.querySelector('.ed-media'));
+  if (app.querySelector('#pageQ')) filterPages(); else app.classList.remove('is-searching');
   if (shelf && route !== 'shelf') requestAnimationFrame(() => { const s = document.getElementById(`sh-${route}`); if (s) s.scrollIntoView(); });
   document.title = '編輯後台｜moonland.ai 說明中心';
 }
@@ -1484,9 +1674,11 @@ addEventListener('hashchange', () => {
   if (skipGuard && location.hash === lastHash) { skipGuard = false; return; }
   skipGuard = false;
   setDirty(false);
+  // 從頁面列表點進去再回來：回到剛才捲到的位置
+  if (isPagesHash(lastHash)) pagesScroll = window.scrollY;
   lastHash = location.hash;
   render();
-  window.scrollTo(0, 0);
+  window.scrollTo(0, isPagesHash(location.hash) ? pagesScroll : 0);
 });
 addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -1520,11 +1712,22 @@ document.addEventListener('click', (e) => {
     else if (a === 'unarchive') unarchivePicked();
     else if (a === 'archive-del') archiveToTrash();
     else if (a === 'todo-add') openItem('todos');
+    else if (a === 'todo-fix') openItem('todos', null, b.dataset.id || '');
+    else if (a === 'todo-done') { const t = S.todos.find((x) => x.id === b.dataset.id); if (t) { t.status = 'done'; persist(); toast('已把「' + t.t + '」標成完成。'); const box = b.closest('li'); if (box) box.remove(); } }
     else if (a === 'wish-add') openItem('wishes');
     else if (a.startsWith('todo-')) todoAct(a, b.dataset.id);
     else if (a.startsWith('wish-')) wishAct(a, b.dataset.id, b);
     else if (a === 'add-tag') { const inp = itemForm.elements.tags; const tags = parseTags(inp.value); if (!tags.includes(b.dataset.tag)) inp.value = [...tags, b.dataset.tag].join('、'); }
     else if (a === 'copy-media') copyMedia(b);
+    else if (a === 'survey-days') { surveyDays = +b.dataset.days; render(); }
+    else if (a === 'survey-csv') surveyCsv();
+    else if (a === 'fold') setFold([b.dataset.fold], !folded.has(b.dataset.fold));
+    else if (a === 'fold-all' || a === 'unfold-all') setFold([...app.querySelectorAll('[data-fold-box]')].map((x) => x.dataset.foldBox), a === 'fold-all');
+    else if (a === 'jump') {
+      setFold(['sec:' + b.dataset.si], false);
+      const sec = document.getElementById('psec' + b.dataset.si);
+      if (sec) { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); const btn = sec.querySelector('.ed-fold'); if (btn) btn.focus({ preventScroll: true }); }
+    }
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
       const v = (prompt('大分類的新名稱：', sec.label) || '').trim();
@@ -1570,11 +1773,12 @@ document.addEventListener('click', (e) => {
 });
 
 app.addEventListener('input', (e) => {
+  if (e.target.id === 'pageQ') { pageQuery = e.target.value; filterPages(); return; }
   const f = e.target.form;
   if (!f || f.id !== 'pageForm') return;
   setDirty(true);
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => { readForm(f); paintPreview(); }, 150);
+  previewTimer = setTimeout(() => { readForm(f); paintPreview(); paintThumb(); }, 150);
 });
 app.addEventListener('change', (e) => {
   const f = e.target.form;
@@ -1621,6 +1825,15 @@ app.addEventListener('submit', (e) => {
     toast(LIVE ? `已把 ${name} 加入名單，他用公司帳號登入後就能編輯。` : `已把 ${name} 加入名單。登出後可以用他的身分登入試試。`);
     render();
   }
+});
+// 表格那一行按 Shift+Enter：在格子裡換行（插入 <br>），不會變成新的一列
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !e.shiftKey || e.isComposing || e.target.id !== 'body') return;
+  const ta = e.target;
+  const line = ta.value.slice(ta.value.lastIndexOf('\n', ta.selectionStart - 1) + 1, ta.selectionStart);
+  if (!line.trim().startsWith('|')) return;
+  e.preventDefault();
+  insertAt('<br>');
 });
 // Ctrl+S 儲存
 document.addEventListener('keydown', (e) => {

@@ -3,11 +3,11 @@
 // 瀏覽器（編輯後台）與伺服器（server/editor.js、server/test.js）共用這一支
 //
 // 說明中心讀的形狀（data/*.js）：
-//   ARTICLES：{ 代號: { t, n?, d?, level?, minutes?, models?: [], tool?, body } }
-//   SECTIONS：[{ label, rows: [{ id, icon, n?, tag? } | { id, t, icon, d?, tag?, groups: [{ g, items: [[代號, 目錄名稱, 標籤?]] }] }] }]
+//   ARTICLES：{ 代號: { t, n?, d?, level?, minutes?, models?: [], tool?, thumb?（首頁縮圖的圖片編號）, body } }
+//   SECTIONS：[{ label, rows: [{ id, icon, n?, tag? } | { id, t, icon, d?, tag?, thumb?, groups: [{ g, items: [[代號, 目錄名稱, 標籤?]] }] }] }]
 // 編輯後台存的形狀：
 //   sections：[{ label, rows: [{ id, groups?: [{ g, items: [代號] }] }] }]
-//   pages：{ 代號: { t, n, d, tag, icon, level, minutes, models（逗號分隔）, tool, body, system?, isNew?, draft? } }
+//   pages：{ 代號: { t, n, d, tag, icon, level, minutes, models（逗號分隔）, tool, thumb, body, system?, isNew?, draft? } }
 // 草稿（draft: true）留在目錄裡原本的位置，但說明中心看不到（toSite 會跳過）
 // 程式附的草稿在 data/drafts.js（DRAFTS），只有編輯後台載入
 // =========================================================
@@ -15,13 +15,14 @@
   // 說明中心 → 編輯後台
   function fromSite(A, SECTIONS, DRAFTS) {
     const pages = {};
-    const extra = (a) => ({ level: a.level || '', minutes: a.minutes ? String(a.minutes) : '', models: (a.models || []).join(', '), tool: a.tool || '', body: (a.body || '').replace(/^\n+/, '') });
+    const extra = (a) => ({ level: a.level || '', minutes: a.minutes ? String(a.minutes) : '', models: (a.models || []).join(', '), tool: a.tool || '', thumb: a.thumb ? String(a.thumb) : '', body: (a.body || '').replace(/^\n+/, '') });
     const sections = SECTIONS.map((sec) => ({
       label: sec.label,
       rows: sec.rows.map((r) => {
         const a = A[r.id] || {};
         if (r.groups) {
           pages[r.id] = { t: r.t || a.t || r.id, n: '', d: r.d || a.d || '', tag: r.tag || '', icon: r.icon, ...extra(a) };
+          if (r.thumb) pages[r.id].thumb = String(r.thumb);
           return { id: r.id, groups: r.groups.map((g) => ({ g: g.g, items: g.items.map(([id, n, tag]) => {
             const b = A[id] || {};
             pages[id] = { t: b.t || n, n: n === b.t ? '' : n, d: b.d || '', tag: tag || '', icon: '', ...extra(b) };
@@ -60,6 +61,7 @@
       const models = String(p.models || '').split(/[,，、]/).map((m) => m.trim()).filter(Boolean);
       if (models.length) a.models = models;
       if (p.tool) a.tool = p.tool;
+      if (+p.thumb) a.thumb = +p.thumb;
       a.body = `\n${p.body || ''}\n`;
       return a;
     };
@@ -72,6 +74,7 @@
           const row = { id: r.id, t: p.t, icon: p.icon || 'folder' };
           if (p.d) row.d = p.d;
           if (p.tag) row.tag = p.tag;
+          if (+p.thumb) row.thumb = +p.thumb;
           row.groups = r.groups.map((g) => ({ g: g.g, items: g.items.filter(live).map((id) => {
             const q = pages[id];
             ARTICLES[id] = article(q);

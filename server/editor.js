@@ -9,6 +9,7 @@
 // - 上傳的檔案：平台有提供物件儲存（vibe.yaml 的 storage: s3，見 server/s3.js）時存在 S3 的 media/<區域>/<文章代號>-<序號>.<副檔名>；
 //   沒有時（本機直接跑）存在 DATA_DIR/media/。圖片經伺服器上傳；影片由瀏覽器直接傳到 S3（不經過網站，最大 90 MB）
 //     session-secret 登入 cookie 的簽章金鑰（自動產生）
+//     survey.jsonl   訪客問卷（server.js 寫入，後台「訪客問卷」讀取）
 // - 說明中心從 /content.js 讀內容，存檔後立刻生效
 const fs = require('node:fs');
 const path = require('node:path');
@@ -44,6 +45,22 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     fs.renameSync(tmp, file(f));
   }
   const readJson = (f) => { try { return JSON.parse(fs.readFileSync(file(f), 'utf8')); } catch { return null; } };
+
+  // ---------- 訪客問卷（server.js 寫入 survey.jsonl）----------
+  // 同一個訪客（vid）重填只留最後一次
+  function surveyEntries() {
+    let lines = [];
+    try { lines = fs.readFileSync(file('survey.jsonl'), 'utf8').split('\n'); } catch {}
+    const byVid = new Map();
+    const out = [];
+    for (const l of lines) {
+      if (!l) continue;
+      let x;
+      try { x = JSON.parse(l); } catch { continue; }
+      if (x.vid) byVid.set(x.vid, x); else out.push(x);
+    }
+    return [...out, ...byVid.values()].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  }
 
   // ---------- 內容 ----------
   // 程式裡附的內容（data/*.js）。第一次啟動時複製成 content.json，之後以 content.json 為準
@@ -435,6 +452,7 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
       else if (pathname === '/api/editor/media' && req.method === 'POST') out = await upload(req, url, await readBody(req, 8e6));
       else if (pathname === '/api/editor/video/start' && req.method === 'POST') out = videoStart(url);
       else if (pathname === '/api/editor/video/finish' && req.method === 'POST') out = await videoFinish(JSON.parse((await readBody(req, 4096)).toString() || 'null'));
+      else if (pathname === '/api/editor/survey' && req.method === 'GET') out = [200, { entries: surveyEntries() }];
       else if (pathname === '/api/editor/check' && req.method === 'GET') out = [200, { problems: Model.checkAll(C.pages, allMedia()) }];
       else if (pathname === '/api/editor/backup' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="moonland-docs-backup-${new Date().toISOString().slice(0, 10)}.json"` });
