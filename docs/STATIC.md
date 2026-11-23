@@ -4,7 +4,7 @@
 
 - **編輯後台照舊**：同事在公司網站（https://moonland-docs-vibe.moonshine-studio.net/edit.html）編輯、存檔、公開。
 - **網站負責人打包**：在自己電腦跑一次打包程式，把「已公開的內容」包成沒有伺服器的純靜態網站。
-- **推到靜態版的 GitHub repo**（例如 `moonland-docs-study`）：工程師從這個 repo 放上 moonland.ai。之後更新也只要重新打包、推上去。
+- **推到靜態版的 GitHub repo**（`moonland-docs-site`）：工程師從這個 repo 放上 moonland.ai。之後更新也只要重新打包、推上去。
 
 ## 打包會做什麼
 
@@ -40,22 +40,22 @@ node tools/build-static.js --push
 
 畫面最後出現「已推送」就完成了。內容沒有變的話會顯示「內容和上次一樣」，不會推送。
 
-- **只想先看看、不推送**：拿掉 `--push`。打包好的網站在 `F:\RD\Moonland\moonland-docs\moonland-docs-study`，用 `python -m http.server 8091 -d ..\moonland-docs-study` 開，再用瀏覽器打開 http://localhost:8091。
+- **只想先看看、不推送**：拿掉 `--push`。打包好的網站在 `F:\RD\Moonland\moonland-docs\moonland-docs-site`，用 `python -m http.server 8091 -d ..\moonland-docs-site` 開，再用瀏覽器打開 http://localhost:8091。
 - **出現 ⚠ 提醒**：照提醒做。最常見的是「找不到要拿掉的段落」：有人改了「點數 3D 模型」那篇的文字，打開 `tools/build-static.js`，把 `STATIC_EDITS` 裡的文字改成新的。
 - **找不到 ffmpeg**：影片和音樂會用原檔，網站一樣能用，只是比較大。程式會自動借用電腦裡其他軟體附的 ffmpeg（例如 Topaz、Red Giant）；要自己裝的話，裝好後重開終端機再跑一次。
 
 ## 第一次設定（只做一次）
 
-1. 在 GitHub 建一個新的 repo，例如 `moonland-docs-study`（不要勾「Add a README」，要空的）。
+1. 在 GitHub 建一個新的 repo，`moonland-docs-site`（不要勾「Add a README」，要空的）。
 2. 打包一次（不推送）：`node tools/build-static.js`
 3. 把輸出資料夾變成 git repo，接到剛建的 GitHub repo：
 
 ```powershell
-cd ..\moonland-docs-study
+cd ..\moonland-docs-site
 git init -b main
 git add -A
 git commit -m "說明中心靜態版"
-git remote add origin https://github.com/<帳號>/moonland-docs-study.git
+git remote add origin https://github.com/<帳號>/moonland-docs-site.git
 git push -u origin main
 ```
 

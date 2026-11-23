@@ -4,10 +4,10 @@
 // 流程：同事在公司網站的編輯後台改好內容 → 網站負責人在自己電腦跑這支 → 推到靜態版的 GitHub repo → 工程師／自動流程放上 moonland.ai
 //
 // 用法（在 repo 資料夾裡）：
-//   node tools/build-static.js            打包到 ../moonland-docs-study（只打包，不推送）
+//   node tools/build-static.js            打包到 ../moonland-docs-site（只打包，不推送）
 //   node tools/build-static.js --push     打包完直接 commit 並 push 到靜態版的 repo
 // 其他選項：
-//   --out <資料夾>       輸出到別的資料夾（預設 ../moonland-docs-study）
+//   --out <資料夾>       輸出到別的資料夾（預設 ../moonland-docs-site）
 //   --site <網址>        內容從哪個網站讀（預設公司網站 https://moonland-docs-vibe.moonshine-studio.net）
 //   --from-repo          不讀公司網站，改用 repo 裡的 data/*.js（只用來測試，內容可能是舊的）
 //   --no-compress        影片、音樂不重新壓縮（比較快，檔案比較大）
@@ -35,7 +35,7 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : def; };
 const has = (name) => args.includes(name);
 const SITE = opt('--site', 'https://moonland-docs-vibe.moonshine-studio.net').replace(/\/+$/, '');
-const OUT = path.resolve(opt('--out', path.join(ROOT, '..', 'moonland-docs-study')));
+const OUT = path.resolve(opt('--out', path.join(ROOT, '..', 'moonland-docs-site')));
 const CACHE = path.resolve(opt('--cache', path.join(ROOT, '..', 'static-cache')));
 const FROM_REPO = has('--from-repo');
 const COMPRESS = !has('--no-compress');
