@@ -276,7 +276,7 @@ async function main() {
 這個 repo 是**自動產生的成品**，不要直接改這裡的檔案，下次打包會被蓋掉。
 
 - 內容由網站負責人從內部的編輯後台打包產生
-- 打包時間：${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}${rev ? `（內容版本 ${rev}）` : ''}
+${rev ? `- 內容版本：${rev}（打包時間看 git 紀錄）` : '- 打包時間看 git 紀錄'}
 
 ## 給工程師
 

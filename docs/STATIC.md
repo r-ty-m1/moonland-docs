@@ -44,7 +44,9 @@ node tools/build-static.js --push
 - **出現 ⚠ 提醒**：照提醒做。最常見的是「找不到要拿掉的段落」：有人改了「點數 3D 模型」那篇的文字，打開 `tools/build-static.js`，把 `STATIC_EDITS` 裡的文字改成新的。
 - **找不到 ffmpeg**：影片和音樂會用原檔，網站一樣能用，只是比較大。程式會自動借用電腦裡其他軟體附的 ffmpeg（例如 Topaz、Red Giant）；要自己裝的話，裝好後重開終端機再跑一次。
 
-## 第一次設定（只做一次）
+## 第一次設定（2026-11-23 已完成：https://github.com/r-ty-m1/moonland-docs-site，公開）
+
+換電腦或重新設定時才需要：
 
 1. 在 GitHub 建一個新的 repo，`moonland-docs-site`（不要勾「Add a README」，要空的）。
 2. 打包一次（不推送）：`node tools/build-static.js`
