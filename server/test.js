@@ -71,7 +71,8 @@ console.log(`✓ ${Object.keys(ARTICLES).length} 篇文章的站內連結都找�
   const enFiles = fs.readdirSync(enDir).filter((f) => f.endsWith('.js'));
   for (const f of enFiles) vm.runInContext(fs.readFileSync(path.join(enDir, f), 'utf8'), enCtx);
   // 本站英文版：點數是 Points、登月幣是 Coins（2026-11-23 起，不再用 credits、Moon Coins）
-  const OLD_TERMS = /\bcredits?\b|Moon ?Coins?/i;
+  // 連結代號（#credits、#credit-tools）和 credit card（信用卡）不算
+  const OLD_TERMS = /(?<![#\w-])credits?\b(?![-\w]|\s*card)|Moon ?Coins?/i;
   const badUi = Object.entries(enCtx.UI_EN || {}).filter(([, v]) => OLD_TERMS.test(v)).map(([k]) => k);
   assert.deepEqual(badUi, [], `data/en/ui.js 還有舊說法（credits、Moon Coins）：${badUi.join('、')}`);
   const seed = enCtx.EN_SEED || { pages: {} };
@@ -284,7 +285,12 @@ const base = `http://127.0.0.1:${PORT}`;
     console.log('✓ 編輯後台：登入、權限、存檔、版本衝突、上傳命名、備份還原都正常');
 
     // --- 4a. 英文版：content.js 帶英文、介面文字檔可以讀，翻譯草稿檔不對外 ---
-    assert.match(await (await fetch(base + '/content.js')).text(), /window\.ARTICLES_EN=/, 'content.js 要有 ARTICLES_EN');
+    assert.match(await (await fetch(base + '/content.js')).text(), /window\.ARTICLES_EN=\{\};/, 'content.js 要有 ARTICLES_EN，而且英文草稿不能出現');
+    const stEn = await (await owner('/api/editor/state')).json();
+    assert.equal(stEn.pages['quick-start'].en.draft, true, '程式附的翻譯要匯入成英文草稿');
+    assert.equal(stEn.pages['quick-start'].en.by, 'AI 翻譯（待審）');
+    assert.equal(stEn.sections[0].en, 'Get started', '大分類的英文名稱要匯入');
+    assert.ok(stEn.log.some((x) => /匯入英文翻譯草稿/.test(x.action)), '匯入要記在修改紀錄');
     assert.equal((await fetch(base + '/data/en/ui.js')).status, 200, '英文介面文字要讀得到');
     assert.equal((await fetch(base + '/data/en/terms.json')).status, 404, '名稱對照表不用對外');
     for (const f of fs.readdirSync(path.join(ROOT, 'data/en')).filter((x) => x.endsWith('.js') && x !== 'ui.js')) {
