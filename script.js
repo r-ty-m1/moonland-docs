@@ -281,6 +281,9 @@ const FB_HINT = {
   other: '想說的都可以寫在這裡。',
 };
 const FB_LOCAL = 'ml-feedback-preview';
+// 回饋、問卷、閱讀流量送到哪裡：公司網站上送給自己（api/...）；靜態版由 config.js 的 apiBase 指回公司網站
+// 都不加 content-type（瀏覽器當成 text/plain），跨網域送時才不用先「預檢」，伺服器一樣當 JSON 讀
+const API = (() => { const b = (window.SITE_CONFIG && window.SITE_CONFIG.apiBase) || ''; return b ? b.replace(/\/*$/, '/') : ''; })();
 let fbFrom = '';   // 從文章底部「還需要改進」過來時，預先選好那一篇
 
 function visitorId() {
@@ -298,7 +301,7 @@ async function sendFeedback(entry) {
   entry = { ...entry, pageTitle: zhTitle, vid: visitorId(), lang: LANG };
   // 先送網站伺服器（公司部署）：伺服器存一份、轉存 Google 試算表、通知負責人
   try {
-    const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
+    const r = await fetch(API + 'api/feedback', { method: 'POST', body: JSON.stringify(entry) });
     if (r.ok) return 'server';
     if (r.status !== 404 && r.status !== 405) return 'failed';   // 有伺服器但拒收（格式錯、太頻繁）
   } catch (e) { /* 連不到伺服器：往下試 Google 試算表 */ }
@@ -830,7 +833,7 @@ function closeJiji() {
 async function sendSurvey() {
   saveJiji({ done: true });
   try {
-    const r = await fetch('api/survey', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
+    const r = await fetch(API + 'api/survey', { method: 'POST', body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
     jj.sent = r.ok;
   } catch (e) { jj.sent = false; }
 }
@@ -895,8 +898,8 @@ const landingFrom = (() => {
 const isStaff = () => { try { return localStorage.getItem('ml-staff') === '1'; } catch (e) { return false; } };
 function beacon(data) {
   const body = JSON.stringify({ ...data, vid: visitorId(), staff: isStaff() || undefined });
-  try { if (navigator.sendBeacon && navigator.sendBeacon('api/view', new Blob([body], { type: 'text/plain' }))) return; } catch (e) {}
-  fetch('api/view', { method: 'POST', body, keepalive: true }).catch(() => {});
+  try { if (navigator.sendBeacon && navigator.sendBeacon(API + 'api/view', new Blob([body], { type: 'text/plain' }))) return; } catch (e) {}
+  fetch(API + 'api/view', { method: 'POST', body, keepalive: true }).catch(() => {});
 }
 const depthNow = () => {
   const h = document.documentElement.scrollHeight - innerHeight;

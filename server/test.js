@@ -160,6 +160,21 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal((await vote('203.0.113.2')).status, 201, '不同訪客不能共用額度');
     console.log('✓ 回饋：送出、驗證、後台密碼都正常');
 
+    // 靜態版（moonland.ai 網域）把回饋送回這裡：只有允許的網站、只有三個收資料的網址會帶跨網域標頭
+    const xo = (origin, ip) => fetch(base + '/api/feedback', { method: 'POST', headers: { origin, 'x-forwarded-for': ip }, body: JSON.stringify({ kind: 'vote', page: 'quick-start', value: 'up' }) });
+    const okx = await xo('https://help.moonland.ai', '203.0.113.50');
+    assert.equal(okx.status, 201, '靜態版用 text/plain 送的回饋要收得到');
+    assert.equal(okx.headers.get('access-control-allow-origin'), 'https://help.moonland.ai');
+    assert.equal((await xo('https://moonland.ai', '203.0.113.51')).headers.get('access-control-allow-origin'), 'https://moonland.ai');
+    assert.equal((await xo('https://evil-moonland.ai', '203.0.113.52')).headers.get('access-control-allow-origin'), null, '名字很像的網站不能放行');
+    assert.equal((await xo('https://moonland.ai.evil.com', '203.0.113.53')).headers.get('access-control-allow-origin'), null);
+    const pre = await fetch(base + '/api/survey', { method: 'OPTIONS', headers: { origin: 'https://help.moonland.ai', 'access-control-request-method': 'POST' } });
+    assert.equal(pre.status, 204);
+    assert.equal((await fetch(base + '/api/survey', { method: 'OPTIONS', headers: { origin: 'https://evil.com' } })).status, 403);
+    assert.equal((await fetch(base + '/api/editor/state', { headers: { origin: 'https://help.moonland.ai' } })).headers.get('access-control-allow-origin'), null, '編輯後台不能開放跨網域');
+    assert.equal((await fetch(base + '/api/views', { headers: { origin: 'https://help.moonland.ai' } })).headers.get('access-control-allow-origin'), null, '閱讀統計不能開放跨網域');
+    console.log('✓ 跨網域：moonland.ai 的靜態版送得進回饋、問卷、流量；其他網站與後台網址不開放');
+
     // --- 4. 編輯後台（DEV_LOGIN 假登入；T0001 是 EDITOR_OWNERS 裡的主管理員） ---
     assert.match(html, /<script src="content\.js"><\/script>/, '首頁要改讀伺服器的 content.js');
     assert.doesNotMatch(html, /data\/start\.js/, '首頁不該再讀 data/*.js');

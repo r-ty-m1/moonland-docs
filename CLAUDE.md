@@ -50,6 +50,12 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 2026-11-18 第一次部署成功（commit `56ff68b`，用 mason deploy-site）。工作 clone 有兩個 remote：`origin` 是 GitHub（預覽版），`gitea` 是公司 Gitea `ufst47/moonland-docs`（推 `main` 就會部署）。改完兩邊都推，保持同步。
 - 使用者的電腦擋外部連線（Google、chat、自己的正式網址都連不到），不要從這台驗證外部網址；請使用者用手機或別的網路確認。
 
+## 靜態版（moonland.ai 網域，2026-11-23）
+
+- 使用者與工程師決定：公司網站（編輯後台）照舊；網站負責人用 `tools/build-static.js` 把已公開內容包成純靜態網站，推到另一個 GitHub repo（`moonland-docs-study`，輸出在 repo 旁的 `../moonland-docs-study`），工程師從那裡放上 moonland.ai。拔掉 3D、影片音樂重壓（快取在 `../static-cache`）。
+- 回饋、問卷、閱讀流量用 `config.js` 的 `apiBase` 送回公司網站（`server/server.js` 的 `corsOrigin` 只允許 moonland.ai 與子網域、localhost；其他用 `CORS_ORIGINS`）。不要在 script.js 的這三個 fetch 加 content-type 標頭，跨網域會觸發預檢。
+- 之後放上 moonland.ai 不再用 mason 部署；公司網站本身仍用 mason。詳細見 `docs/STATIC.md`。
+
 ## 維護手冊
 
 - 上線到公司網站後**不再用 AI 維護**（使用者 2026-10-30），由同事用編輯後台、平台組工程師處理程式。所以上線前要做到不靠 AI 也能維護。

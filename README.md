@@ -2,7 +2,7 @@
 
 網址：https://r-ty-m1.github.io/moonland-docs/
 
-純靜態網站，不需要安裝或建置。接手維護請先讀 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md)；編輯者的操作說明在編輯後台的「使用說明」分頁。推到 `main` 後，GitHub Pages 約 1～2 分鐘自動更新。
+純靜態網站，不需要安裝或建置。接手維護請先讀 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md)；編輯者的操作說明在編輯後台的「使用說明」分頁。要放到 moonland.ai 網域的靜態版怎麼打包、更新，見 [`docs/STATIC.md`](docs/STATIC.md)。推到 `main` 後，GitHub Pages 約 1～2 分鐘自動更新。
 
 所有圖片、影片、音訊都放在網站自己的 `assets/media/`，不再依賴 Notion。
 
@@ -148,7 +148,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261123c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261123d`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
