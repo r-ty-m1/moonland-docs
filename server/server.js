@@ -262,30 +262,10 @@ function serveFile(req, res, rel) {
 
 const editor = require('./editor.js')({ ROOT, DATA_DIR, send, sendJson });
 
-// ---------- 跨網域（2026-11-23）----------
-// 放在 moonland.ai 網域的靜態版說明中心（tools/build-static.js 產生）沒有伺服器，回饋、問卷、閱讀流量送回這裡存。
-// 只開放這三個「任何人都能送」的網址，而且只讀得到「有沒有收到」；編輯後台、讀回饋的網址都不開放。
-// 允許的網站：moonland.ai 與它的子網域、本機測試（localhost）；要加別的網址，設環境變數 CORS_ORIGINS（用逗號分開，例如 https://xxx.pages.dev）
-const CORS_PATHS = new Set(['/api/feedback', '/api/survey', '/api/view']);
-const CORS_EXTRA = String(process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
-function corsOrigin(origin) {
-  if (!origin) return '';
-  if (CORS_EXTRA.includes(origin)) return origin;
-  return /^https:\/\/([\w-]+\.)*moonland\.ai$/.test(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : '';
-}
-
+// 不開放跨網域：moonland.ai 上的靜態版不連回這裡（2026-11-23 使用者要求，公司網域不讓外部網站的網頁連進來）
 const server = http.createServer(async (req, res) => {
   let pathname, url;
   try { url = new URL(req.url, 'http://x'); pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Bad request'); }
-  if (CORS_PATHS.has(pathname)) {
-    const ok = corsOrigin(req.headers.origin);
-    if (ok) { res.setHeader('access-control-allow-origin', ok); res.setHeader('vary', 'Origin'); }
-    if (req.method === 'OPTIONS') {
-      if (!ok) return send(res, 403, 'Forbidden');
-      res.writeHead(204, { 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' });
-      return res.end();
-    }
-  }
   if (await editor.handle(req, res, pathname, url)) return;
 
   if (pathname === '/api/view') {

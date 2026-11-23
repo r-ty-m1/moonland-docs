@@ -17,8 +17,10 @@
 // - 3D 模型：拿掉（[3d 編號] 與下面 STATIC_EDITS 列的介紹段落），不附 3D 檢視程式
 // - 媒體：只放公開頁面有用到的；圖片一律 WebP；影片壓到寬度最多 1280、音樂壓到 96 kbps（壓完沒有變小就用原檔）
 //   壓過的檔案存在 ../static-cache，下次只壓新的，所以第二次以後很快
-// - 回饋、吉吉問卷、閱讀流量：config.js 的 apiBase 填公司網站，資料照樣送回公司網站存（server/server.js 允許 moonland.ai 網域）
+// - 不連公司網域（2026-11-23 使用者要求）：config.js 的 noServer 設成 true，回饋只送 Google 試算表，
+//   吉吉問卷不主動出現（答案只留在訪客瀏覽器），閱讀流量不記；成品裡出現公司網址就停止、不推送
 // - 不含編輯後台、回饋後台、伺服器程式
+// - 讀內容的那一步要在公司網路裡做（打包的電腦連得到公司網站），成品本身不連公司
 //
 // 需要：Node 18 以上；壓縮影片和音樂要 ffmpeg（找 PATH 上的 ffmpeg 或環境變數 FFMPEG，找不到就用原檔並提醒）
 'use strict';
@@ -251,10 +253,10 @@ async function main() {
     Object.entries(out).map(([k, v]) => `window.${k}=${JSON.stringify(v)};`).join('\n') + '\n';
   write('content.js', contentJs);
 
-  // config.js：回饋、問卷、閱讀流量送回公司網站
-  let config = fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8');
-  if (!/apiBase: ''/.test(config)) throw new Error('config.js 找不到 apiBase 設定');
-  write('config.js', config.replace(/apiBase: ''/, `apiBase: '${SITE}/'`));
+  // config.js：標成沒有伺服器（回饋只送 Google 試算表，問卷不主動出現，閱讀流量不記）
+  const config = fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8');
+  if (!/noServer: false/.test(config)) throw new Error('config.js 找不到 noServer 設定');
+  write('config.js', config.replace(/noServer: false/, 'noServer: true'));
 
   for (const f of ['style.css', 'markup.js', 'survey.js', 'script.js', 'data/en/ui.js', 'assets/favicon.png', 'assets/logo-white.png', 'assets/logo-dark.png']) {
     write(f, fs.readFileSync(path.join(ROOT, f)));
@@ -273,18 +275,28 @@ async function main() {
 
 這個 repo 是**自動產生的成品**，不要直接改這裡的檔案，下次打包會被蓋掉。
 
-- 內容來源：公司網站的編輯後台（${SITE}/edit.html）
-- 打包程式：moonland-docs repo 的 \`tools/build-static.js\`
+- 內容由網站負責人從內部的編輯後台打包產生
 - 打包時間：${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}${rev ? `（內容版本 ${rev}）` : ''}
 
 ## 給工程師
 
 - 純靜態網站：根目錄的 \`index.html\` 就是首頁，沒有伺服器程式、不需要建置。網址用 \`#文章代號\` 切換頁面，不需要設定改寫規則。
-- 回饋、訪客問卷、閱讀流量會從瀏覽器直接送到 \`${SITE}/api/...\`（公司網站），那邊已允許 \`moonland.ai\` 與子網域。網址不在 moonland.ai 底下（例如 \`*.pages.dev\` 測試網址）時送不進去，要請網站負責人在公司網站加上環境變數 \`CORS_ORIGINS\`。
+- 不會連到公司內部的任何網址。對外連線只有：Google Fonts（字型）、Google Apps Script（意見回饋與「有幫助嗎」投票，網址在 \`config.js\`）。
+- 訪客問卷的答案只存在訪客自己的瀏覽器；不記閱讀流量。
 - 快取：\`index.html\`、\`content.js\` 建議每次都確認有沒有更新（例如 \`Cache-Control: no-cache\`）；css／js 網址帶內容雜湊，\`assets/media/\` 的檔名不會重複使用，都可以長時間快取。
 `);
 
   const files = []; const walk = (d) => { for (const n of fs.readdirSync(d)) { if (n === '.git') continue; const p = path.join(d, n); fs.statSync(p).isDirectory() ? walk(p) : files.push(p); } }; walk(OUT);
+
+  // 安全檢查：成品裡不能出現公司內部的網域（2026-11-23 使用者要求外部不能有任何方式連到公司）
+  // 例如有人在文章裡貼了公司網站的連結或圖片網址，這裡會擋下來，不會推送
+  const INTERNAL = [/moonshine-studio\.net/i, /moonshine\.tw/i, /gitea\.moonshine/i, new RegExp(new URL(SITE).hostname.replace(/\./g, '\\.'), 'i')];
+  const leaks = [];
+  for (const f of files.filter((x) => /\.(html|js|css|json|md|txt)$/i.test(x))) {
+    const t = fs.readFileSync(f, 'utf8');
+    for (const re of INTERNAL) { const m = re.exec(t); if (m) leaks.push(`${path.relative(OUT, f)}：${t.slice(Math.max(0, m.index - 40), m.index + 60).replace(/\s+/g, ' ')}`); }
+  }
+  if (leaks.length) throw new Error(`成品裡出現公司內部網址，已停止（不會推送）。請在編輯後台把這些地方改掉再打包：\n  ${[...new Set(leaks)].join('\n  ')}`);
   const total = files.reduce((s, f) => s + fs.statSync(f).size, 0);
   log(`完成：${OUT}`);
   log(`  共 ${files.length} 個檔案、${MB(total)}（媒體 ${MB(stats.before)} → ${MB(stats.after)}，這次新壓縮 ${stats.compressed} 個），花了 ${Math.round((Date.now() - t0) / 1000)} 秒`);

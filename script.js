@@ -281,9 +281,9 @@ const FB_HINT = {
   other: '想說的都可以寫在這裡。',
 };
 const FB_LOCAL = 'ml-feedback-preview';
-// 回饋、問卷、閱讀流量送到哪裡：公司網站上送給自己（api/...）；靜態版由 config.js 的 apiBase 指回公司網站
-// 都不加 content-type（瀏覽器當成 text/plain），跨網域送時才不用先「預檢」，伺服器一樣當 JSON 讀
-const API = (() => { const b = (window.SITE_CONFIG && window.SITE_CONFIG.apiBase) || ''; return b ? b.replace(/\/*$/, '/') : ''; })();
+// 靜態版（tools/build-static.js 產生，放在 moonland.ai）沒有伺服器，也不能連回公司網域（2026-11-23 使用者要求）：
+// 回饋只送 Google 試算表；吉吉問卷不主動出現、不送；閱讀流量不記。公司網站上 noServer 是 false，一切照舊
+const NO_SERVER = !!(window.SITE_CONFIG && window.SITE_CONFIG.noServer);
 let fbFrom = '';   // 從文章底部「還需要改進」過來時，預先選好那一篇
 
 function visitorId() {
@@ -300,8 +300,8 @@ async function sendFeedback(entry) {
   const zhTitle = entry.page ? (ZH_ARTICLES[entry.page] && ZH_ARTICLES[entry.page].t) || entry.pageTitle : entry.pageTitle;
   entry = { ...entry, pageTitle: zhTitle, vid: visitorId(), lang: LANG };
   // 先送網站伺服器（公司部署）：伺服器存一份、轉存 Google 試算表、通知負責人
-  try {
-    const r = await fetch(API + 'api/feedback', { method: 'POST', body: JSON.stringify(entry) });
+  if (!NO_SERVER) try {
+    const r = await fetch('api/feedback', { method: 'POST', body: JSON.stringify(entry) });
     if (r.ok) return 'server';
     if (r.status !== 404 && r.status !== 405) return 'failed';   // 有伺服器但拒收（格式錯、太頻繁）
   } catch (e) { /* 連不到伺服器：往下試 Google 試算表 */ }
@@ -314,6 +314,7 @@ async function sendFeedback(entry) {
       return (await r.json()).ok ? 'server' : 'failed';
     } catch (e) { return 'failed'; }
   }
+  if (NO_SERVER) return 'failed';   // 靜態版沒有預覽用的後台頁，存在瀏覽器裡沒有人看得到
   try {
     const list = JSON.parse(localStorage.getItem(FB_LOCAL) || '[]');
     list.push({ ...entry, id: 'local-' + Date.now(), at: new Date().toISOString() });
@@ -832,8 +833,9 @@ function closeJiji() {
 }
 async function sendSurvey() {
   saveJiji({ done: true });
+  if (NO_SERVER) { jj.sent = false; return; }
   try {
-    const r = await fetch(API + 'api/survey', { method: 'POST', body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
+    const r = await fetch('api/survey', { method: 'POST', body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
     jj.sent = r.ok;
   } catch (e) { jj.sent = false; }
 }
@@ -874,7 +876,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !jiji.hi
 // 換到別頁（例如點了目錄）就收起來，問卷答到一半不算略過，點吉吉可以接著答
 addEventListener('hashchange', () => { if (!jiji.hidden && jj.step !== 'hello' && jj.step !== 'q') closeJiji(); });
 // 第一次來：畫面載入後，吉吉在畫面中間打招呼、問問卷（使用者 2026-11-20 要求要主動、明顯）；答完或略過就不再出現
-if (!jijiState()) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
+if (!jijiState() && !NO_SERVER) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
 
 // ---------------------------------------------------------
 // 8. 閱讀流量：記每篇被看了多久、捲到多深、從哪裡來（回饋後台「閱讀流量」看統計）
@@ -897,9 +899,10 @@ const landingFrom = (() => {
 })();
 const isStaff = () => { try { return localStorage.getItem('ml-staff') === '1'; } catch (e) { return false; } };
 function beacon(data) {
+  if (NO_SERVER) return;
   const body = JSON.stringify({ ...data, vid: visitorId(), staff: isStaff() || undefined });
-  try { if (navigator.sendBeacon && navigator.sendBeacon(API + 'api/view', new Blob([body], { type: 'text/plain' }))) return; } catch (e) {}
-  fetch(API + 'api/view', { method: 'POST', body, keepalive: true }).catch(() => {});
+  try { if (navigator.sendBeacon && navigator.sendBeacon('api/view', new Blob([body], { type: 'text/plain' }))) return; } catch (e) {}
+  fetch('api/view', { method: 'POST', body, keepalive: true }).catch(() => {});
 }
 const depthNow = () => {
   const h = document.documentElement.scrollHeight - innerHeight;
