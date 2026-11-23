@@ -3,7 +3,7 @@
 // - 正式版（公司網站）：伺服器有 /api/me 時，用公司帳號登入、內容存在伺服器（server/editor.js），儲存後說明中心立刻更新
 // - 示範版（GitHub Pages 預覽，沒有伺服器）：登入是模擬的，修改只存在這台電腦的瀏覽器（localStorage ml-editor-demo）
 // - 預覽用 markup.js 的 renderMarkup，和說明中心的畫面一樣；內容格式轉換與檢查在 model.js
-// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#todo 待辦清單（#todo 新增文章、#todo/edit 修改文章、#todo/wish 功能許願池）、#shelf 草稿・封存・刪除（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
+// - 網址：#pages 頁面列表、#edit/代號 編輯、#new/位置 新增、#todo 待辦清單（#todo 新增文章、#todo/edit 修改文章、#todo/wish 功能許願池）、#shelf 草稿與封存（#drafts #archive #trash 跳到該區；封存與最近刪除可以多選）、#media 圖庫、
 //   #survey 訪客問卷（吉吉問的匿名問卷統計）、#log 修改紀錄（內容）、#log/code 網站程式的修改紀錄（server/changelog.json）、#tools 檢查與備份、#editors 編輯者名單、#help 使用說明
 // =========================================================
 
@@ -177,20 +177,37 @@ function toast(msg) {
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => t.classList.remove('show'), 4000);
 }
+// 上方的功能列：常用的排成一排（有圖示，數量用小圓點），不常用的收在「更多」；使用說明在右上角
+// 2026-11-23 使用者覺得原本 10 個分頁太亂、會折成兩排，改成這樣
 function tabs(cur) {
   const drafts = Object.values(S.pages).filter((p) => p.draft).length;
   const todo = S.todos.filter((t) => t.status !== 'done').length;
   const bn = boardNew();
-  const items = [['pages', '頁面'], ['board', `布告欄${bn ? `<span class="ed-newn" aria-label="${bn} 則新內容">${bn}</span>` : ''}`], ['todo', `待辦清單${todo ? `（${todo}）` : ''}`], ['shelf', `草稿・封存・刪除${drafts ? `（${drafts} 篇草稿）` : ''}`], ['media', '圖庫'], ['log', '修改紀錄'], ['survey', '訪客問卷'], ['tools', '檢查與備份']];
-  if (myRole() === 'owner') items.push(['editors', '編輯者名單']);
-  items.push(['help', '使用說明']);
-  return `<nav class="ed-tabs" aria-label="後台功能">${items.map(([k, t]) => `<a href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
+  const num = (n, label, cls = '') => (n ? `<span class="ed-tabn${cls}" aria-label="${label}">${n}</span>` : '');
+  const main = [
+    ['pages', 'file', '頁面'],
+    ['board', 'megaphone', '布告欄', num(bn, `${bn} 則新內容`, ' new')],
+    ['todo', 'listadd', '待辦', num(todo, `${todo} 項還沒完成`)],
+    ['media', 'image', '圖庫'],
+    ['shelf', 'archive', '草稿與封存', num(drafts, `${drafts} 篇草稿`)],
+    ['log', 'history', '修改紀錄'],
+  ];
+  const more = [['survey', 'message', '訪客問卷'], ['tools', 'shield', '檢查與備份']];
+  if (myRole() === 'owner') more.push(['editors', 'users', '編輯者名單']);
+  const inMore = more.find(([k]) => k === cur);
+  const link = ([k, icon, t, extra = ''], cls = '') => `<a class="${cls}" href="#${k}"${k === cur ? ' aria-current="page"' : ''}>${ic(icon)}<span>${t}</span>${extra}</a>`;
+  return `<nav class="ed-tabs" aria-label="後台功能">${main.map((x) => link(x)).join('')}
+    <details class="ed-tabmore">
+      <summary${inMore ? ' aria-current="page"' : ''}>${ic(inMore ? inMore[1] : 'grid')}<span>${inMore ? inMore[2] : '更多'}</span>${ic('chev', 'ic ed-tabmore-chev')}</summary>
+      <div class="ed-tabmenu" role="menu">${more.map((x) => link(x, 'ed-tabitem')).join('')}</div>
+    </details></nav>`;
 }
 function paintWho() {
   const who = document.getElementById('who');
   if (!me) { who.innerHTML = ''; return; }
   const r = myRole();
-  who.innerHTML = `<span class="ed-me"><b>${esc(me.name)}</b><small>${r ? ROLES[r] : '沒有編輯權限'}</small></span>
+  who.innerHTML = `${r ? `<a class="ed-helplink" href="#help" title="使用說明"${/^#help/.test(location.hash) ? ' aria-current="page"' : ''}>${ic('help')}<span>使用說明</span></a>` : ''}
+    <span class="ed-me"><b>${esc(me.name)}</b><small>${r ? ROLES[r] : '沒有編輯權限'}</small></span>
     <button type="button" class="icon-btn" data-act="logout" aria-label="登出" title="登出">${ic('logout')}</button>`;
 }
 
@@ -251,7 +268,7 @@ function enBadge(id) {
   if (st === 'ok') return '<span class="chip ed-en ok" title="英文版已公開">EN</span>';
   return '';
 }
-// 封存鈕：從目錄拿下來放進封存（要刪除請到「草稿・封存・刪除」）
+// 封存鈕：從目錄拿下來放進封存（要刪除請到「草稿與封存」）
 function acts(id, canDelete) {
   const name = esc(S.pages[id].n || S.pages[id].t);
   const n = fixesFor(id).length;
@@ -442,7 +459,7 @@ function takeDown(id) {
   delete S.pages[id];
   addLog('封存', id, p.t);
   persist();
-  toast(`已封存「${p.t}」，說明中心看不到了；可以在「草稿・封存・刪除」放回目錄或刪除。`);
+  toast(`已封存「${p.t}」，說明中心看不到了；可以在「草稿與封存」放回目錄或刪除。`);
   render();
 }
 
@@ -1262,6 +1279,7 @@ function viewHelp() {
       <li>用<b>公司帳號</b>登入，不用另外記密碼${LIVE ? '' : '（正式版）'}。</li>
       <li>登入後，要在「編輯者名單」上才能編輯。不在名單上的人會看到「沒有編輯權限」，請找主管理員把你的員工編號加進去。</li>
       <li><b>編輯者</b>可以新增、修改、刪除與排序頁面；<b>主管理員</b>另外可以管理編輯者名單。</li>
+      <li>上方的功能列：頁面、布告欄、待辦、圖庫、草稿與封存、修改紀錄；比較少用的<b>訪客問卷、檢查與備份、編輯者名單</b>在最右邊的「更多」裡。這份使用說明在右上角。</li>
       <li>用完記得按右上角的登出。</li></ul>`, true)}
     ${sec('2. 頁面與目錄', `<ul>
       <li>「頁面」分頁就是說明中心左側目錄的樣子，由上到下照順序排。</li>
@@ -1269,9 +1287,9 @@ function viewHelp() {
       <li><b>找頁面</b>：在上方輸入標題或網址代號，只會留下符合的頁面。點大分類的名稱按鈕可以直接跳過去；大分類和分類左邊的 ${ic('chev', 'ic sm')} 可以收合或展開（這台電腦會記住），也可以按「全部收合」「全部展開」。</li>
       <li><b>調整順序、換分類</b>：按住頁面左邊的 ${ic('grip', 'ic sm')} 拖到想放的位置再放開，可以拖進別的分類或小標底下（手機一樣用手指按住拖）。拖到一半想取消就按 Esc。用鍵盤的話，按 Tab 移到 ${ic('grip', 'ic sm')} 再按上下鍵。也可以進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
       <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存，要先把頁面搬走。</li>
-      <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿・封存・刪除」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
+      <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿與封存」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
       <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
-      <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿・封存・刪除」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
+      <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿與封存」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('2-1. 待辦清單與功能許願池', `<ul>
       <li>待辦分成<b>新增文章</b>和<b>修改文章</b>兩類，用上方的切換鈕切換。</li>
       <li><b>新增文章</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序，按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
@@ -1332,7 +1350,7 @@ function viewHelp() {
       <li>檔名規則是「區域／文章代號-序號」，例如 <code>image/img-basics-03.webp</code>；上傳時會自動照規則命名。</li></ul>`)}
     ${sec('7. 改錯了怎麼辦', `<ul>
       <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
-      <li><b>草稿・封存・刪除</b>：封存和最近刪除都可以勾選多篇（或全選）一起處理。封存按「放回目錄」回到原本的位置；最近刪除按「還原到封存」放回封存。誰在什麼時候封存、刪除，都記在修改紀錄裡。</li>
+      <li><b>草稿與封存</b>：封存和最近刪除都可以勾選多篇（或全選）一起處理。封存按「放回目錄」回到原本的位置；最近刪除按「還原到封存」放回封存。誰在什麼時候封存、刪除，都記在修改紀錄裡。</li>
       <li><b>修改紀錄</b>：「內容修改」是誰在什麼時候改了哪一頁；「網站程式修改」是網站本身的版面、功能改了什麼（工程師更新程式時記的）。</li>
       <li><b>檢查與備份</b>：一次檢查全站的圖片和連結；下載整個網站的備份檔。網站的儲存空間不是備份，建議每個月、或大改之前下載一次，存到公司雲端硬碟。主管理員可以用備份檔還原整個網站。</li>
       <li>兩個人同時改內容時，後存的人會看到「其他人剛剛也改了內容」，畫面會換成最新版本；正在編輯的文字還在，再按一次儲存就好。</li></ul>`)}
@@ -1668,7 +1686,7 @@ function wishAct(a, id, b) {
   }
 }
 
-// 草稿・封存・刪除：說明中心看不到的頁面放在同一頁
+// 草稿與封存：說明中心看不到的頁面放在同一頁
 // - 草稿：還在目錄裡的原位置，只是不公開；寫好取消勾選「草稿」就公開
 // - 封存：從目錄拿下來長期保留（不會自動清掉），可以放回原位置
 // - 最近刪除：從封存刪掉的頁面，保留 30 天後自動清掉，可以還原回封存
@@ -1704,7 +1722,7 @@ const daysLeft = (x) => { const d = Math.ceil((Date.parse(x.at) + TRASH_DAYS * 8
 function viewShelf(route) {
   const drafts = Object.keys(S.pages).filter((id) => S.pages[id].draft && locate(id));
   const sec = (id, icon, title, hint, body) => `<section class="ed-sec" id="${id}" aria-labelledby="${id}-h"><div class="ed-sec-head"><h2 id="${id}-h">${ic(icon)}${title}</h2></div><p class="ed-hint">${hint}</p>${body}</section>`;
-  return `${tabs('shelf')}<div class="ed-head"><div><h1>草稿・封存・刪除</h1><p class="ed-hint">說明中心看不到的頁面都在這裡。</p></div></div>
+  return `${tabs('shelf')}<div class="ed-head"><div><h1>草稿與封存</h1><p class="ed-hint">說明中心看不到的頁面都在這裡。</p></div></div>
     <nav class="ed-jump" aria-label="跳到">${[['drafts', '草稿', drafts.length], ['archive', '封存', S.archive.length], ['trash', '最近刪除', S.trash.length]].map(([k, t, n]) => `<a href="#${k}"${route === k ? ' aria-current="true"' : ''}>${t}<span class="chip">${n}</span></a>`).join('')}</nav>
     ${sec('sh-drafts', 'pencil', `草稿（${drafts.length}）`, '還沒寫完、先不公開的頁面，留在目錄裡原本的位置。寫好後進入頁面，取消勾選「草稿」再儲存就會公開。',
       drafts.length ? `<ul class="ed-list">${drafts.map((id) => { const p = S.pages[id]; return `<li class="ed-item"><a class="ed-name" href="#edit/${id}">${ic(p.icon || 'file')}<span><b>${esc(p.n || p.t)}<span class="chip ed-draft">草稿</span></b><small>${esc(placeName(locate(id).key))}</small></span></a></li>`; }).join('')}</ul>` : '<p class="ed-hint">目前沒有草稿。</p>')}
@@ -2084,6 +2102,10 @@ addEventListener('hashchange', () => {
   lastHash = location.hash;
   render();
   window.scrollTo(0, isPagesHash(location.hash) ? pagesScroll : 0);
+  // 手機上功能列放不下時，捲到目前所在的分頁
+  const nav = app.querySelector('.ed-tabs');
+  const cur = nav && nav.querySelector('[aria-current]');
+  if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, (cur.closest('.ed-tabmore') || cur).offsetLeft - nav.offsetLeft - 24);
 });
 addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -2272,6 +2294,20 @@ let caretTimer = 0;
 const caretSoon = (e) => { if (e.target.id !== 'body') return; clearTimeout(caretTimer); caretTimer = setTimeout(() => markCaret(true), 120); };
 document.addEventListener('click', caretSoon);
 document.addEventListener('keyup', (e) => { if (/^(Arrow|Page|Home|End)/.test(e.key)) caretSoon(e); });
+// 功能列的「更多」：選單貼在按鈕下方（功能列可以左右滑動，選單要用 fixed 才不會被裁掉）；點別的地方或按 Esc 收起
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('ed-tabmore') || !d.open) return;
+  const r = d.querySelector('summary').getBoundingClientRect();
+  const m = d.querySelector('.ed-tabmenu');
+  m.style.top = `${r.bottom + 4}px`;
+  m.style.left = `${Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8))}px`;
+}, true);
+const closeTabMore = (e) => { document.querySelectorAll('.ed-tabmore[open]').forEach((d) => { if (!e || !d.contains(e.target)) d.open = false; }); };
+document.addEventListener('click', closeTabMore);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTabMore(); });
+addEventListener('scroll', () => closeTabMore(), { passive: true });
+addEventListener('resize', () => closeTabMore());
 // 布告欄的回覆框：Ctrl+Enter 送出
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;

@@ -44,13 +44,41 @@ body.is-editing .ed { max-width: 1440px; }
 .ed-note b { display: block; color: var(--fg); }
 
 /* 分頁 */
-.ed-tabs { display: flex; flex-wrap: wrap; gap: 0 4px; border-bottom: 1px solid var(--line); }
-.ed-tabs a {
-  flex: none; padding: 8px 12px; font-size: 0.9375rem; color: var(--fg-2); text-decoration: none;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+/* 分頁（edit.js 的 tabs）：一排，常用的直接列出、不常用的在「更多」；放不下時左右滑動，不會折成兩排 */
+.ed-tabs { display: flex; align-items: stretch; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.ed-tabs::-webkit-scrollbar { display: none; }
+.ed-tabs > a, .ed-tabmore > summary {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px; font-size: 0.9375rem; color: var(--fg-2);
+  text-decoration: none; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
 }
-.ed-tabs a:hover { color: var(--fg); }
-.ed-tabs a[aria-current] { color: var(--fg); font-weight: 500; border-bottom-color: var(--brand-ic); }
+.ed-tabs .ic { width: 17px; height: 17px; color: var(--muted); }
+.ed-tabs > a:hover, .ed-tabmore > summary:hover { color: var(--fg); }
+.ed-tabs > a:hover .ic, .ed-tabmore > summary:hover .ic { color: var(--fg-2); }
+.ed-tabs > a[aria-current], .ed-tabmore > summary[aria-current] { color: var(--fg); font-weight: 500; border-bottom-color: var(--brand-ic); }
+.ed-tabs > a[aria-current] .ic, .ed-tabmore > summary[aria-current] .ic { color: var(--brand-ic); }
+.ed-tabn { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--raised); color: var(--fg-2); font-size: 0.6875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ed-tabn.new { background: var(--brand); color: #04140a; }
+.ed-tabmore { flex: none; margin-left: auto; }
+.ed-tabmore > summary { list-style: none; }
+.ed-tabmore > summary::-webkit-details-marker { display: none; }
+.ed-tabmore .ed-tabmore-chev { width: 14px; height: 14px; transform: rotate(90deg); transition: transform .15s; }
+.ed-tabmore[open] .ed-tabmore-chev { transform: rotate(-90deg); }
+.ed-tabmenu {
+  position: fixed; z-index: 40; min-width: 190px; padding: 6px; display: grid; gap: 2px;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+.ed-tabitem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 0.9375rem; color: var(--fg-2); text-decoration: none; }
+.ed-tabitem:hover { background: var(--hover); color: var(--fg); }
+.ed-tabitem[aria-current] { background: var(--accent-soft); color: var(--fg); font-weight: 500; }
+.ed-helplink { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; padding: 6px 10px; border-radius: 10px; font-size: 0.875rem; color: var(--fg-2); text-decoration: none; white-space: nowrap; }
+.ed-helplink .ic { width: 17px; height: 17px; }
+.ed-helplink:hover, .ed-helplink[aria-current] { background: var(--hover); color: var(--fg); }
+@media (max-width: 620px) {
+  .ed-helplink span { display: none; }
+  .ed-helplink { margin-right: 0; padding: 6px; }
+  .ed-tabs > a, .ed-tabmore > summary { padding: 9px 10px; font-size: 0.875rem; }
+  .ed-tabmore { margin-left: 0; }
+}
 
 /* 登入 */
 .ed-login { max-width: 460px; margin: 6vh auto 0; text-align: center; }
