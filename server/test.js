@@ -43,6 +43,20 @@ CHANGES.forEach((c, i) => {
 });
 console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`);
 
+// Google Apps Script（google-apps-script/Code.gs）收靜態版的吉吉問卷：題目與選項代號要和 survey.js 一樣
+{
+  const vm = require('node:vm');
+  const Survey = require(path.join(ROOT, 'survey.js'));
+  const gs = {}; vm.createContext(gs);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'google-apps-script/Code.gs'), 'utf8'), gs);
+  const want = Survey.QUESTIONS.map((q) => ({ id: q.id, multi: q.type === 'multi', codes: q.options.map((o) => o[0]), other: Object.keys(q.other || {}) }));
+  assert.deepEqual(JSON.parse(JSON.stringify(gs.SURVEY)), want, 'Code.gs 的 SURVEY 要和 survey.js 的題目、選項代號一致（改了 survey.js 要同步改 Code.gs，並在 Apps Script 重新部署）');
+  for (const a of [{ role: 'work-other', 'role_work-other': '建築', ai: 'some', tools: ['gemini', 'bad', 'gemini', 'other'], tools_other: 'Claude', reason: 'nope' }, { ai: 'x' }, null]) {
+    assert.deepEqual(JSON.parse(JSON.stringify(gs.cleanSurvey(a))), Survey.clean(a), 'Code.gs 的 cleanSurvey 要和 survey.js 的 clean 結果一樣');
+  }
+  console.log('✓ Google 試算表（Code.gs）：問卷題目與檢查規則和 survey.js 一致');
+}
+
 // --- 1b. 站內連結：[文字](#頁面代號) 要有那一頁，[文字](#h-錨點) 要在同一篇找得到 ---
 // （英文版已在 2026-10-30 移除，舊版在 git tag english-version）
 global.SNIP = {};

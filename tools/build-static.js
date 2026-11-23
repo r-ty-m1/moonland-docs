@@ -17,8 +17,8 @@
 // - 3D 模型：拿掉（[3d 編號] 與下面 STATIC_EDITS 列的介紹段落），不附 3D 檢視程式
 // - 媒體：只放公開頁面有用到的；圖片一律 WebP；影片壓到寬度最多 1280、音樂壓到 96 kbps（壓完沒有變小就用原檔）
 //   壓過的檔案存在 ../static-cache，下次只壓新的，所以第二次以後很快
-// - 不連公司網域（2026-11-23 使用者要求）：config.js 的 noServer 設成 true，回饋只送 Google 試算表，
-//   吉吉問卷不主動出現（答案只留在訪客瀏覽器），閱讀流量不記；成品裡出現公司網址就停止、不推送
+// - 不連公司網域（2026-11-23 使用者要求）：config.js 的 noServer 設成 true，回饋與吉吉問卷只送 Google 試算表，
+//   閱讀流量不記；成品裡出現公司網址就停止、不推送
 // - 不含編輯後台、回饋後台、伺服器程式
 // - 讀內容的那一步要在公司網路裡做（打包的電腦連得到公司網站），成品本身不連公司
 //
@@ -253,7 +253,7 @@ async function main() {
     Object.entries(out).map(([k, v]) => `window.${k}=${JSON.stringify(v)};`).join('\n') + '\n';
   write('content.js', contentJs);
 
-  // config.js：標成沒有伺服器（回饋只送 Google 試算表，問卷不主動出現，閱讀流量不記）
+  // config.js：標成沒有伺服器（回饋與問卷只送 Google 試算表，閱讀流量不記）
   const config = fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8');
   if (!/noServer: false/.test(config)) throw new Error('config.js 找不到 noServer 設定');
   write('config.js', config.replace(/noServer: false/, 'noServer: true'));
@@ -281,8 +281,8 @@ async function main() {
 ## 給工程師
 
 - 純靜態網站：根目錄的 \`index.html\` 就是首頁，沒有伺服器程式、不需要建置。網址用 \`#文章代號\` 切換頁面，不需要設定改寫規則。
-- 不會連到公司內部的任何網址。對外連線只有：Google Fonts（字型）、Google Apps Script（意見回饋與「有幫助嗎」投票，網址在 \`config.js\`）。
-- 訪客問卷的答案只存在訪客自己的瀏覽器；不記閱讀流量。
+- 不會連到公司內部的任何網址。對外連線只有：Google Fonts（字型）、Google Apps Script（意見回饋、「有幫助嗎」投票、訪客問卷，網址在 \`config.js\`）。
+- 不記閱讀流量。
 - 快取：\`index.html\`、\`content.js\` 建議每次都確認有沒有更新（例如 \`Cache-Control: no-cache\`）；css／js 網址帶內容雜湊，\`assets/media/\` 的檔名不會重複使用，都可以長時間快取。
 `);
 

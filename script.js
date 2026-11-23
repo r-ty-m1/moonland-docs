@@ -282,8 +282,9 @@ const FB_HINT = {
 };
 const FB_LOCAL = 'ml-feedback-preview';
 // 靜態版（tools/build-static.js 產生，放在 moonland.ai）沒有伺服器，也不能連回公司網域（2026-11-23 使用者要求）：
-// 回饋只送 Google 試算表；吉吉問卷不主動出現、不送；閱讀流量不記。公司網站上 noServer 是 false，一切照舊
+// 回饋與吉吉問卷只送 Google 試算表（問卷在「問卷」分頁）；閱讀流量不記。公司網站上 noServer 是 false，一切照舊
 const NO_SERVER = !!(window.SITE_CONFIG && window.SITE_CONFIG.noServer);
+const GOOGLE_URL = (window.SITE_CONFIG && window.SITE_CONFIG.googleScriptUrl) || '';
 let fbFrom = '';   // 從文章底部「還需要改進」過來時，預先選好那一篇
 
 function visitorId() {
@@ -833,7 +834,15 @@ function closeJiji() {
 }
 async function sendSurvey() {
   saveJiji({ done: true });
-  if (NO_SERVER) { jj.sent = false; return; }
+  // 靜態版：送 Google 試算表（不加 content-type，Apps Script 才收得到）
+  if (NO_SERVER) {
+    if (!GOOGLE_URL) { jj.sent = false; return; }
+    try {
+      const r = await fetch(GOOGLE_URL, { method: 'POST', body: JSON.stringify({ kind: 'survey', answers: jj.a, vid: visitorId(), lang: LANG }) });
+      jj.sent = !!(await r.json()).ok;
+    } catch (e) { jj.sent = false; }
+    return;
+  }
   try {
     const r = await fetch('api/survey', { method: 'POST', body: JSON.stringify({ answers: jj.a, vid: visitorId() }) });
     jj.sent = r.ok;
@@ -876,7 +885,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !jiji.hi
 // 換到別頁（例如點了目錄）就收起來，問卷答到一半不算略過，點吉吉可以接著答
 addEventListener('hashchange', () => { if (!jiji.hidden && jj.step !== 'hello' && jj.step !== 'q') closeJiji(); });
 // 第一次來：畫面載入後，吉吉在畫面中間打招呼、問問卷（使用者 2026-11-20 要求要主動、明顯）；答完或略過就不再出現
-if (!jijiState() && !NO_SERVER) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
+if (!jijiState() && (!NO_SERVER || GOOGLE_URL)) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
 
 // ---------------------------------------------------------
 // 8. 閱讀流量：記每篇被看了多久、捲到多深、從哪裡來（回饋後台「閱讀流量」看統計）
