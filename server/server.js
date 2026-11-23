@@ -43,7 +43,7 @@ const TYPES = {
 };
 
 // 只開放網站本身會用到的檔案，其餘（server/、README、Dockerfile 等）一律 404
-const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model|survey)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?!drafts\.js$)[\w.-]+\.js$/, /^\/assets\/[\w./-]+$/];
+const PUBLIC = [/^\/style\.css$/, /^\/(?:script|config|markup|model|survey)\.js$/, /^\/(?:admin|edit)\.(?:css|js)$/, /^\/data\/(?!drafts\.js$)[\w.-]+\.js$/, /^\/data\/en\/ui\.js$/, /^\/assets\/[\w./-]+$/];
 
 const hashOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex').slice(0, 10);
 
@@ -205,7 +205,8 @@ function postView(req, res) {
 function getViews(req, res, url) {
   if (!editor.isEditor(req) && !canReadFeedback(req)) return sendJson(res, 401, { error: '請先登入編輯後台' });
   const days = [0, 7, 30, 90].includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 30;
-  sendJson(res, 200, Views.stats({ days, staff: url.searchParams.get('staff') === '1', pages: editor.publicPages() }));
+  const lang = ['zh', 'en'].includes(url.searchParams.get('lang')) ? url.searchParams.get('lang') : '';
+  sendJson(res, 200, Views.stats({ days, staff: url.searchParams.get('staff') === '1', pages: editor.publicPages(), lang }));
 }
 
 function getFeedback(req, res) {

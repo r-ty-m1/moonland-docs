@@ -237,9 +237,18 @@ function viewDenied() {
 // ---------------------------------------------------------
 function badge(id) {
   const p = S.pages[id];
-  if (p.draft) return '<span class="chip ed-draft">草稿</span>';
-  if (p.isNew) return '<span class="chip ed-new">新頁面</span>';
-  if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>';
+  const en = enBadge(id);
+  if (p.draft) return '<span class="chip ed-draft">草稿</span>' + en;
+  if (p.isNew) return '<span class="chip ed-new">新頁面</span>' + en;
+  if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>' + en;
+  return en;
+}
+// 英文版的狀態（model.js 的 enState）：EN 草稿、EN 待更新（中文改過）、EN（已公開）
+function enBadge(id) {
+  const st = Model.enState(S.pages[id]);
+  if (st === 'draft') return '<span class="chip ed-en" title="英文版還是草稿，說明中心切到英文時先顯示中文">EN 草稿</span>';
+  if (st === 'stale') return '<span class="chip ed-en stale" title="中文在翻譯之後改過，英文要跟著更新">EN 待更新</span>';
+  if (st === 'ok') return '<span class="chip ed-en ok" title="英文版已公開">EN</span>';
   return '';
 }
 // 封存鈕：從目錄拿下來放進封存（要刪除請到「草稿・封存・刪除」）
@@ -299,7 +308,8 @@ function viewPages() {
     <p class="ed-hint ed-noresult" id="pageNone" hidden>找不到符合的頁面。</p>
     ${S.sections.map((sec, si) => `<section class="ed-sec${folded.has(`sec:${si}`) ? ' is-folded' : ''}" id="psec${si}" aria-labelledby="sec${si}" data-fold-box="sec:${si}">
       <div class="ed-sec-head">${foldBtn(`sec:${si}`, sec.label)}<h2 id="sec${si}">${esc(sec.label)}</h2>
-        <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button></div>
+        <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button>
+        <button type="button" class="ed-link" data-act="rename-sec-en" data-si="${si}" title="說明中心切到英文時顯示的名稱">${sec.en ? `英文：${esc(sec.en)}` : '加英文名稱'}</button></div>
       <div class="ed-sec-body">
       <ul class="ed-list" data-key="s${si}" data-top="1">${sec.rows.map((r) => (r.groups ? catLi(r) : itemLi(r.id))).join('')}</ul>
       <div class="ed-adds"><a class="ed-add" href="#new/s${si}">${ic('plus')}新增頁面</a><button type="button" class="ed-add" data-act="add-cat" data-si="${si}">${ic('folder')}新增分類</button></div>
@@ -457,7 +467,7 @@ function startDraft(id, newKey) {
   if (!p || p.system) return null;
   const l = locate(id);
   const row = rowOf(id);
-  return { ...clone(p), isNew: false, id, origId: id, where: l.key, groups: row && row.groups ? row.groups.map((g, gi) => ({ g: g.g, n: g.items.length, src: gi })) : null };
+  return { ...clone(p), isNew: false, id, origId: id, where: l.key, lang: 'zh', groups: row && row.groups ? row.groups.map((g, gi) => ({ g: g.g, en: g.en || '', n: g.items.length, src: gi })) : null };
 }
 
 function whereOptions(d) {
@@ -469,9 +479,28 @@ const TOOLS = [
   ['steps', '步驟', 'steps'], ['tip', '提示框', 'bulb'], ['warn', '注意框', 'alert'], ['table', '表格', 'table'],
   ['prompt', '提示詞', 'prompt'], ['image', '圖片', 'image'], ['compare', '前後比較', 'compare'], ['row', '並排', 'columns'], ['help', '寫法說明', 'help'],
 ];
+// 英文版的編輯欄位：標題、目錄名稱、摘要、英文草稿；圖片、程度、放在哪裡等沿用中文
+function enFields(d) {
+  const e = d.en || { t: '', n: '', d: '', body: '', draft: true };
+  const stale = e.src && e.src !== Model.zhSig(d);
+  return `<div class="ed-fields">
+      <p class="ed-hint wide">英文版只有標題、目錄名稱、摘要和內文要填；程度、閱讀時間、圖片、放在哪裡都沿用中文版。說明中心切到英文時，這頁還沒有英文或英文還是草稿，就先顯示中文。</p>
+      ${e.by === 'AI 翻譯（待審）' && e.draft ? '<div class="ed-note wide"><b>這份英文是 AI 翻譯的</b>請對照中文看過一遍（特別是功能名稱要和 moonland.ai 英文版一致），沒問題再取消「英文草稿」並儲存。</div>' : ''}
+      ${stale ? `<div class="ed-note ed-stale wide"><b>中文在英文翻譯之後改過</b>請對照中文，把改過的地方也更新到英文。
+        <label class="ed-check"><input type="checkbox" name="ensync"${e.sync ? ' checked' : ''}><span>英文已經對照目前的中文更新好了<small>勾選後儲存，就不再標「英文待更新」</small></span></label></div>` : ''}
+      <label class="ed-f"><span>英文標題<em>必填</em><small>中文：${esc(d.t)}</small></span><input name="t" maxlength="90" value="${esc(e.t)}" lang="en" spellcheck="true"></label>
+      <label class="ed-f"><span>目錄上顯示的名稱<small>選填${d.n ? `；中文：${esc(d.n)}` : ''}</small></span><input name="n" maxlength="45" value="${esc(e.n)}" lang="en" spellcheck="true"></label>
+      <label class="ed-f wide"><span>摘要<small>${d.d ? `中文：${esc(d.d)}` : '中文沒有摘要'}</small></span><textarea name="d" rows="2" maxlength="300" lang="en" spellcheck="true">${esc(e.d)}</textarea></label>
+      <label class="ed-f ed-check wide"><input type="checkbox" name="draft"${e.draft ? ' checked' : ''}><span>英文草稿，先不公開<small>勾選時說明中心切到英文也看不到這份英文（顯示中文）；看過、確認沒問題後取消勾選再儲存就會公開</small></span></label>
+      ${d.groups ? `<fieldset class="ed-f wide"><legend>分類裡小標的英文名稱</legend>
+        <div class="ed-groups">${d.groups.map((g, gi) => `<div class="ed-group"><input name="ge${gi}" maxlength="40" value="${esc(g.en || '')}" lang="en" aria-label="第 ${gi + 1} 組小標的英文" placeholder="${esc(g.g || '（沒有小標）')}"><small>${esc(g.g || '')}</small></div>`).join('')}</div></fieldset>` : ''}
+    </div>`;
+}
 function viewEdit() {
   const d = draft;
   const top = listOf(d.where) && listOf(d.where).top;
+  const en = d.lang === 'en';
+  const body = en ? (d.en ? d.en.body : '') : d.body;
   return `<div class="ed-bar">
       <a class="ed-back" href="#pages">← 所有頁面</a>
       <span class="ed-state" id="edState" aria-live="polite"></span>
@@ -481,7 +510,11 @@ function viewEdit() {
     <form id="pageForm" class="ed-form" novalidate>
       <h1 class="ed-title">${d.isNew ? '新增頁面' : `編輯「${esc(S.pages[d.origId].t)}」`}${d.groups ? '<span class="chip">分類</span>' : ''}</h1>
       ${d.isNew ? '' : fixBox(d.origId)}
-      <div class="ed-fields">
+      ${d.isNew ? '' : `<div class="ed-seg ed-seg-btn ed-langseg" role="group" aria-label="編輯哪個語言">
+        <button type="button" data-act="lang" data-lang="zh" aria-pressed="${!en}">中文</button>
+        <button type="button" data-act="lang" data-lang="en" aria-pressed="${en}">English ${enBadge(d.origId) || '<span class="chip">還沒有</span>'}</button></div>`}
+      <div class="ed-spots" id="spotBox" hidden></div>
+      ${en ? enFields(d) : `<div class="ed-fields">
         <label class="ed-f"><span>標題<em>必填</em></span><input name="t" maxlength="60" value="${esc(d.t)}" required></label>
         <label class="ed-f"><span>目錄上顯示的名稱<small>選填，標題太長時用</small></span><input name="n" maxlength="30" value="${esc(d.n)}"></label>
         <label class="ed-f wide"><span>摘要<small>顯示在標題下方，也會出現在分類列表和搜尋結果</small></span><textarea name="d" rows="2" maxlength="200">${esc(d.d)}</textarea></label>
@@ -502,7 +535,7 @@ function viewEdit() {
           ${d.groups ? '' : `<label class="ed-f"><span>相關模型<small>選填，用逗號分開，會顯示在標題下方</small></span><input name="models" maxlength="120" value="${esc(d.models)}"></label>`}
           ${d.isNew || S.pages[d.origId].draft ? '' : `<p class="ed-hint"><a href="./#${esc(d.origId)}" target="_blank" rel="noopener">在說明中心看這頁目前的樣子 ↗</a></p>`}
         </details>
-      </div>
+      </div>`}
       <div class="ed-split" data-pane="write">
         <div class="ed-pane-tabs" role="tablist" aria-label="切換編輯與預覽">
           <button type="button" role="tab" data-pane-to="write" aria-selected="true">編輯</button>
@@ -512,10 +545,10 @@ function viewEdit() {
           <div class="ed-tools" role="toolbar" aria-label="插入格式">${TOOLS.map(([k, t, icn]) => `<button type="button" class="ed-tool" data-tool="${k}" title="${t}">${ic(icn)}<span>${t}</span></button>`).join('')}</div>
           <div class="ed-cheat" id="cheat" hidden>${cheatSheet()}</div>
           <label class="vh" for="body">內文</label>
-          <textarea name="body" id="body" spellcheck="false">${esc(d.body)}</textarea>
+          <textarea name="body" id="body" spellcheck="${en}"${en ? ' lang="en"' : ''}>${esc(body)}</textarea>
           <p class="ed-warn" id="linkWarn" role="status"></p>
         </div>
-        <div class="ed-preview-wrap"><div class="ed-preview-label">預覽（和說明中心看到的一樣）</div><article class="content ed-preview" id="preview"></article></div>
+        <div class="ed-preview-wrap"><div class="ed-preview-label">${en ? `<span>${d.zhRef ? '中文原文（對照用）' : '英文預覽・點任何一段，左邊就跳到那段的語法'}</span><button type="button" class="ed-btn sm" data-act="zh-ref">${d.zhRef ? '看英文預覽' : '對照中文原文'}</button>` : '預覽（和說明中心看到的一樣）・點任何一段，左邊就跳到那段的語法'}</div><article class="content ed-preview" id="preview"${en && !d.zhRef ? ' lang="en"' : ''}></article></div>
       </div>
       <p class="ed-err" id="formErr" role="alert"></p>
     </form>`;
@@ -551,8 +584,17 @@ function crumbFor(where) {
   const parts = l.label.replace('（直接列在目錄上）', '').split(' › ').slice(0, 2);
   return `<nav class="crumb" aria-label="位置">${parts.map((c) => `<span>${esc(c)}</span>`).join('<span class="sep">/</span>')}</nav>`;
 }
-function paintPreview() {
+// 預覽顯示的內容：編輯英文時是英文（小標用英文名稱），按「對照中文原文」時是中文
+function shown() {
   const d = draft;
+  if (d.lang !== 'en' || d.zhRef) return d;
+  const e = d.en || {};
+  return { ...d, t: e.t || '', n: e.n || '', d: e.d || '', body: e.body || '', groups: d.groups && d.groups.map((g) => ({ ...g, g: g.en || g.g })) };
+}
+function paintPreview() {
+  const d = shown();
+  const enView = draft.lang === 'en' && !draft.zhRef;
+  const titleOf = (id) => (enView && S.pages[id].en && S.pages[id].en.t) || S.pages[id].t;
   const chips = [];
   if (d.level) chips.push(`<span class="chip${d.level === '新手' ? ' brand' : ''}">${esc(d.level)}</span>`);
   if (d.tool) chips.push(`<span class="chip">使用${esc(d.tool)}</span>`);
@@ -565,9 +607,11 @@ function paintPreview() {
   if (d.groups) {
     const row = rowOf(d.origId);
     list = d.groups.map((g) => `<h2>${esc(g.g || '這個分類的文章')}</h2><div class="list">${((row && g.src != null && row.groups[g.src]) ? row.groups[g.src].items : []).map((id) =>
-      `<span class="list-row"><span class="list-t"><b>${esc(S.pages[id].t)}</b>${S.pages[id].d ? `<small>${esc(S.pages[id].d)}</small>` : ''}</span>${ic('chev', 'ic chev')}</span>`).join('') || '<p class="ed-hint">這組還沒有頁面。</p>'}</div>`).join('');
+      `<span class="list-row"><span class="list-t"><b>${esc(titleOf(id))}</b>${S.pages[id].d ? `<small>${esc(S.pages[id].d)}</small>` : ''}</span>${ic('chev', 'ic chev')}</span>`).join('') || '<p class="ed-hint">這組還沒有頁面。</p>'}</div>`).join('');
   }
-  document.getElementById('preview').innerHTML = `${crumbFor(d.where)}${head}${chips.length ? `<div class="meta">${chips.join('')}</div>` : ''}${d.d ? `<p class="lead">${esc(d.d)}</p>` : ''}<div class="prose">${renderMarkup(d.body)}</div>${list}`;
+  document.getElementById('preview').innerHTML = `${crumbFor(d.where)}${head}${chips.length ? `<div class="meta">${chips.join('')}</div>` : ''}${d.d ? `<p class="lead">${esc(d.d)}</p>` : ''}<div class="prose">${renderMarkup(d.body, { lines: !(draft.lang === 'en' && draft.zhRef) })}</div>${list}`;
+  markCaret(false);
+  paintSpots();
   // 連到不存在的頁面時提醒
   const bad = [...new Set([...d.body.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]).filter((k) => !k.startsWith('h-') && !S.pages[k] && k !== d.id))];
   document.getElementById('linkWarn').textContent = bad.length ? `提醒：這些連結找不到頁面：${bad.map((k) => `#${k}`).join('、')}` : '';
@@ -575,6 +619,80 @@ function paintPreview() {
   if (missing.length) document.getElementById('linkWarn').textContent += `${bad.length ? '；' : '提醒：'}找不到圖片編號 ${missing.join('、')}`;
 }
 let previewTimer = 0;
+
+// ---------- 預覽與語法對應：點預覽跳到語法那一行；游標移到哪一行，預覽就標出那一段 ----------
+// 預覽的每一段有 data-ln（第幾行，markup.js 的 renderMarkup(…, { lines: true })）
+let pendingSpot = null;   // 從「全站檢查」點進來：打開後跳到第幾個問題
+let pendingLang = 'zh';   // 那個問題在中文還是英文版
+function lineStart(text, ln) {
+  let p = 0;
+  for (let k = 0; k < ln; k++) { const n = text.indexOf('\n', p); if (n < 0) return text.length; p = n + 1; }
+  return p;
+}
+// 量出 textarea 裡某個位置離頂端多遠（考慮自動換行），用來把那一行捲到看得到的地方
+function caretTop(ta, pos) {
+  const cs = getComputedStyle(ta);
+  const div = document.createElement('div');
+  ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderLeftWidth', 'borderRightWidth', 'boxSizing'].forEach((k) => { div.style[k] = cs[k]; });
+  Object.assign(div.style, { position: 'absolute', visibility: 'hidden', top: '0', left: '-9999px', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', width: `${ta.clientWidth}px` });
+  div.textContent = ta.value.slice(0, pos);
+  const mark = document.createElement('span');
+  mark.textContent = '​';
+  div.appendChild(mark);
+  document.body.appendChild(div);
+  const top = mark.offsetTop;
+  div.remove();
+  return top;
+}
+// 選取語法裡第 ln 行（有 needle 就只選那段文字），捲到看得到，預覽也標出那一段
+function jumpToLine(ln, needle) {
+  const ta = document.getElementById('body');
+  if (!ta) return;
+  const split = document.querySelector('.ed-split');
+  if (split && split.dataset.pane === 'preview') {
+    split.dataset.pane = 'write';
+    split.querySelectorAll('[data-pane-to]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.paneTo === 'write')));
+  }
+  const v = ta.value;
+  let s = lineStart(v, ln);
+  let e = v.indexOf('\n', s);
+  if (e < 0) e = v.length;
+  if (needle) { const k = v.indexOf(needle, s); if (k >= 0 && k <= e) { s = k; e = k + needle.length; } }
+  ta.focus({ preventScroll: true });
+  ta.setSelectionRange(s, e);
+  ta.scrollTop = Math.max(0, caretTop(ta, s) - ta.clientHeight / 3);
+  const r = ta.getBoundingClientRect();
+  if (r.top < 0 || r.top > innerHeight - 80) ta.scrollIntoView({ block: 'center' });
+  ta.classList.remove('ed-flash'); void ta.offsetWidth; ta.classList.add('ed-flash');
+  markCaret(true);
+}
+// 標出預覽裡游標所在的那一段（行號不超過游標所在行、最接近的那一段）
+let caretLn = -1;
+function markCaret(scroll) {
+  const ta = document.getElementById('body');
+  const pv = document.getElementById('preview');
+  if (!ta || !pv) return;
+  if (document.activeElement === ta || scroll) caretLn = ta.value.slice(0, ta.selectionStart).split('\n').length - 1;
+  pv.querySelectorAll('.ed-here').forEach((x) => x.classList.remove('ed-here'));
+  if (caretLn < 0) return;
+  let best = null, bestLn = -1;
+  pv.querySelectorAll('[data-ln]').forEach((el) => { const n = +el.dataset.ln; if (n <= caretLn && n >= bestLn) { best = el; bestLn = n; } });
+  if (!best) return;
+  best.classList.add('ed-here');
+  if (scroll && pv.offsetParent) {
+    const r = best.getBoundingClientRect();
+    if (r.top < 80 || r.bottom > innerHeight) best.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+// 這頁要確認的地方（找不到的圖片、點不開的連結），每一個都可以「跳到這裡」
+let spots = [];
+function paintSpots() {
+  const box = document.getElementById('spotBox');
+  if (!box || !draft) return;
+  spots = Model.problemSpots(draft.lang === 'en' ? (draft.en ? draft.en.body : '') : draft.body, draft.id, { ...S.pages, [draft.id]: draft }, MEDIA);
+  box.hidden = !spots.length;
+  box.innerHTML = spots.length ? `<b>${ic('alert')}這頁有 ${spots.length} 個地方要確認</b><ul>${spots.map((x, i) => `<li><span>${esc(x.msg)}<small>第 ${x.line + 1} 行</small></span><button type="button" class="ed-btn sm" data-act="spot-go" data-i="${i}">跳到這裡</button></li>`).join('')}</ul>` : '';
+}
 function setDirty(v) {
   dirty = v;
   const s = document.getElementById('edState');
@@ -583,18 +701,27 @@ function setDirty(v) {
 
 function readForm(f) {
   const d = draft;
-  ['t', 'n', 'd', 'tag', 'where', 'body'].forEach((k) => { if (f.elements[k]) d[k] = f.elements[k].value; });
-  d.id = f.elements.slug.value;
+  // 編輯英文時，標題、目錄名稱、摘要、內文、草稿都寫進 d.en
+  const en = d.lang === 'en';
+  if (en && !d.en) d.en = { t: '', n: '', d: '', body: '', draft: true };
+  const tgt = en ? d.en : d;
+  ['t', 'n', 'd', 'body'].forEach((k) => { if (f.elements[k]) tgt[k] = f.elements[k].value; });
+  ['tag', 'where'].forEach((k) => { if (f.elements[k]) d[k] = f.elements[k].value; });
+  if (f.elements.slug) d.id = f.elements.slug.value;
   if (f.elements.level) d.level = f.elements.level.value;
   if (f.elements.minutes) d.minutes = f.elements.minutes.value;
   if (f.elements.models) d.models = f.elements.models.value;
   if (f.elements.thumb) d.thumb = f.elements.thumb.value.trim();
-  d.draft = f.elements.draft.checked;
+  if (f.elements.draft) tgt.draft = f.elements.draft.checked;
+  if (en && f.elements.ensync) d.en.sync = f.elements.ensync.checked;
   const icon = f.querySelector('input[name="icon"]:checked');
   if (icon) d.icon = icon.value;
-  if (d.groups) d.groups.forEach((g, gi) => { if (f.elements[`g${gi}`]) g.g = f.elements[`g${gi}`].value.trim(); });
+  if (d.groups) d.groups.forEach((g, gi) => {
+    if (f.elements[`g${gi}`]) g.g = f.elements[`g${gi}`].value.trim();
+    if (f.elements[`ge${gi}`]) g.en = f.elements[`ge${gi}`].value.trim();
+  });
 }
-const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'thumb', 'body', 'draft'];
+const FIELDS = ['t', 'n', 'd', 'tag', 'icon', 'level', 'minutes', 'models', 'tool', 'thumb', 'body', 'draft', 'en'];
 // 首頁縮圖：顯示目前會用的圖（沒填就是預設的那張）
 function paintThumb() {
   const img = document.getElementById('thumbPv');
@@ -612,20 +739,45 @@ async function savePage(f) {
   readForm(f);
   const d = draft;
   const err = document.getElementById('formErr');
+  // 錯誤在另一個語言的欄位時，先切過去再標出來
+  const fail = (msg, lang, field) => {
+    if (d.lang !== lang) { d.lang = lang; d.zhRef = false; render(true); setDirty(true); }
+    document.getElementById('formErr').textContent = msg;
+    const pf = document.getElementById('pageForm');
+    if (field === 'slug') pf.querySelector('.ed-more').open = true;
+    if (pf.elements[field]) pf.elements[field].focus();
+  };
   d.t = d.t.trim(); d.id = d.id.trim();
-  if (!d.t) { err.textContent = '請填寫標題。'; f.elements.t.focus(); return; }
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.id)) { err.textContent = '網址代號只能用英文小寫、數字和 -。'; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
-  if (d.id !== d.origId && (S.pages[d.id] || ['home', 'pages', 'feedback'].includes(d.id))) { err.textContent = `網址代號「${d.id}」已經有其他頁面在用了。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
-  if (d.id !== d.origId && S.archive.some((x) => x.id === d.id)) { err.textContent = `網址代號「${d.id}」是一篇封存的頁面在用，請換一個。`; f.querySelector('.ed-more').open = true; f.elements.slug.focus(); return; }
+  if (!d.t) return fail('請填寫標題。', 'zh', 't');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.id)) return fail('網址代號只能用英文小寫、數字和 -。', 'zh', 'slug');
+  if (d.id !== d.origId && (S.pages[d.id] || ['home', 'pages', 'feedback'].includes(d.id))) return fail(`網址代號「${d.id}」已經有其他頁面在用了。`, 'zh', 'slug');
+  if (d.id !== d.origId && S.archive.some((x) => x.id === d.id)) return fail(`網址代號「${d.id}」是一篇封存的頁面在用，請換一個。`, 'zh', 'slug');
+  // 英文版：什麼都沒填就當作沒有英文；有內容就要有英文標題
+  if (d.en) {
+    ['t', 'n', 'd'].forEach((k) => { d.en[k] = String(d.en[k] || '').trim(); });
+    d.en.body = String(d.en.body || '').replace(/\s+$/, '');
+    if (!d.en.t && !d.en.d && !d.en.body.trim()) d.en = undefined;
+    else if (!d.en.t) return fail('請填寫英文標題。', 'en', 't');
+  }
   err.textContent = '';
   // 儲存前檢查：找不到的圖片、連到不存在頁面的連結。可以照樣儲存，但先提醒
   const problems = Model.checkBody(d.body, d.id, { ...S.pages, [d.id]: d }, MEDIA);
+  if (d.en) problems.push(...Model.checkBody(d.en.body, d.id, { ...S.pages, [d.id]: d }, MEDIA).map((x) => `英文版：${x}`));
   if (problems.length && !confirm(`這頁有些地方要確認：\n・${problems.join('\n・')}\n\n讀者會看到空白的圖片或點不開的連結。還是要儲存嗎？`)) return;
 
   const page = {};
   FIELDS.forEach((k) => { page[k] = typeof d[k] === 'string' ? d[k].trim() : d[k]; });
   page.body = d.body.replace(/\s+$/, '');
   if (!page.draft) delete page.draft;
+  // 英文版：記下翻譯對照的是哪個版本的中文（中文之後再改就會標「英文待更新」）
+  if (page.en) {
+    const old = !d.isNew && S.pages[d.origId] && S.pages[d.origId].en;
+    const e = { t: page.en.t, n: page.en.n || '', d: page.en.d || '', body: page.en.body || '', draft: !!page.en.draft, src: page.en.src || '', at: page.en.at || now(), by: page.en.by || me.name };
+    const changed = !old || ['t', 'n', 'd', 'body', 'draft'].some((k) => (old[k] || '') !== (e[k] || ''));
+    if (changed) { e.at = now(); e.by = me.name; }
+    if (!e.src || page.en.sync) e.src = Model.zhSig(page);
+    page.en = e;
+  } else delete page.en;
   let action = '修改';
   if (d.isNew) {
     page.isNew = true;
@@ -640,7 +792,7 @@ async function savePage(f) {
     if (!h.length && !old.isNew) h.push({ at: null, by: '說明中心目前的版本', page: clone(old) });
     if (d.groups) {
       const row = rowOf(d.origId);
-      row.groups = d.groups.map((g) => ({ g: g.g, items: g.src != null && row.groups[g.src] ? row.groups[g.src].items : [] }));
+      row.groups = d.groups.map((g) => ({ g: g.g, ...(g.en ? { en: g.en } : {}), items: g.src != null && row.groups[g.src] ? row.groups[g.src].items : [] }));
     }
     if (d.where !== locate(d.origId).key) { moveTo(d.origId, d.where); action = '修改並搬移'; }
     delete S.pages[d.origId];
@@ -667,7 +819,15 @@ async function savePage(f) {
   toast(page.draft ? `已存成草稿「${page.t}」，說明中心看不到這頁。${LIVE ? '' : '（示範：只存在這台電腦）'}`
     : LIVE ? `已儲存「${page.t}」，說明中心已經更新。` : `已儲存「${page.t}」（示範：只存在這台電腦）`);
   if (d.isNew || d.id !== d.origId) { skipGuard = true; location.hash = `#edit/${d.id}`; }
-  else { draft = startDraft(d.id); }
+  else {
+    // 留在剛才編輯的語言，重畫一次讓「English」旁的狀態（EN 草稿、待更新）更新
+    const lang = d.lang, zhRef = d.zhRef, y = window.scrollY;
+    draft = startDraft(d.id);
+    draft.lang = lang; draft.zhRef = zhRef;
+    render(true);
+    setDirty(false);
+    window.scrollTo(0, y);
+  }
 }
 
 function openHistory() {
@@ -1134,8 +1294,17 @@ function viewHelp() {
     ${sec('2-4. 閱讀流量', `<ul>
       <li>說明中心會記錄每篇文章被看了幾次、看了多久、有沒有讀到最後、讀者從哪裡來，以及大家在搜尋框打了什麼卻找不到。不記個人資料、不存網路位址（IP）。</li>
       <li>統計在<a href="admin.html#views" target="_blank" rel="noopener">回饋後台的「閱讀流量」</a>，用編輯後台的公司帳號登入就能看。</li>
-      <li>在這台瀏覽器登入過編輯後台的人，之後看說明中心不會算進去（可以勾選「包含編輯者自己看的」）。</li></ul>`)}
+      <li>在這台瀏覽器登入過編輯後台的人，之後看說明中心不會算進去（可以勾選「包含編輯者自己看的」）。</li>
+      <li>可以只看中文版或英文版的流量。</li></ul>`)}
+    ${sec('2-5. 英文版', `<ul>
+      <li>說明中心右上角的「EN」可以切成英文（手機在目錄最下面）。預設是中文。</li>
+      <li>每一頁的編輯畫面上方有「中文 / English」：切到 English 填英文標題、摘要和內文；圖片、程度、閱讀時間、放在哪裡都沿用中文。按「對照中文原文」可以在右邊看中文。</li>
+      <li><b>英文草稿</b>：勾選時說明中心切到英文還是顯示中文。AI 翻譯的英文一開始都是草稿，請對照中文看過，沒問題再取消勾選並儲存。</li>
+      <li>頁面列表上的標示：<b>EN 草稿</b>（還沒公開）、<b>EN 待更新</b>（中文改過，英文要跟著改）、<b>EN</b>（已公開）。英文改好後勾「英文已經對照目前的中文更新好了」再儲存，就不再標待更新。</li>
+      <li>大分類的英文名稱：頁面列表大分類旁的「加英文名稱」。分類裡小標的英文：在那個分類的 English 填。</li>
+      <li><b>功能名稱要和 moonland.ai 英文版一致</b>：點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery、素材庫 Library、體驗代碼 Trial code。不要寫 credits 或 Moon Coins。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
+      <li>右邊的預覽點任何一段，左邊語法就會跳到那一段並選起來；在語法裡移動游標，預覽也會標出對應的那一段。</li>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>
       <li>內文用上方工具列插入格式：小標題、粗體、連結、清單、步驟、提示框、注意框、表格、提示詞、圖片、前後比較、並排。</li>
       <li>右邊（手機上切到「預覽」）就是讀者會看到的樣子。</li>
@@ -1203,12 +1372,34 @@ function viewLog(sub) {
         ${list.map((x) => `<tr><td data-label="日期">${esc(String(x.date || '').replace(/-/g, '/'))}</td><td data-label="改了什麼">${esc(x.text || '')}</td><td data-label="版本">${x.commit ? `<code>${esc(x.commit)}</code>` : '<span class="ed-hint">最新</span>'}</td></tr>`).join('')}
       </tbody></table></div>` : '<p class="ed-hint">還沒有網站程式的修改紀錄。</p>'}`;
   }
-  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>${seg}
-    ${S.log.length ? `<div class="ed-tbl"><table class="ed-table"><thead><tr><th>時間</th><th>誰</th><th>做了什麼</th><th>頁面</th></tr></thead><tbody>
-      ${S.log.map((x) => `<tr><td data-label="時間">${fmt(x.at)}</td><td data-label="誰">${esc(x.by)}</td><td data-label="做了什麼">${esc(x.action)}</td>
-        <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
-    </tbody></table></div>` : '<p class="ed-hint">還沒有任何修改。</p>'}`;
+  // 依日期分組（每天一段，可以收合），上方篩選期間與編輯者
+  const dayKey = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const today = dayKey(new Date().toISOString());
+  const yest = dayKey(new Date(Date.now() - 864e5).toISOString());
+  const since = logF.days ? dayKey(new Date(Date.now() - (logF.days - 1) * 864e5).toISOString()) : '';
+  const people = [...new Set(S.log.map((x) => x.by).filter(Boolean))];
+  const list = S.log.filter((x) => (!since || dayKey(x.at) >= since) && (!logF.by || x.by === logF.by));
+  const days = [];
+  for (const x of list) { const k = dayKey(x.at); if (!days.length || days[days.length - 1].k !== k) days.push({ k, rows: [] }); days[days.length - 1].rows.push(x); }
+  const WEEK = '日一二三四五六';
+  const dayName = (k) => { const [y, m, d] = k.split('-').map(Number); const w = WEEK[new Date(y, m - 1, d).getDay()]; return `${k === today ? '今天・' : k === yest ? '昨天・' : ''}${y !== new Date().getFullYear() ? `${y}/` : ''}${m}/${d}（${w}）`; };
+  const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const filters = `<div class="ed-logbar">
+      <div class="ed-seg ed-seg-btn" role="group" aria-label="期間">${[[1, '今天'], [7, '最近 7 天'], [30, '最近 30 天'], [0, '全部']].map(([d, t]) => `<button type="button" data-act="log-days" data-days="${d}" aria-pressed="${logF.days === d}">${t}</button>`).join('')}</div>
+      <label class="ed-logby"><span>編輯者</span><select data-act="log-by"><option value="">所有人</option>${people.map((p) => `<option${p === logF.by ? ' selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
+      ${days.length > 1 ? '<button type="button" class="ed-btn sm" data-act="log-fold">全部收合／展開</button>' : ''}
+    </div>`;
+  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁，依日期分組，點日期可以收合。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>${seg}
+    ${S.log.length ? filters : ''}
+    ${!S.log.length ? '<p class="ed-hint">還沒有任何修改。</p>' : !days.length ? `<p class="ed-hint ed-empty">${logF.days === 1 ? '今天' : '這段期間'}${logF.by ? `「${esc(logF.by)}」` : ''}沒有修改。</p>`
+      : days.map((g, gi) => { const who = [...new Set(g.rows.map((x) => x.by))]; return `<details class="ed-logday"${gi < 3 || logF.days ? ' open' : ''}>
+        <summary><b>${dayName(g.k)}</b><span>${g.rows.length} 筆・${esc(who.join('、'))}</span></summary>
+        <div class="ed-tbl"><table class="ed-table"><thead><tr><th>時間</th><th>誰</th><th>做了什麼</th><th>頁面</th></tr></thead><tbody>
+        ${g.rows.map((x) => `<tr><td data-label="時間">${hm(x.at)}</td><td data-label="誰">${esc(x.by)}</td><td data-label="做了什麼">${esc(x.action)}</td>
+          <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
+        </tbody></table></div></details>`; }).join('')}`;
 }
+const logF = { days: 0, by: '' };
 // ---------------------------------------------------------
 // 訪客問卷：說明中心的吉吉問的匿名問卷（題目在 survey.js），這裡看統計、下載 CSV
 // 同一個訪客重填只算最後一次（伺服器 /api/editor/survey 已經處理）
@@ -1580,7 +1771,12 @@ function viewTools() {
   return `${tabs('tools')}<div class="ed-head"><div><h1>檢查與備份</h1></div></div>
     <section class="ed-sec"><div class="ed-sec-head"><h2>全站檢查</h2></div>
       <p class="ed-hint">檢查每一頁有沒有找不到的圖片、點不開的站內連結。儲存單頁時也會自動檢查。</p>
-      ${problems.length ? `<ul class="ed-list">${problems.map((x) => `<li class="ed-item"><a class="ed-name" href="#edit/${x.id}">${ic('alert')}<span><b>${esc(x.t)}</b>${x.problems.map((p) => `<small>${esc(p)}</small>`).join('')}</span></a></li>`).join('')}</ul>`
+      ${problems.length ? `<p class="ed-hint">點下面任何一項，會打開那一頁並直接跳到出問題的位置。</p><ul class="ed-list ed-checks">${problems.map((x) => {
+        const pg = S.pages[x.id];
+        const link = (lang) => (p, i) => `<button type="button" class="ed-spotlink" data-act="spot-open" data-id="${x.id}" data-lang="${lang}" data-i="${i}">${lang === 'en' ? '英文版：' : ''}${esc(p.msg)}<small>第 ${p.line + 1} 行・跳到這裡</small></button>`;
+        const sp = Model.problemSpots(pg.body, x.id, S.pages, MEDIA).map(link('zh'));
+        const spEn = pg.en ? Model.problemSpots(pg.en.body, x.id, S.pages, MEDIA).map(link('en')) : [];
+        return `<li class="ed-item"><span class="ed-name">${ic('alert')}<span><a href="#edit/${x.id}"><b>${esc(x.t)}</b></a>${sp.join('')}${spEn.join('')}</span></span></li>`; }).join('')}</ul>`
         : `<p class="ed-ok">${ic('check')}全部 ${Object.values(S.pages).filter((p) => !p.system).length} 頁都沒有問題。</p>`}
     </section>
     <section class="ed-sec"><div class="ed-sec-head"><h2>備份</h2></div>
@@ -1848,6 +2044,7 @@ function render(keepDraft) {
   document.body.classList.toggle('is-editing', route === 'edit' || route === 'new');
   if (route === 'edit' || route === 'new') {
     if (!keepDraft) draft = route === 'edit' ? startDraft(decodeURIComponent(arg || '')) : startDraft(null, decodeURIComponent(arg || ''));
+    if (!keepDraft && draft && pendingSpot != null && pendingLang === 'en') draft.lang = 'en';
     // 從待辦按「開始寫」：帶入暫定標題，存檔後待辦會連到這頁
     if (!keepDraft && draft && draft.isNew && pendingTodo) { const t = S.todos.find((x) => x.id === pendingTodo); if (t) { draft.t = t.t; draft.todo = t.id; } }
     pendingTodo = null;
@@ -1856,6 +2053,11 @@ function render(keepDraft) {
     paintPreview();
     paintThumb();
     if (!keepDraft) setDirty(false); else setDirty(dirty);
+    if (pendingSpot != null) {
+      const i = pendingSpot;
+      pendingSpot = null;
+      setTimeout(() => { if (spots[i]) jumpToLine(spots[i].line, spots[i].needle); }, 50);
+    }
     document.title = `${draft.isNew ? '新增頁面' : `編輯「${draft.t}」`}｜編輯後台`;
     return;
   }
@@ -1924,6 +2126,10 @@ document.addEventListener('click', (e) => {
     else if (a === 'copy-media') copyMedia(b);
     else if (a === 'survey-days') { surveyDays = +b.dataset.days; render(); }
     else if (a === 'survey-csv') surveyCsv();
+    else if (a === 'log-days') { logF.days = +b.dataset.days; render(); }
+    else if (a === 'log-fold') { const ds = [...app.querySelectorAll('.ed-logday')]; const open = !ds.every((d) => d.open); ds.forEach((d) => { d.open = open; }); }
+    else if (a === 'spot-go') { const x = spots[+b.dataset.i]; if (x) jumpToLine(x.line, x.needle); }
+    else if (a === 'spot-open') { pendingSpot = +b.dataset.i; pendingLang = b.dataset.lang || 'zh'; location.hash = `#edit/${b.dataset.id}`; }
     else if (a.startsWith('board-') || a === 'notice-hide') boardAct(a, b);
     else if (a === 'fold') setFold([b.dataset.fold], !folded.has(b.dataset.fold));
     else if (a === 'fold-all' || a === 'unfold-all') setFold([...app.querySelectorAll('[data-fold-box]')].map((x) => x.dataset.foldBox), a === 'fold-all');
@@ -1931,6 +2137,21 @@ document.addEventListener('click', (e) => {
       setFold(['sec:' + b.dataset.si], false);
       const sec = document.getElementById('psec' + b.dataset.si);
       if (sec) { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); const btn = sec.querySelector('.ed-fold'); if (btn) btn.focus({ preventScroll: true }); }
+    }
+    else if (a === 'rename-sec-en') {
+      const sec = S.sections[+b.dataset.si];
+      const v = prompt(`「${sec.label}」的英文名稱（說明中心切到英文時顯示；空白就用網站預設的翻譯）：`, sec.en || '');
+      if (v === null) return;
+      const t = v.trim();
+      if (t !== (sec.en || '')) { addLog(`大分類「${sec.label}」的英文名稱改成「${t || '（預設）'}」`, '', sec.label); if (t) sec.en = t; else delete sec.en; persist(); render(); }
+    }
+    else if (a === 'lang' || a === 'zh-ref') {
+      readForm(document.getElementById('pageForm'));
+      if (a === 'lang') { if (draft.lang === b.dataset.lang) return; draft.lang = b.dataset.lang; draft.zhRef = false; }
+      else draft.zhRef = !draft.zhRef;
+      const keep = dirty;
+      render(true);
+      setDirty(keep);
     }
     else if (a === 'rename-sec') {
       const sec = S.sections[+b.dataset.si];
@@ -1974,6 +2195,9 @@ document.addEventListener('click', (e) => {
   }
   // 預覽裡的連結只是示意，不跳頁
   if (e.target.closest('#preview a')) e.preventDefault();
+  // 點預覽的某一段：左邊語法跳到那一行（前後比較的拖曳、播放影片時不跳）
+  const ln = e.target.closest('#preview [data-ln]');
+  if (ln && !e.target.closest('.cmp-view, video, audio, .copy, .m3d-load')) jumpToLine(+ln.dataset.ln);
 });
 
 app.addEventListener('input', (e) => {
@@ -1996,6 +2220,7 @@ app.addEventListener('change', (e) => {
     syncPick(pa); return;
   }
   const sa = e.target.dataset.act;
+  if (sa === 'log-by') { logF.by = e.target.value; render(); const s = app.querySelector('[data-act="log-by"]'); if (s) s.focus({ preventScroll: true }); return; }
   if (sa === 'todo-pri' || sa === 'todo-status' || sa === 'wish-status') {
     const x = S[sa === 'wish-status' ? 'wishes' : 'todos'].find((y) => y.id === e.target.dataset.id);
     if (!x) return;
@@ -2042,6 +2267,11 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   insertAt('<br>');
 });
+// 在語法裡移動游標（點一下、方向鍵）：預覽標出對應的那一段
+let caretTimer = 0;
+const caretSoon = (e) => { if (e.target.id !== 'body') return; clearTimeout(caretTimer); caretTimer = setTimeout(() => markCaret(true), 120); };
+document.addEventListener('click', caretSoon);
+document.addEventListener('keyup', (e) => { if (/^(Arrow|Page|Home|End)/.test(e.key)) caretSoon(e); });
 // 布告欄的回覆框：Ctrl+Enter 送出
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;

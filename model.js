@@ -9,6 +9,9 @@
 //   sections：[{ label, rows: [{ id, groups?: [{ g, items: [代號] }] }] }]
 //   pages：{ 代號: { t, n, d, tag, icon, level, minutes, models（逗號分隔）, tool, thumb, body, system?, isNew?, draft? } }
 // 草稿（draft: true）留在目錄裡原本的位置，但說明中心看不到（toSite 會跳過）
+// 英文版（2026-11-23 加回）：頁面的 en: { t, n, d, body, draft?, src, at, by }；大分類 sections[].en、分類的小標 groups[].en
+//   en.draft 是英文草稿（說明中心看不到英文，顯示中文）；en.src 是翻譯時中文的簽章（zhSig），和現在的中文不同就是「英文待更新」
+//   說明中心讀 toSite 回傳的 ARTICLES_EN（只有公開的英文）與 SECTIONS 裡的 en
 // 程式附的草稿在 data/drafts.js（DRAFTS），只有編輯後台載入
 // =========================================================
 (function (root) {
@@ -50,9 +53,35 @@
     return { sections, pages };
   }
 
+  // 中文內容的簽章：標題、摘要、內文有改就會變（判斷英文版要不要更新）
+  function zhSig(p) {
+    const s = `${(p && p.t) || ''}\n${(p && p.d) || ''}\n${String((p && p.body) || '').replace(/\r/g, '').trim()}`;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+  // 英文版的狀態：'none' 沒有、'draft' 英文草稿、'stale' 中文改過英文還沒跟上、'ok' 已公開而且是最新的
+  function enState(p) {
+    if (!p || !p.en || !String(p.en.t || '').trim()) return 'none';
+    if (p.en.src && p.en.src !== zhSig(p)) return 'stale';
+    return p.en.draft ? 'draft' : 'ok';
+  }
+
   // 編輯後台 → 說明中心
   function toSite(sections, pages) {
     const ARTICLES = {};
+    // 公開的英文版：{ 代號: { t, n?, d?, body? } }；英文草稿不放（說明中心顯示中文）
+    const ARTICLES_EN = {};
+    const english = (id, withBody) => {
+      const p = pages[id];
+      const e = p && p.en;
+      if (!e || e.draft || !String(e.t || '').trim()) return;
+      const x = { t: e.t };
+      if (e.n) x.n = e.n;
+      if (e.d) x.d = e.d;
+      if (withBody && e.body) x.body = `\n${e.body}\n`;
+      ARTICLES_EN[id] = x;
+    };
     const article = (p) => {
       const a = { t: p.t };
       if (p.d) a.d = p.d;
@@ -68,6 +97,7 @@
     const live = (id) => pages[id] && !pages[id].draft;
     const SECTIONS = sections.map((sec) => ({
       label: sec.label,
+      ...(sec.en ? { en: sec.en } : {}),
       rows: sec.rows.filter((r) => live(r.id)).map((r) => {
         const p = pages[r.id];
         if (r.groups) {
@@ -75,24 +105,27 @@
           if (p.d) row.d = p.d;
           if (p.tag) row.tag = p.tag;
           if (+p.thumb) row.thumb = +p.thumb;
-          row.groups = r.groups.map((g) => ({ g: g.g, items: g.items.filter(live).map((id) => {
+          english(r.id, !!p.body);
+          row.groups = r.groups.map((g) => ({ g: g.g, ...(g.en ? { en: g.en } : {}), items: g.items.filter(live).map((id) => {
             const q = pages[id];
             ARTICLES[id] = article(q);
+            english(id, true);
             return q.tag ? [id, q.n || q.t, q.tag] : [id, q.n || q.t];
           }) })).filter((g, i, all) => g.items.length || (i === 0 && all.every((x) => !x.items.length)));
           // 分類頁本身有內文（例如「模型指南」）才算一篇文章
           if (p.body) ARTICLES[r.id] = article(p);
           return row;
         }
-        if (p.system) return { id: r.id, t: p.t, icon: p.icon };
+        if (p.system) { english(r.id, false); return { id: r.id, t: p.t, icon: p.icon }; }
         ARTICLES[r.id] = article(p);
+        english(r.id, true);
         const row = { id: r.id, icon: p.icon || 'file' };
         if (p.n) row.n = p.n;
         if (p.tag) row.tag = p.tag;
         return row;
       }),
     }));
-    return { ARTICLES, SECTIONS };
+    return { ARTICLES, SECTIONS, ARTICLES_EN };
   }
 
   // 檢查一篇內文：找不到的媒體編號、連到不存在頁面的連結、本頁找不到的 #h- 錨點
@@ -110,12 +143,29 @@
     return out;
   }
 
+  // 和 checkBody 一樣的檢查，但列出每一個出問題的位置：[{ msg, line（從 0 算）, needle（那一行裡出問題的文字） }]
+  // 編輯後台用來「跳到這裡」並選取那段文字
+  function problemSpots(body, id, pages, MEDIA) {
+    const out = [];
+    String(body || '').replace(/\r/g, '').split('\n').forEach((l, line) => {
+      for (const m of l.matchAll(/\[(?:i|v|a|3d)\s+(\d+)[^\]]*\]/g)) if (!MEDIA[m[1]]) out.push({ msg: `找不到媒體編號 ${m[1]}`, line, needle: m[0] });
+      for (const m of l.matchAll(/\]\(#([\w-]+)\)/g)) {
+        const k = m[1];
+        const missing = k.startsWith('h-') ? !String(body).includes(`{#${k}}`) : !(k === 'home' || k === id || pages[k]);
+        if (missing) out.push({ msg: `連結找不到目標：#${k}`, line, needle: `#${k}` });
+        else if (!k.startsWith('h-') && k !== id && pages[k] && pages[k].draft && !(pages[id] && pages[id].draft)) out.push({ msg: `連結指到還沒公開的草稿：#${k}`, line, needle: `#${k}` });
+      }
+    });
+    return out;
+  }
+
   // 檢查整個網站：[{ id, t, problems: [...] }]
   function checkAll(pages, MEDIA) {
     const out = [];
     for (const [id, p] of Object.entries(pages)) {
       if (p.system) continue;
       const problems = checkBody(p.body, id, pages, MEDIA);
+      if (p.en && p.en.body) problems.push(...checkBody(p.en.body, id, pages, MEDIA).map((x) => `英文版：${x}`));
       if (problems.length) out.push({ id, t: p.t, problems });
     }
     return out;
@@ -172,7 +222,7 @@
   // 第幾個大分類、哪個分類（還沒存的新頁面用這個）
   const areaOfPlace = (si, rowId) => AREA_OF_ROW[rowId] || AREA_OF_SECTION[si] || 'support';
 
-  const api = { fromSite, toSite, checkBody, checkAll, checkShape, areaFor, areaOfPlace };
+  const api = { fromSite, toSite, zhSig, enState, checkBody, problemSpots, checkAll, checkShape, areaFor, areaOfPlace };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Model = api;
 })(this);

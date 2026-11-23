@@ -23,7 +23,29 @@ const ALIASES = {
   'a-1': 'admin-1', 'a-2': 'admin-2', 'a-3': 'admin-3', 'a-4': 'admin-4', 'a-5': 'admin-5', 'a-6': 'admin-6',
 };
 
-const ARTICLES = window.ARTICLES || {};
+// 英文版（2026-11-23 加回）：公開的英文（content.js 的 ARTICLES_EN）蓋過中文的標題、摘要與內文；
+// 等級、分鐘數、圖片等沿用中文版。還沒有英文（或英文還是草稿）的頁面顯示中文，頁面上會提示
+// 大分類與小標用編輯後台填的英文名稱（SECTIONS 的 en），沒填就查 data/en/ui.js 的對照
+const ZH_ARTICLES = window.ARTICLES || {};
+const EN_ARTICLES = window.ARTICLES_EN || {};
+const ARTICLES = LANG === 'en'
+  ? Object.fromEntries(Object.entries(ZH_ARTICLES).map(([k, a]) => [k, EN_ARTICLES[k] && EN_ARTICLES[k].body ? { ...a, ...EN_ARTICLES[k] } : { ...a, untranslated: true }]))
+  : ZH_ARTICLES;
+if (LANG === 'en') {
+  SECTIONS.forEach((sec) => {
+    sec.label = sec.en || T(sec.label);
+    sec.rows.forEach((r) => {
+      const e = EN_ARTICLES[r.id];
+      if (r.t) r.t = (e && e.t) || T(r.t);
+      if (e && e.d && r.d) r.d = e.d;
+      if (r.n) r.n = (e && (e.n || e.t)) || r.n;
+      (r.groups || []).forEach((g) => {
+        g.g = g.en || T(g.g);
+        g.items.forEach((it) => { const x = EN_ARTICLES[it[0]]; if (x) it[1] = x.n || x.t; });
+      });
+    });
+  });
+}
 
 // 由 SECTIONS 建立頁面索引
 const PAGES = { home: { t: T('首頁'), crumb: [] } };
@@ -77,7 +99,7 @@ function toggleToc(open) {
 }
 // 「付費」（登月幣）用紫色，和一般標籤（新手等）分開
 const PAID = '付費';
-const tagHtml = (tag) => (tag ? `<span class="tag${tag === PAID ? ' paid' : ''}">${esc(tag)}</span>` : '');
+const tagHtml = (tag) => (tag ? `<span class="tag${tag === PAID ? ' paid' : ''}">${esc(T(tag))}</span>` : '');
 
 function navRow(r) {
   if (!r.groups) {
@@ -100,6 +122,8 @@ function navRow(r) {
 side.innerHTML =
   `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">${T('首頁')}</span></a>` +
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
+  // 手機上頂部列放不下語言按鈕，目錄最下面也放一個
+  `<button class="nav-row lang-row" type="button" data-switch-lang lang="${LANG === 'en' ? 'zh-Hant' : 'en'}">${ic('globe')}<span class="lbl">${LANG === 'en' ? '中文' : 'English'}</span></button>` +
   `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonland.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
 
 function setOpen(cat, open) {
@@ -149,10 +173,10 @@ function metaHtml(a) {
 }
 
 function articleList(c) {
-  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || T('這個分類的文章'))}${g.items.some((x) => x[2] === PAID) ? ` <span class="chip paid">${PAID}</span>` : ''}</h2><div class="list">` +
+  return c.groups.map((g, i) => `<h2 id="g${i}">${esc(g.g || T('這個分類的文章'))}${g.items.some((x) => x[2] === PAID) ? ` <span class="chip paid">${T(PAID)}</span>` : ''}</h2><div class="list">` +
     g.items.map(([aid, n, tag]) => {
       const a = ARTICLES[aid] || {};
-      return `<a class="list-row" href="#${aid}"><span class="list-t"><b>${esc(a.t || n)}</b>${a.d ? `<small>${esc(a.d)}</small>` : ''}</span>${tag ? `<span class="chip ${tag === PAID ? 'paid' : 'brand'}">${esc(tag)}</span>` : ''}${ic('chev', 'ic chev')}</a>`;
+      return `<a class="list-row" href="#${aid}"><span class="list-t"><b>${esc(a.t || n)}</b>${a.d ? `<small>${esc(a.d)}</small>` : ''}</span>${tag ? `<span class="chip ${tag === PAID ? 'paid' : 'brand'}">${esc(T(tag))}</span>` : ''}${ic('chev', 'ic chev')}</a>`;
     }).join('') + `</div>`).join('');
 }
 
@@ -162,8 +186,9 @@ function articleView(id) {
   const head = c
     ? `<div class="cat-head"><span class="cat-icon">${ic(c.icon)}</span><h1>${esc(a.t)}</h1></div>`
     : `<h1>${esc(a.t)}</h1>`;
-  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}
-    <div class="prose">${renderMarkup(a.body)}</div>
+  const notYet = a.untranslated ? `<div class="callout note">${T('這篇還沒有英文版，以下先顯示中文內容。')}</div>` : '';
+  return `${crumb(id)}${head}${metaHtml(a)}${a.d ? `<p class="lead">${esc(a.d)}</p>` : ''}${notYet}
+    <div class="prose"${a.untranslated ? ' lang="zh-Hant-TW"' : ''}>${renderMarkup(a.body)}</div>
     ${c ? articleList(c) : ''}`;
 }
 
@@ -268,7 +293,9 @@ function visitorId() {
 // 回傳 'server'（存到 Google 試算表或伺服器）、'local'（預覽版，存在這台電腦）或 'failed'
 // 頁面標題一律送中文版的，後台才不會同一篇出現中英兩種名稱
 async function sendFeedback(entry) {
-  entry = { ...entry, vid: visitorId() };
+  // 頁面標題一律送中文的，後台才不會同一篇出現中英兩種名稱；lang 記下是看哪個語言時送的
+  const zhTitle = entry.page ? (ZH_ARTICLES[entry.page] && ZH_ARTICLES[entry.page].t) || entry.pageTitle : entry.pageTitle;
+  entry = { ...entry, pageTitle: zhTitle, vid: visitorId(), lang: LANG };
   // 先送網站伺服器（公司部署）：伺服器存一份、轉存 Google 試算表、通知負責人
   try {
     const r = await fetch('api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
@@ -328,7 +355,7 @@ function render() {
   }
 
   buildToc();
-  document.title = (id === 'home' ? '' : PAGES[id].t + '｜') + T('moonland.ai 說明中心');
+  document.title = (id === 'home' ? '' : PAGES[id].t + (LANG === 'en' ? ' | ' : '｜')) + T('moonland.ai 說明中心');
   window.scrollTo(0, 0);
   closeDrawer();
 }
@@ -713,16 +740,16 @@ const saveJiji = (v) => { try { localStorage.setItem(JIJI_KEY, JSON.stringify({ 
 const jijiBtn = document.createElement('button');
 jijiBtn.className = 'jiji-btn';
 jijiBtn.type = 'button';
-jijiBtn.setAttribute('aria-label', '問吉吉：幫你找文章');
+jijiBtn.setAttribute('aria-label', T('問吉吉：幫你找文章'));
 jijiBtn.setAttribute('aria-expanded', 'false');
 jijiBtn.setAttribute('aria-controls', 'jiji');
-jijiBtn.title = '問吉吉';
+jijiBtn.title = T('問吉吉');
 jijiBtn.innerHTML = CAT_SVG;
 const jiji = document.createElement('section');
 jiji.className = 'jiji';
 jiji.id = 'jiji';
 jiji.hidden = true;
-jiji.setAttribute('aria-label', '吉吉');
+jiji.setAttribute('aria-label', T('吉吉'));
 // 問卷（打招呼、作答、推薦）放在畫面中間，後面蓋一層半透明底；點底色等於「先不用」
 const jijiBack = document.createElement('div');
 jijiBack.className = 'jiji-back';
@@ -742,14 +769,14 @@ jijiBack.addEventListener('click', () => { closeJiji(); });
 let jj = { step: 'menu', i: 0, a: {} };   // 目前畫面：hello 打招呼、q 問卷第 i 題、done 推薦、menu 選單、topic 某個選單項目
 const qList = () => Survey.QUESTIONS.filter((q) => Survey.shown(q, jj.a));
 // 說明和標題差不多時就不重複顯示
-const pageLink = ([id, why]) => (PAGES[id] ? `<a class="jiji-link" href="#${id}"><b>${esc(PAGES[id].t)}</b>${why && !PAGES[id].t.startsWith(why) ? `<small>${esc(why)}</small>` : ''}${ic('chev', 'ic chev')}</a>` : '');
+const pageLink = ([id, why]) => { why = why && T(why); return PAGES[id] ? `<a class="jiji-link" href="#${id}"><b>${esc(PAGES[id].t)}</b>${why && !PAGES[id].t.startsWith(why) ? `<small>${esc(why)}</small>` : ''}${ic('chev', 'ic chev')}</a>` : ''; };
 const say = (html) => `<div class="jiji-say">${html}</div>`;
 
 function paintJiji() {
   let body = '';
   if (jj.step === 'hello') {
-    body = say('喵～我是<b>吉吉</b>，說明中心的小黑貓。<br>回答幾個小問題（大約 30 秒、不記名），我幫你挑最適合的文章！')
-      + `<div class="jiji-acts"><button type="button" class="jiji-main" data-jj="start">好啊</button><button type="button" class="jiji-ghost" data-jj="skip">先不用</button></div>`;
+    body = say(T('喵～我是<b>吉吉</b>，說明中心的小黑貓。<br>回答幾個小問題（大約 30 秒、不記名），我幫你挑最適合的文章！'))
+      + `<div class="jiji-acts"><button type="button" class="jiji-main" data-jj="start">${T('好啊')}</button><button type="button" class="jiji-ghost" data-jj="skip">${T('先不用')}</button></div>`;
   } else if (jj.step === 'q') {
     const list = qList();
     const q = list[jj.i];
@@ -757,29 +784,29 @@ function paintJiji() {
     const multi = q.type === 'multi';
     const picked = (code) => (multi ? (v || []).includes(code) : v === code);
     const others = Object.entries(q.other || {}).filter(([code]) => picked(code));
-    body = `<div class="jiji-prog" aria-label="第 ${jj.i + 1} 題，共 ${list.length} 題"><span style="width:${((jj.i + 1) / list.length) * 100}%"></span></div>`
-      + say(`<b>${esc(q.q)}</b>${q.hint ? `<small>${esc(q.hint)}</small>` : ''}`)
-      + `<div class="jiji-opts" role="group" aria-label="${esc(q.q)}">${q.options.map(([code, label]) => `<button type="button" class="jiji-opt" data-jj="pick" data-code="${code}" aria-pressed="${picked(code)}">${esc(label)}</button>`).join('')}</div>`
-      + others.map(([code, label]) => `<label class="jiji-other"><span>${esc(label)}</span><input data-other="${q.id}_${code}" maxlength="60" value="${esc(jj.a[`${q.id}_${code}`] || '')}"></label>`).join('')
+    body = `<div class="jiji-prog" aria-label="${T('第 {i} 題，共 {n} 題', { i: jj.i + 1, n: list.length })}"><span style="width:${((jj.i + 1) / list.length) * 100}%"></span></div>`
+      + say(`<b>${esc(T(q.q))}</b>${q.hint ? `<small>${esc(T(q.hint))}</small>` : ''}`)
+      + `<div class="jiji-opts" role="group" aria-label="${esc(T(q.q))}">${q.options.map(([code, label]) => `<button type="button" class="jiji-opt" data-jj="pick" data-code="${code}" aria-pressed="${picked(code)}">${esc(T(label))}</button>`).join('')}</div>`
+      + others.map(([code, label]) => `<label class="jiji-other"><span>${esc(T(label))}</span><input data-other="${q.id}_${code}" maxlength="60" value="${esc(jj.a[`${q.id}_${code}`] || '')}"></label>`).join('')
       // 單選又不用填字：點選項就直接到下一題，不需要「下一題」鈕；還沒答才顯示「略過這題」
-      + `<div class="jiji-acts">${jj.i ? '<button type="button" class="jiji-ghost" data-jj="back">上一步</button>' : ''}<span class="jiji-sp"></span>`
-      + `${v && v.length ? '' : '<button type="button" class="jiji-ghost" data-jj="next">略過這題</button>'}`
-      + `${multi || others.length ? `<button type="button" class="jiji-main" data-jj="next">${jj.i === list.length - 1 ? '完成' : '下一題'}</button>` : ''}</div>`;
+      + `<div class="jiji-acts">${jj.i ? `<button type="button" class="jiji-ghost" data-jj="back">${T('上一步')}</button>` : ''}<span class="jiji-sp"></span>`
+      + `${v && v.length ? '' : `<button type="button" class="jiji-ghost" data-jj="next">${T('略過這題')}</button>`}`
+      + `${multi || others.length ? `<button type="button" class="jiji-main" data-jj="next">${T(jj.i === list.length - 1 ? '完成' : '下一題')}</button>` : ''}</div>`;
   } else if (jj.step === 'done') {
     const recs = Survey.recommend(jj.a).map(pageLink).join('');
-    body = say('謝謝你！喵～依你的回答，建議先看這幾篇：') + `<div class="jiji-links">${recs}</div>`
-      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">我想找別的</button></div>`;
+    body = say(T('謝謝你！喵～依你的回答，建議先看這幾篇：')) + `<div class="jiji-links">${recs}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">${T('我想找別的')}</button></div>`;
   } else if (jj.step === 'topic') {
     const [label, items] = Survey.MENU[jj.i];
-    body = say(`「${esc(label)}」的話，可以看這幾篇：`) + `<div class="jiji-links">${items.map(pageLink).join('')}</div>`
-      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">← 回到選單</button></div>`;
+    body = say(T('「{x}」的話，可以看這幾篇：', { x: esc(T(label)) })) + `<div class="jiji-links">${items.map(pageLink).join('')}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="menu">${T('← 回到選單')}</button></div>`;
   } else {
-    body = say('喵～你想做什麼？') + `<div class="jiji-opts col">${Survey.MENU.map(([label], i) => `<button type="button" class="jiji-opt" data-jj="topic" data-i="${i}">${esc(label)}</button>`).join('')}</div>`
-      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="search">${ic('search', 'ic sm')}自己搜尋</button><span class="jiji-sp"></span><button type="button" class="jiji-ghost" data-jj="start">${(jijiState() || {}).done ? '重新回答問卷' : '回答問卷，讓我推薦'}</button></div>`;
+    body = say(T('喵～你想做什麼？')) + `<div class="jiji-opts col">${Survey.MENU.map(([label], i) => `<button type="button" class="jiji-opt" data-jj="topic" data-i="${i}">${esc(T(label))}</button>`).join('')}</div>`
+      + `<div class="jiji-acts"><button type="button" class="jiji-ghost" data-jj="search">${ic('search', 'ic sm')}${T('自己搜尋')}</button><span class="jiji-sp"></span><button type="button" class="jiji-ghost" data-jj="start">${T((jijiState() || {}).done ? '重新回答問卷' : '回答問卷，讓我推薦')}</button></div>`;
   }
   setTimeout(placeJiji);
-  jiji.innerHTML = `<header class="jiji-head"><span class="jiji-ava">${CAT_SVG}</span><span><b>吉吉</b><small>幫你找文章的小黑貓</small></span>
-    <button type="button" class="icon-btn" data-jj="close" aria-label="關閉吉吉">${ic('x')}</button></header><div class="jiji-body" aria-live="polite">${body}</div>`;
+  jiji.innerHTML = `<header class="jiji-head"><span class="jiji-ava">${CAT_SVG}</span><span><b>${T('吉吉')}</b><small>${T('幫你找文章的小黑貓')}</small></span>
+    <button type="button" class="icon-btn" data-jj="close" aria-label="${T('關閉吉吉')}">${ic('x')}</button></header><div class="jiji-body" aria-live="polite">${body}</div>`;
 }
 function openJiji(step) {
   if (step) jj = { step, i: 0, a: step === 'q' ? {} : jj.a };
@@ -876,7 +903,7 @@ const depthNow = () => {
   return h <= 0 ? 100 : Math.min(100, Math.round((scrollY / h) * 100));
 };
 function startReading(id) {
-  reading = { id, t: PAGES[id] ? PAGES[id].t : id, view: Math.random().toString(36).slice(2, 12), ms: 0, since: document.hidden ? 0 : Date.now(), depth: depthNow(), src: reading ? (viewFrom || 'internal') : landingFrom };
+  reading = { id, t: ZH_ARTICLES[id] ? ZH_ARTICLES[id].t : PAGES[id] ? PAGES[id].t : id, view: Math.random().toString(36).slice(2, 12), ms: 0, since: document.hidden ? 0 : Date.now(), depth: depthNow(), src: reading ? (viewFrom || 'internal') : landingFrom };
   viewFrom = '';
 }
 function flushReading() {
@@ -885,7 +912,7 @@ function flushReading() {
   if (r.since) { r.ms += Date.now() - r.since; r.since = document.hidden ? 0 : Date.now(); }
   const sec = Math.round(r.ms / 1000);
   if (sec < 3) return;
-  beacon({ kind: 'view', page: r.id, t: r.t, view: r.view, sec, depth: r.depth, src: r.src });
+  beacon({ kind: 'view', page: r.id, t: r.t, view: r.view, sec, depth: r.depth, src: r.src, lang: LANG });
 }
 addEventListener('scroll', () => { if (reading) reading.depth = Math.max(reading.depth, depthNow()); }, { passive: true });
 document.addEventListener('visibilitychange', () => {
@@ -900,7 +927,7 @@ q.addEventListener('input', () => {
   clearTimeout(missTimer);
   const s = q.value.trim();
   if (!s || results.querySelector('a')) return;
-  missTimer = setTimeout(() => { if (q.value.trim() === s && !results.querySelector('a')) beacon({ kind: 'miss', q: s.slice(0, 60) }); }, 1500);
+  missTimer = setTimeout(() => { if (q.value.trim() === s && !results.querySelector('a')) beacon({ kind: 'miss', q: s.slice(0, 60), lang: LANG }); }, 1500);
 });
 addEventListener('hashchange', () => {
   const id = currentId();
@@ -909,6 +936,36 @@ addEventListener('hashchange', () => {
   startReading(id);
 });
 startReading(currentId());
+
+// ---------------------------------------------------------
+// 9. 語言切換：記在這台裝置上（localStorage ml-lang），並把 ?lang= 寫進網址（分享網址也是同一種語言），再重新載入
+//    預設中文（使用者 2026-11-23 決定）；index.html 開頭依 ?lang= 或上次的選擇設定 <html lang>
+// ---------------------------------------------------------
+const langBtn = document.getElementById('langBtn');
+if (langBtn) {
+  langBtn.textContent = LANG === 'en' ? '中文' : 'EN';
+  langBtn.lang = LANG === 'en' ? 'zh-Hant' : 'en';
+  langBtn.title = LANG === 'en' ? '切換成中文' : 'Switch to English';
+  langBtn.setAttribute('aria-label', langBtn.title);
+  langBtn.dataset.switchLang = '';
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-switch-lang]')) return;
+  const next = LANG === 'en' ? 'zh' : 'en';
+  try { localStorage.setItem('ml-lang', next); } catch (err) {}
+  const u = new URL(location.href);
+  u.searchParams.set('lang', next);
+  location.href = u.href;
+});
+// index.html 裡寫死的文字：有 data-t 的換內文，aria-label／title／placeholder 有對照就換
+if (LANG === 'en') {
+  document.querySelectorAll('[data-t]').forEach((el) => { el.innerHTML = T(el.innerHTML.trim()); });
+  document.querySelectorAll('[aria-label], [title], [placeholder]').forEach((el) => ['aria-label', 'title', 'placeholder'].forEach((at) => {
+    if (el.hasAttribute(at) && el !== langBtn) el.setAttribute(at, T(el.getAttribute(at)));
+  }));
+  const md = document.querySelector('meta[name="description"]');
+  if (md) md.content = T(md.content);
+}
 
 // 啟動
 document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', ic(el.dataset.icon)));

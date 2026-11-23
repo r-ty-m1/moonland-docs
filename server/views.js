@@ -22,6 +22,7 @@ module.exports = function views(DATA_DIR) {
     if (!b || typeof b !== 'object') return null;
     const base = { at: new Date().toISOString(), vid: str(b.vid, 40) };
     if (b.staff === true) base.staff = true;
+    if (b.lang === 'en') base.lang = 'en';   // 英文版（沒寫就是中文）
     if (b.kind === 'view') {
       const page = str(b.page, 60);
       const view = str(b.view, 20);
@@ -77,14 +78,20 @@ module.exports = function views(DATA_DIR) {
 
   // 統計：days 是最近幾天（0 是全部），staff 為 true 時連編輯者自己看的也算
   // pages 是說明中心目前所有公開的頁面 [{ id, t }]，用來列出「沒人看」的頁面
-  function stats({ days = 30, staff = false, pages = [] } = {}) {
+  // lang：'zh' 只算中文、'en' 只算英文、空白全部；回傳的 langs 是兩種語言各被看幾次
+  function stats({ days = 30, staff = false, pages = [], lang = '' } = {}) {
     let since = '';
     if (days > 0) {
       // 從台灣時間 days-1 天前的 0 點開始，今天也算一天
       const today = dayOf(new Date().toISOString());
       since = new Date(Date.parse(`${today}T00:00:00+08:00`) - (days - 1) * 864e5).toISOString();
     }
-    const all = read(since).filter((e) => staff || !e.staff);
+    const everyone = read(since).filter((e) => staff || !e.staff);
+    const langOf = (e) => (e.lang === 'en' ? 'en' : 'zh');
+    const all = lang ? everyone.filter((e) => langOf(e) === lang) : everyone;
+    const langs = { zh: 0, en: 0 };
+    const seenView = new Set();
+    for (const e of everyone) if (e.kind === 'view' && !seenView.has(e.view)) { seenView.add(e.view); langs[langOf(e)]++; }
     const byView = new Map();
     for (const e of all) {
       if (e.kind !== 'view') continue;
@@ -117,20 +124,20 @@ module.exports = function views(DATA_DIR) {
       if (e.kind !== 'miss') continue;
       const k = e.q.toLowerCase();
       if (!miss.has(k)) miss.set(k, { q: e.q, n: 0, vids: new Set(), last: '' });
-      const m = miss.get(k); m.n++; m.vids.add(e.vid); if (e.at > m.last) m.last = e.at;
+      const m = miss.get(k); m.n++; m.vids.add(e.vid); if (e.at > m.last) m.last = e.at; if (e.lang === 'en') m.en = true;
     }
     const titles = new Map(pages.map((p) => [p.id, p.t]));
     const pageRows = [...per.values()].map((p) => ({ id: p.id, t: titles.get(p.id) || p.t || p.id, views: p.views, visitors: p.vids.size, avgSec: Math.round(p.sec / p.views), endPct: Math.round((p.ends / p.views) * 100), live: titles.has(p.id) || p.id === 'home' }))
       .sort((a, b) => b.views - a.views);
     return {
-      days, since, staff,
+      days, since, staff, lang, langs,
       first: all.length ? all.reduce((m, e) => (e.at < m ? e.at : m), all[0].at) : null,
       totals: { views: vs.length, visitors: visitors.size, avgSec: vs.length ? Math.round(secSum / vs.length) : 0, endPct: vs.length ? Math.round((ends / vs.length) * 100) : 0 },
       daily: [...daily.values()].map((d) => ({ d: d.d, views: d.views, visitors: d.vids.size })).sort((a, b) => a.d.localeCompare(b.d)),
       pages: pageRows,
       unread: pages.filter((p) => !per.has(p.id)).map((p) => ({ id: p.id, t: p.t })),
       sources: [...src.entries()].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n),
-      misses: [...miss.values()].map((m) => ({ q: m.q, n: m.n, visitors: m.vids.size, last: m.last })).sort((a, b) => b.n - a.n).slice(0, 100),
+      misses: [...miss.values()].map((m) => ({ q: m.q, n: m.n, visitors: m.vids.size, last: m.last, en: m.en })).sort((a, b) => b.n - a.n).slice(0, 100),
     };
   }
 

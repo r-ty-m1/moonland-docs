@@ -75,7 +75,12 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
     const order = ['media.js', 'snippets.js', ...files.filter((f) => !['media.js', 'snippets.js', 'sections.js'].includes(f)).sort(), 'sections.js'];
     for (const f of order) if (files.includes(f)) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
-    return { MEDIA: ctx.MEDIA || {}, ARTICLES: ctx.ARTICLES || {}, SECTIONS: ctx.SECTIONS || [], DRAFTS: ctx.DRAFTS || {} };
+    // 英文翻譯（data/en/*.js 的 EN_SEED）：啟動時匯入成英文草稿，見 importEnSeed
+    const enDir = path.join(dir, 'en');
+    let enFiles = [];
+    try { enFiles = fs.readdirSync(enDir).filter((f) => f.endsWith('.js') && f !== 'ui.js'); } catch {}
+    for (const f of enFiles.sort()) vm.runInContext(fs.readFileSync(path.join(enDir, f), 'utf8'), ctx, { filename: `en/${f}` });
+    return { MEDIA: ctx.MEDIA || {}, ARTICLES: ctx.ARTICLES || {}, SECTIONS: ctx.SECTIONS || [], DRAFTS: ctx.DRAFTS || {}, EN_SEED: ctx.EN_SEED || {} };
   }
   const site = loadSiteData();
   const BASE_MEDIA = site.MEDIA;
@@ -88,6 +93,30 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   if (!Array.isArray(C.archive)) C.archive = [];
   if (!Array.isArray(C.todos)) C.todos = [];
   if (!Array.isArray(C.wishes)) C.wishes = [];
+  // 程式附的英文翻譯：還沒有英文版的頁面、大分類、小標，匯入成「英文草稿」（編輯者在後台看過、取消草稿才公開）
+  // 已經有英文的不覆蓋，所以後台改過的英文不會被蓋掉；翻譯時的中文和現在不同時，後台會標「英文待更新」
+  function importEnSeed() {
+    const seed = site.EN_SEED || {};
+    const at = new Date().toISOString();
+    let pages = 0, names = 0;
+    for (const [id, e] of Object.entries(seed.pages || {})) {
+      const p = C.pages[id];
+      if (!p || p.en || !e || !e.t) continue;
+      p.en = { t: String(e.t), n: String(e.n || ''), d: String(e.d || ''), body: String(e.body || '').replace(/^\n+|\s+$/g, ''), draft: true, src: String(e.src || ''), at, by: 'AI 翻譯（待審）' };
+      pages++;
+    }
+    for (const sec of C.sections) {
+      if (!sec.en && seed.sections && seed.sections[sec.label]) { sec.en = seed.sections[sec.label]; names++; }
+      for (const r of sec.rows) for (const g of r.groups || []) if (g.g && !g.en && seed.groups && seed.groups[g.g]) { g.en = seed.groups[g.g]; names++; }
+    }
+    if (!pages && !names) return;
+    C.rev++;
+    C.log.unshift({ at, by: '網站程式', action: `匯入英文翻譯草稿（${pages} 頁${names ? `、${names} 個分類名稱` : ''}）`, id: '', t: '英文版' });
+    C.log.length = Math.min(C.log.length, LIMITS.log);
+    writeJson('content.json', C);
+    console.log(`匯入英文翻譯草稿：${pages} 頁、${names} 個名稱`);
+  }
+  importEnSeed();
   let uploads = readJson('media.json') || {};
   let CHANGES = [];
   try { CHANGES = JSON.parse(fs.readFileSync(path.join(__dirname, 'changelog.json'), 'utf8')).changes || []; } catch (e) { console.error('讀不到 server/changelog.json', e.message); }
@@ -96,8 +125,8 @@ module.exports = function createEditor({ ROOT, DATA_DIR, send, sendJson }) {
   // 說明中心讀的 /content.js，內容變了才重算
   let contentJs = null;
   function buildContentJs() {
-    const { ARTICLES, SECTIONS } = Model.toSite(C.sections, C.pages);
-    const body = `// 由伺服器產生（版本 ${C.rev}），內容來自編輯後台\nwindow.MEDIA=${JSON.stringify(allMedia())};\nwindow.ARTICLES=${JSON.stringify(ARTICLES)};\nwindow.SECTIONS=${JSON.stringify(SECTIONS)};\n`;
+    const { ARTICLES, SECTIONS, ARTICLES_EN } = Model.toSite(C.sections, C.pages);
+    const body = `// 由伺服器產生（版本 ${C.rev}），內容來自編輯後台\nwindow.MEDIA=${JSON.stringify(allMedia())};\nwindow.ARTICLES=${JSON.stringify(ARTICLES)};\nwindow.SECTIONS=${JSON.stringify(SECTIONS)};\nwindow.ARTICLES_EN=${JSON.stringify(ARTICLES_EN)};\n`;
     contentJs = { body, etag: `"c${C.rev}-${crypto.createHash('sha256').update(body).digest('hex').slice(0, 12)}"` };
   }
   buildContentJs();

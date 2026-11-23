@@ -485,3 +485,47 @@ a.ed-btn { text-decoration: none; }
 .ed-boardrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
 .ed-boardrow > [hidden] + .ed-f { grid-column: 1 / -1; }
 @media (max-width: 620px) { .ed-boardrow { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- 預覽與語法對應、這頁要確認的地方（edit.js） ---------- */
+.ed-preview [data-ln] { cursor: pointer; border-radius: 6px; transition: box-shadow .15s, background-color .15s; }
+.ed-preview [data-ln]:hover:not(:has([data-ln]:hover)) { box-shadow: 0 0 0 2px var(--accent-line); }
+.ed-preview .ed-here { box-shadow: 0 0 0 2px var(--brand-ic); background-color: var(--accent-soft); }
+.ed-write textarea.ed-flash { animation: ed-flash 1.2s ease-out; }
+@keyframes ed-flash { 0% { box-shadow: 0 0 0 3px var(--brand-ic); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.ed-spots { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--warn-line); border-radius: 12px; background: var(--warn-soft); }
+.ed-spots > b { display: flex; align-items: center; gap: 6px; color: var(--warn-ink); }
+.ed-spots > b .ic { width: 18px; height: 18px; }
+.ed-spots ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.ed-spots li { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ed-spots li small { margin-left: 8px; color: var(--muted); }
+.ed-checks .ed-name > span { display: grid; gap: 4px; }
+.ed-checks .ed-name a { color: var(--fg); text-decoration: none; }
+.ed-spotlink { font: inherit; font-size: 0.875rem; text-align: left; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--fg-2); cursor: pointer; }
+.ed-spotlink:hover { border-color: var(--accent-line); background: var(--hover); color: var(--fg); }
+.ed-spotlink small { margin-left: 8px; color: var(--accent-ink); }
+@media (prefers-reduced-motion: reduce) { .ed-write textarea.ed-flash { animation: none; } }
+
+/* ---------- 修改紀錄：依日期分組與篩選 ---------- */
+.ed-logbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 16px 0 8px; }
+.ed-seg-btn { margin-top: 0; }
+.ed-seg-btn button { font: inherit; font-size: 0.875rem; padding: 6px 12px; border: 0; border-radius: 9px; background: none; color: var(--fg-2); cursor: pointer; }
+.ed-seg-btn button:hover { color: var(--fg); }
+.ed-seg-btn button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 500; }
+.ed-logby { display: grid; gap: 4px; font-size: 0.8125rem; color: var(--muted); }
+.ed-logday { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ed-logday > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.ed-logday > summary::-webkit-details-marker { display: none; }
+.ed-logday > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+.ed-logday[open] > summary::before { transform: rotate(90deg); }
+.ed-logday > summary span { font-size: 0.8125rem; color: var(--muted); }
+.ed-logday .ed-tbl { margin: 0 10px 10px; }
+
+/* ---------- 英文版（edit.js：每頁的中文／English、頁面列表的 EN 標示） ---------- */
+.chip.ed-en { font-size: 0.6875rem; letter-spacing: .02em; color: var(--muted); border-style: dashed; }
+.chip.ed-en.ok { color: var(--accent-ink); border-color: var(--accent-line); border-style: solid; }
+.chip.ed-en.stale { color: var(--warn-ink); border-color: var(--warn-line); background: var(--warn-soft); border-style: solid; }
+.ed-langseg { margin: 14px 0 0; }
+.ed-langseg .chip { margin-left: 6px; }
+.ed-stale { border-color: var(--warn-line); background: var(--warn-soft); }
+.ed-stale .ed-check { margin-top: 8px; }
+.ed-preview-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }

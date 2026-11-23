@@ -55,9 +55,15 @@
 
 2. 在 `data/sections.js` 的 `SECTIONS` 把 `['文章代號', '目錄上顯示的名稱']` 加到想放的分類。
 
-## 英文版（已移除）
+## 英文版
 
-2026-10-30 起網站只有中文。英文版（語言切換、`data/en/` 的 48 篇翻譯）保留在 git 的 `english-version` 標籤，要找回來時從那裡取。介面文字在程式裡仍包在 `T()` 裡，日後要加回其他語言只要改 `markup.js` 的 `T()`。
+2026-11-23 加回（2026-10-30 曾移除，舊版在 git 標籤 `english-version`）。預設中文，右上角「EN」切換（手機在目錄最下面），網址加 `?lang=en` 直接開英文，選擇記在 `localStorage ml-lang`。
+
+- **名稱照 moonland.ai 本站英文版**：點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery…。對照表在 `data/en/terms.json`（更新方法見 `tools/moonland-terms.js` 開頭：在瀏覽器打開本站、貼到主控台執行）。`server/test.js` 會擋下英文裡的舊說法（credits、Moon Coins）。
+- **介面文字**：程式裡的中文包 `T()`，英文對照在 `data/en/ui.js`（`UI_EN`，查不到就顯示中文）。
+- **文章的英文**：存在編輯後台每頁的「English」（`content.json` 頁面的 `en: { t, n, d, body, draft, src }`；大分類 `sections[].en`、小標 `groups[].en`）。說明中心只顯示公開的英文（`content.js` 的 `ARTICLES_EN`），還沒有英文或英文是草稿的頁面顯示中文並提示。
+- **英文待更新**：`en.src` 是翻譯時中文的簽章（`model.js` 的 `zhSig`），中文之後改過就和現在不同，後台標「EN 待更新」；改好英文時勾「英文已經對照目前的中文更新好了」再存。
+- **程式附的翻譯**：`data/en/*.js`（`EN_SEED`，不對外提供）。伺服器啟動時把還沒有英文的頁面匯入成英文草稿（`server/editor.js` 的 `importEnSeed`），已經有英文的不覆蓋。
 
 ## 文章標記語法
 
@@ -142,7 +148,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261120c`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261123a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 
@@ -151,7 +157,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 1. **公司網站**：一律先送到網站伺服器（`server/server.js` 的 `/api/feedback`），存成 `DATA_DIR`（預設 `.data/`）裡的 `feedback.jsonl`。`config.js` 的 `googleScriptUrl` 有填網址時，伺服器再轉存到公司 Google 帳號的試算表（設定步驟見 [`google-apps-script/README.md`](google-apps-script/README.md)）；文字回饋另用 Zulip 私訊負責人（`server/notify.js`，設定見 `docs/MAINTENANCE.md`〈用 mason 部署〉）。
 2. **GitHub Pages 預覽版**（沒有伺服器）：有填 Google 網址就直接送到試算表；沒填就進預覽模式，見下方。
 
-回饋後台若看到標示「英文版」的舊回饋，是英文版移除前送出的。
+回饋後台標示「英文版」的回饋，是讀者在英文版送出的（頁面名稱一律存中文）。
 
 - 後台在 `admin.html`（只有中文）。有 Google 試算表時讀試算表，密碼是 Apps Script 指令碼屬性 `ADMIN_TOKEN`，也可以直接打開試算表看。沒有試算表時讀伺服器：伺服器設了環境變數 `ADMIN_TOKEN` 就用它；沒設時只有在伺服器那台電腦本機（127.0.0.1）打開才看得到。
 - **GitHub Pages 預覽版沒有伺服器**：回饋改存在送出者自己的瀏覽器，後台顯示示範資料加上這台電腦送出的回饋，方便展示流程，但收不到別人的回饋。

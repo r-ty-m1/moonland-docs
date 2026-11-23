@@ -61,6 +61,45 @@ for (const [k, a] of Object.entries(ARTICLES)) {
 assert.deepEqual(broken, [], `這些站內連結找不到目標：${broken.join(', ')}`);
 console.log(`✓ ${Object.keys(ARTICLES).length} 篇文章的站內連結都找得到`);
 
+// --- 1d. 英文版：介面文字、翻譯草稿的名稱要和 moonland.ai 本站英文版一致；公開／草稿／待更新的判斷 ---
+{
+  const vm = require('node:vm');
+  const enCtx = { window: {} };
+  enCtx.window = enCtx;
+  vm.createContext(enCtx);
+  const enDir = path.join(ROOT, 'data/en');
+  const enFiles = fs.readdirSync(enDir).filter((f) => f.endsWith('.js'));
+  for (const f of enFiles) vm.runInContext(fs.readFileSync(path.join(enDir, f), 'utf8'), enCtx);
+  // 本站英文版：點數是 Points、登月幣是 Coins（2026-11-23 起，不再用 credits、Moon Coins）
+  const OLD_TERMS = /\bcredits?\b|Moon ?Coins?/i;
+  const badUi = Object.entries(enCtx.UI_EN || {}).filter(([, v]) => OLD_TERMS.test(v)).map(([k]) => k);
+  assert.deepEqual(badUi, [], `data/en/ui.js 還有舊說法（credits、Moon Coins）：${badUi.join('、')}`);
+  const seed = enCtx.EN_SEED || { pages: {} };
+  const badSeed = Object.entries(seed.pages || {}).filter(([, e]) => OLD_TERMS.test(`${e.t} ${e.n || ''} ${e.d || ''} ${e.body || ''}`)).map(([k]) => k);
+  assert.deepEqual(badSeed, [], `英文翻譯還有舊說法（credits、Moon Coins）：${badSeed.join('、')}`);
+  // 英文翻譯引用的圖片要存在、站內連結要有那一頁（翻譯不能弄丟或改錯編號）
+  const enMissing = [];
+  for (const [k, e] of Object.entries(seed.pages || {})) {
+    for (const m of String(e.body || '').matchAll(/\[(?:i|v|a|3d)\s+(\d+)/g)) if (!MEDIA[m[1]]) enMissing.push(`${k} #${m[1]}`);
+  }
+  assert.deepEqual(enMissing, [], `英文翻譯引用了不存在的媒體：${enMissing.join(', ')}`);
+  const Model = require(path.join(ROOT, 'model.js'));
+  const pages = { a: { t: '中文', d: '', body: '內文', en: { t: 'English', body: 'Body', draft: true } }, b: { t: '乙', body: '內文乙' } };
+  pages.a.en.src = Model.zhSig(pages.a);
+  assert.equal(Model.enState(pages.a), 'draft');
+  assert.equal(Model.enState(pages.b), 'none');
+  let site = Model.toSite([{ label: '大分類', en: 'Section', rows: [{ id: 'a' }, { id: 'b' }] }], pages);
+  assert.deepEqual(site.ARTICLES_EN, {}, '英文草稿不能出現在說明中心');
+  assert.equal(site.SECTIONS[0].en, 'Section', '大分類的英文名稱要帶給說明中心');
+  pages.a.en.draft = false;
+  site = Model.toSite([{ label: '大分類', rows: [{ id: 'a' }, { id: 'b' }] }], pages);
+  assert.equal(site.ARTICLES_EN.a.t, 'English');
+  assert.equal(Model.enState(pages.a), 'ok');
+  pages.a.body = '內文改過了';
+  assert.equal(Model.enState(pages.a), 'stale', '中文改過，英文要標待更新');
+  console.log(`✓ 英文版：介面文字 ${Object.keys(enCtx.UI_EN || {}).length} 句、翻譯 ${Object.keys(seed.pages || {}).length} 頁沒有舊說法；公開、草稿、待更新判斷正確`);
+}
+
 // --- 2. 伺服器 ---
 const PORT = 18080 + Math.floor(Math.random() * 1000);
 const DATA_DIR = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moonland-fb-'));
@@ -244,6 +283,15 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal((await fetch(base + '/model.js')).status, 200, 'model.js 要能讀到');
     console.log('✓ 編輯後台：登入、權限、存檔、版本衝突、上傳命名、備份還原都正常');
 
+    // --- 4a. 英文版：content.js 帶英文、介面文字檔可以讀，翻譯草稿檔不對外 ---
+    assert.match(await (await fetch(base + '/content.js')).text(), /window\.ARTICLES_EN=/, 'content.js 要有 ARTICLES_EN');
+    assert.equal((await fetch(base + '/data/en/ui.js')).status, 200, '英文介面文字要讀得到');
+    assert.equal((await fetch(base + '/data/en/terms.json')).status, 404, '名稱對照表不用對外');
+    for (const f of fs.readdirSync(path.join(ROOT, 'data/en')).filter((x) => x.endsWith('.js') && x !== 'ui.js')) {
+      assert.equal((await fetch(base + '/data/en/' + f)).status, 404, `英文翻譯草稿 data/en/${f} 不能對外`);
+    }
+    console.log('✓ 英文版：content.js 帶英文、翻譯草稿不對外');
+
     // --- 4b. 閱讀流量：收紀錄、擋格式不對與機器人、同一次閱讀只算一次、搜尋找不到的字、讀取要登入 ---
     const pv = (body, ua) => fetch(base + '/api/view', { method: 'POST', headers: { 'content-type': 'text/plain', 'user-agent': ua || 'Mozilla/5.0', 'x-forwarded-for': '198.51.100.20' }, body: JSON.stringify(body) });
     const v1 = { kind: 'view', page: 'quick-start', t: '5 分鐘快速入門', view: 'aaaa1111', vid: 'reader1', sec: 12, depth: 40, src: 'google' };
@@ -254,8 +302,12 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.equal((await pv({ ...v1, view: 'dddd4444', src: 'evil<script>' })).status, 400, '來源格式不對要拒絕');
     assert.equal((await pv({ ...v1, view: 'eeee5555' }, 'Googlebot/2.1')).status, 204, '機器人回 204 但不存');
     assert.equal((await pv({ kind: 'miss', q: '  量子 糖果機  ', vid: 'reader1' })).status, 204);
+    assert.equal((await pv({ ...v1, view: 'ffff6666', vid: 'reader3', lang: 'en', sec: 20 })).status, 204, '英文版的閱讀');
     assert.equal((await fetch(base + '/api/views')).status, 401, '沒登入、沒密碼不能看閱讀流量');
-    const vs = await (await owner('/api/views?days=7')).json();
+    const vsEn = await (await owner('/api/views?days=7&lang=en')).json();
+    assert.equal(vsEn.totals.views, 1, '只看英文版');
+    assert.deepEqual(vsEn.langs, { zh: 1, en: 1 }, '中英文各被看幾次');
+    const vs = await (await owner('/api/views?days=7&lang=zh')).json();
     assert.equal(vs.totals.views, 1, '編輯者自己看的預設不算，同一次閱讀只算一次，機器人不算');
     assert.equal(vs.pages[0].id, 'quick-start');
     assert.equal(vs.pages[0].avgSec, 30, '同一次閱讀取秒數最多的那筆');
@@ -264,7 +316,7 @@ const base = `http://127.0.0.1:${PORT}`;
     assert.deepEqual(vs.misses.map((m) => m.q), ['量子 糖果機']);
     assert.ok(vs.unread.some((p) => p.id === 'credits') && !vs.unread.some((p) => p.id === 'quick-start'), '要列出沒人看的頁面');
     const vs2 = await (await fetch(base + '/api/views?days=0&staff=1', { headers: { authorization: 'Bearer test-token' } })).json();
-    assert.equal(vs2.totals.views, 2, '勾「包含編輯者」要算進去；後台密碼也能讀');
+    assert.equal(vs2.totals.views, 3, '勾「包含編輯者」要算進去；後台密碼也能讀');
     const vfiles = fs.readdirSync(path.join(DATA_DIR, 'views'));
     const vraw = fs.readFileSync(path.join(DATA_DIR, 'views', vfiles[0]), 'utf8');
     assert.ok(!vraw.includes('198.51.100.20') && !vraw.includes('Mozilla'), '閱讀紀錄不能存 IP 或瀏覽器資訊');

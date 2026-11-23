@@ -44,11 +44,14 @@ const ic = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-h
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------------------------------------------------------
-// 0. 介面文字：T('約 {n} 分鐘', { n: 5 }) 會把大括號換成對應的值
-//    英文版已在 2026-10-30 移除（舊版在 git tag english-version）。介面文字仍包在 T() 裡，日後要加回其他語言只要改這裡
+// 0. 語言：中文（預設）／英文。index.html 開頭依 ?lang= 或上次的選擇設定 <html lang>（編輯後台一律中文）
+//    介面文字一律寫中文、外面包 T()；英文對照在 data/en/ui.js（UI_EN），查不到就顯示中文
+//    T('約 {n} 分鐘', { n: 5 })：大括號裡的名稱會換成對應的值
 // ---------------------------------------------------------
+const LANG = document.documentElement.lang === 'en' ? 'en' : 'zh';
+const UI_EN = window.UI_EN || {};
 function T(s, vars) {
-  let r = s;
+  let r = (LANG === 'en' && s && UI_EN[s]) || s;
   if (vars) r = r.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   return r;
 }
@@ -89,17 +92,23 @@ function inline(s) {
 
 const isStarter = (t) => /^(:::|#{2,4}\s|>|\||\[(i|v|a|3d|embed)\s|- |\d+\.\s|---$|@ |\?\? |\|\|\|$)/.test(t);
 
+// 編輯後台的預覽：每個區塊加上 data-ln（來自內文第幾行，從 0 算），點預覽就能跳到那一行的語法
+// 說明中心不開，畫面完全不變（renderMarkup 的第二個參數）
+let MARK_LINES = false;
+const markLn = (html, ln) => (MARK_LINES && html ? html.replace(/^<([a-z0-9]+)/i, `<$1 data-ln="${ln}"`) : html);
+
+// at：這一段（有開頭的話是開頭那一行）在 lines 裡的位置
 function splitAt(lines, test) {
   const parts = [];
   let cur = null, depth = 0;
-  for (const line of lines) {
+  lines.forEach((line, k) => {
     const t = line.trim();
     if (/^:::\w/.test(t)) depth++;
     else if (t === ':::') depth--;
-    if (depth === 0 && test(t)) { cur = { head: t, lines: [] }; parts.push(cur); continue; }
-    if (!cur) { cur = { head: null, lines: [] }; parts.push(cur); }
+    if (depth === 0 && test(t)) { cur = { head: t, lines: [], at: k }; parts.push(cur); return; }
+    if (!cur) { cur = { head: null, lines: [], at: k }; parts.push(cur); }
     cur.lines.push(line);
-  }
+  });
   return parts;
 }
 
@@ -152,41 +161,43 @@ function compare(arg, inner) {
     + `</div>${prompts}</figure>`;
 }
 
-function container(type, arg, inner) {
+// off：inner 第一行在整篇內文的第幾行（給編輯後台的預覽標行號）
+function container(type, arg, inner, off = 0) {
   if (type === 'compare') return compare(arg, inner);
   if (type === 'tip' || type === 'warn' || type === 'note') {
-    return `<div class="callout ${type}">${arg ? `<b>${inline(arg)}</b>` : ''}${blocks(inner)}</div>`;
+    return `<div class="callout ${type}">${arg ? `<b>${inline(arg)}</b>` : ''}${blocks(inner, off)}</div>`;
   }
-  if (type === 'details') return `<details class="more"><summary>${inline(arg)}</summary><div>${blocks(inner)}</div></details>`;
+  if (type === 'details') return `<details class="more"><summary>${inline(arg)}</summary><div>${blocks(inner, off)}</div></details>`;
   if (type === 'steps') {
     const items = splitAt(inner, (t) => t.startsWith('@ ')).filter((p) => p.head);
-    return `<ol class="steps">${items.map((p) => `<li><div class="step-t">${inline(p.head.slice(2))}</div>${blocks(p.lines)}</li>`).join('')}</ol>`;
+    return `<ol class="steps">${items.map((p) => markLn(`<li><div class="step-t">${inline(p.head.slice(2))}</div>${blocks(p.lines, off + p.at + 1)}</li>`, off + p.at)).join('')}</ol>`;
   }
   if (type === 'row') {
-    const cells = [{ lines: [] }];
+    const cells = [{ lines: [], at: 0 }];
     let depth = 0;
-    for (const line of inner) {
+    inner.forEach((line, k) => {
       const t = line.trim();
       if (/^:::\w/.test(t)) depth++; else if (t === ':::') depth--;
-      if (depth === 0 && t === '|||') { cells.push({ lines: [] }); continue; }
+      if (depth === 0 && t === '|||') { cells.push({ lines: [], at: k + 1 }); return; }
       cells[cells.length - 1].lines.push(line);
-    }
+    });
     // 每一欄都只有一張圖或影片時，手機上維持兩欄並排
     const mediaOnly = cells.every((c) => { const ls = c.lines.map((l) => l.trim()).filter(Boolean); return ls.length === 1 && /^\[(i|v)\s+\d+/.test(ls[0]); });
-    return `<div class="row${mediaOnly ? ' media' : ''}" style="--n:${cells.length}">${cells.map((c) => `<div class="cell">${blocks(c.lines)}</div>`).join('')}</div>`;
+    return `<div class="row${mediaOnly ? ' media' : ''}" style="--n:${cells.length}">${cells.map((c) => `<div class="cell">${blocks(c.lines, off + c.at)}</div>`).join('')}</div>`;
   }
   if (type === 'faq') {
     const qs = splitAt(inner, (t) => t.startsWith('?? ')).filter((p) => p.head);
-    return qs.map((p) => `<details class="qa"><summary>${inline(p.head.slice(3))}</summary><div>${blocks(p.lines)}</div></details>`).join('');
+    return qs.map((p) => markLn(`<details class="qa"><summary>${inline(p.head.slice(3))}</summary><div>${blocks(p.lines, off + p.at + 1)}</div></details>`, off + p.at)).join('');
   }
-  return blocks(inner);
+  return blocks(inner, off);
 }
 
-function blocks(lines) {
+function blocks(lines, off = 0) {
   let out = '';
   let i = 0;
   while (i < lines.length) {
     const t = lines[i].trim();
+    const at = off + i;
     // 連續空兩行以上：每多空一行就多留一行空間
     if (!t) {
       let k = 0;
@@ -203,7 +214,7 @@ function blocks(lines) {
         if (/^:::\w/.test(tt)) depth++;
         else if (tt === ':::' && --depth === 0) break;
       }
-      out += container(type, arg, lines.slice(i + 1, j));
+      out += markLn(container(type, arg, lines.slice(i + 1, j), at + 1), at);
       i = j + 1;
       continue;
     }
@@ -211,14 +222,14 @@ function blocks(lines) {
     if ((m = t.match(/^(#{2,4})\s+(.+?)(?:\s+\{#([\w-]+)\})?$/))) {
       const lvl = m[1].length;
       const id = m[3] || `h${++headingCount}`;
-      out += `<h${lvl} id="${id}">${inline(m[2])}</h${lvl}>`;
+      out += markLn(`<h${lvl} id="${id}">${inline(m[2])}</h${lvl}>`, at);
       i++; continue;
     }
-    if (t === '---') { out += '<hr>'; i++; continue; }
+    if (t === '---') { out += markLn('<hr>', at); i++; continue; }
     if (t.startsWith('>')) {
       const buf = [];
       while (i < lines.length && lines[i].trim().startsWith('>')) { buf.push(lines[i].trim().replace(/^>\s?/, '')); i++; }
-      out += `<div class="prompt"><pre>${esc(buf.join('\n'))}</pre><button type="button" class="copy" aria-label="${T('複製提示詞')}">${ic('copy')}<span>${T('複製')}</span></button></div>`;
+      out += markLn(`<div class="prompt"><pre>${esc(buf.join('\n'))}</pre><button type="button" class="copy" aria-label="${T('複製提示詞')}">${ic('copy')}<span>${T('複製')}</span></button></div>`, at);
       continue;
     }
     if (t.startsWith('|')) {
@@ -229,31 +240,35 @@ function blocks(lines) {
         i++;
       }
       const [head, ...body] = rows;
-      out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c, i) => `<td data-label="${esc(plainText(head[i] || ''))}">${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      out += markLn(`<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c, i) => `<td data-label="${esc(plainText(head[i] || ''))}">${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`, at);
       continue;
     }
-    if (/^\[(i|v|a|3d|embed)\s/.test(t)) { out += media(t); i++; continue; }
+    if (/^\[(i|v|a|3d|embed)\s/.test(t)) { out += markLn(media(t), at); i++; continue; }
     if (t.startsWith('- ')) {
       const items = [];
       while (i < lines.length && lines[i].trim().startsWith('- ')) { items.push(lines[i].trim().slice(2)); i++; }
-      out += `<ul>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</ul>`;
+      out += markLn(`<ul>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</ul>`, at);
       continue;
     }
     if ((m = t.match(/^(\d+)\.\s/))) {
       const start = +m[1];
       const items = [];
       while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) { items.push(lines[i].trim().replace(/^\d+\.\s/, '')); i++; }
-      out += `<ol${start > 1 ? ` start="${start}"` : ''}>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</ol>`;
+      out += markLn(`<ol${start > 1 ? ` start="${start}"` : ''}>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</ol>`, at);
       continue;
     }
     const buf = [];
     while (i < lines.length && lines[i].trim() && !isStarter(lines[i].trim())) { buf.push(inline(lines[i].trim())); i++; }
-    if (buf.length) out += `<p>${buf.join('<br>')}</p>`;
+    if (buf.length) out += markLn(`<p>${buf.join('<br>')}</p>`, at);
     else i++;
   }
   return out;
 }
-const renderMarkup = (src) => { headingCount = 0; return blocks(String(src).replace(/\r/g, '').split('\n')); };
+const renderMarkup = (src, opt) => {
+  headingCount = 0;
+  MARK_LINES = !!(opt && opt.lines);
+  try { return blocks(String(src).replace(/\r/g, '').split('\n')); } finally { MARK_LINES = false; }
+};
 const plainText = (src) => String(src)
   .replace(/\[(i|v|a|3d|embed)\s[^\]]*\]/g, ' ')
   .replace(/\[((?:[^\[\]]|\[[^\]]*\])+)\]\([^)]+\)/g, '$1')

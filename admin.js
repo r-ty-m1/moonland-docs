@@ -17,7 +17,7 @@ const TOKEN_KEY = 'ml-admin-token';
 let entries = [];
 let mode = 'server';
 let tab = location.hash === '#views' ? 'views' : 'fb';
-const vf = { days: 30, staff: false, sort: 'views', dir: -1 };
+const vf = { days: 30, staff: false, sort: 'views', dir: -1, lang: '' };
 let vdata = null;
 const tabsHtml = () => `<nav class="adm-tabs" aria-label="後台分頁"><a href="#feedback"${tab === 'fb' ? ' aria-current="page"' : ''}>意見回饋</a><a href="#views"${tab === 'views' ? ' aria-current="page"' : ''}>閱讀流量</a></nav>`;
 const authHeaders = () => { let t = ''; try { t = sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e) {} return t ? { authorization: `Bearer ${t}` } : {}; };
@@ -200,6 +200,8 @@ adm.addEventListener('change', (e) => {
 });
 adm.addEventListener('input', (e) => { if (e.target.id === 'fQ') { filter.q = e.target.value; drawNotes(); } });
 adm.addEventListener('click', (e) => {
+  const vl = e.target.closest('[data-vlang]');
+  if (vl) { vf.lang = vl.dataset.vlang; loadViews(); return; }
   const d = e.target.closest('[data-days]');
   if (d) { vf.days = +d.dataset.days; loadViews(); return; }
   const so = e.target.closest('[data-sort]');
@@ -241,7 +243,7 @@ addEventListener('hashchange', () => {
 async function loadViews() {
   adm.innerHTML = `${tabsHtml()}<p class="adm-loading">讀取中…</p>`;
   let r;
-  try { r = await fetch(`api/views?days=${vf.days}${vf.staff ? '&staff=1' : ''}`, { headers: authHeaders(), cache: 'no-store' }); } catch (e) { r = null; }
+  try { r = await fetch(`api/views?days=${vf.days}${vf.staff ? '&staff=1' : ''}${vf.lang ? `&lang=${vf.lang}` : ''}`, { headers: authHeaders(), cache: 'no-store' }); } catch (e) { r = null; }
   if (r && r.status === 401) {
     adm.innerHTML = `${tabsHtml()}<div class="adm-login"><h1>閱讀流量</h1><p>閱讀流量要用公司帳號登入才看得到（編輯後台的編輯者都可以看）。</p><a class="adm-btn adm-go" href="edit.html#pages" target="_blank" rel="noopener">到編輯後台登入</a><p class="adm-hint">登入後回到這裡，按「重新整理」或重新打開這頁。</p><button type="button" class="adm-btn" id="reload">重新整理</button></div>`;
     return;
@@ -307,6 +309,7 @@ function drawViews() {
     <div class="adm-head">
       <h1>閱讀流量</h1>
       <div class="adm-acts"><div class="adm-seg" role="group" aria-label="期間">${[[7, '7 天'], [30, '30 天'], [90, '90 天'], [0, '全部']].map(([d, l]) => `<button type="button" data-days="${d}" aria-pressed="${vf.days === d}">${l}</button>`).join('')}</div>
+      <div class="adm-seg" role="group" aria-label="語言">${[['', '全部語言'], ['zh', '中文'], ['en', 'English']].map(([l, t]) => `<button type="button" data-vlang="${l}" aria-pressed="${vf.lang === l}">${t}</button>`).join('')}</div>
       <button type="button" class="adm-btn" id="reload">重新整理</button></div>
     </div>
     <p class="adm-hint">${v.first ? `最早一筆紀錄是 ${fmtDate(v.first)}。` : '還沒有任何紀錄，部署後說明中心有人看文章就會開始累積。'}停留不到 3 秒的不算；一個訪客是一個瀏覽器。
@@ -317,6 +320,7 @@ function drawViews() {
       <div class="adm-tile"><small>平均閱讀時間</small><b>${t.views ? dur(t.avgSec) : '—'}</b><span>超過 30 分鐘的算 30 分鐘</span></div>
       <div class="adm-tile"><small>讀到最後</small><b>${t.views ? t.endPct + '%' : '—'}</b><span>捲到頁面九成以上</span></div>
     </div>
+    <p class="adm-hint adm-langs">這段期間中文版被看 <b>${v.langs ? v.langs.zh : 0}</b> 次、英文版 <b>${v.langs ? v.langs.en : 0}</b> 次${v.langs && v.langs.zh + v.langs.en ? `（英文占 ${pct(v.langs.en, v.langs.zh + v.langs.en)}%）` : ''}。上面的「語言」可以只看其中一種。</p>
 
     <section><h2>每天的瀏覽次數</h2><p class="adm-hint">滑鼠移到長條上可以看當天的瀏覽與訪客。</p>${chart(days)}</section>
 
@@ -343,7 +347,7 @@ function drawViews() {
     </section>
 
     <section><h2>搜尋找不到的字</h2><p class="adm-hint">讀者在說明中心搜尋、卻沒有任何結果的關鍵字。次數多的可能是缺的文章，或文章裡沒用到讀者習慣的說法。</p>
-      ${v.misses.length ? `<table class="adm-table adm-misses"><thead><tr><th scope="col">關鍵字</th><th scope="col">次數</th><th scope="col">人數</th><th scope="col">最近一次</th></tr></thead><tbody>${v.misses.map((m) => `<tr><th scope="row">${esc(m.q)}</th><td class="num">${m.n}</td><td class="num">${m.visitors}</td><td class="num">${fmtDate(m.last)}</td></tr>`).join('')}</tbody></table>` : '<p class="adm-empty">這段期間沒有找不到結果的搜尋。</p>'}
+      ${v.misses.length ? `<table class="adm-table adm-misses"><thead><tr><th scope="col">關鍵字</th><th scope="col">次數</th><th scope="col">人數</th><th scope="col">最近一次</th></tr></thead><tbody>${v.misses.map((m) => `<tr><th scope="row">${esc(m.q)}${m.en ? ' <small class="adm-gone">英文版搜尋</small>' : ''}</th><td class="num">${m.n}</td><td class="num">${m.visitors}</td><td class="num">${fmtDate(m.last)}</td></tr>`).join('')}</tbody></table>` : '<p class="adm-empty">這段期間沒有找不到結果的搜尋。</p>'}
     </section>`;
 }
 function viewsCsv() {
