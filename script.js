@@ -124,7 +124,7 @@ side.innerHTML =
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
   // 手機上頂部列放不下語言按鈕，目錄最下面也放一個
   `<button class="nav-row lang-row" type="button" data-switch-lang lang="${LANG === 'en' ? 'zh-Hant' : 'en'}">${ic('globe')}<span class="lbl">${LANG === 'en' ? '中文' : 'English'}</span></button>` +
-  `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonland.ai，或<a href="https://lin.ee/PpA769D" target="_blank" rel="noopener">加入 LINE 社群</a>詢問。')}</div>`;
+  `<div class="side-foot">${T('<b>找不到答案？</b>寫信到 support@moonland.ai，或來電 <a href="tel:+886227853069">02-2785-3069</a> 詢問。')}</div>`;
 
 function setOpen(cat, open) {
   cat.classList.toggle('open', open);

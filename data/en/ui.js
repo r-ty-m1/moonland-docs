@@ -186,7 +186,7 @@ window.UI_EN = {
   "需要回覆時會依你留的聯絡方式聯繫。": "If a reply is needed, we’ll reach you at the contact you left.",
   "目前是預覽版，回饋只存在這台電腦的瀏覽器，可以到<a href=\"admin.html\">後台頁</a>查看。": "This is a preview: feedback is only saved in this browser. You can see it on the <a href=\"admin.html\">admin page</a>.",
   "再寫一則": "Send another",
-  "<b>找不到答案？</b>寫信到 support@moonland.ai，或<a href=\"https://lin.ee/PpA769D\" target=\"_blank\" rel=\"noopener\">加入 LINE 社群</a>詢問。": "<b>Can’t find an answer?</b>Email support@moonland.ai or <a href=\"https://lin.ee/PpA769D\" target=\"_blank\" rel=\"noopener\">ask in our LINE community</a>.",
+  "<b>找不到答案？</b>寫信到 support@moonland.ai，或來電 <a href=\"tel:+886227853069\">02-2785-3069</a> 詢問。": "<b>Can’t find an answer?</b>Email support@moonland.ai or call <a href=\"tel:+886227853069\">+886 2 2785 3069</a>.",
   "付費": "Paid",
   "新": "New",
   "先看這篇": "Start here",
