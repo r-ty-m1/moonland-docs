@@ -36,8 +36,14 @@ function doPost(e) {
   var course = normCourse(body.course);
   var vid = typeof body.vid === 'string' ? body.vid.trim().slice(0, 40) : '';
   if (!course || !/^[\w-]{4,40}$/.test(vid)) return json({ error: 'bad' });
-  if (tooMany(vid)) return json({ error: 'busy' });
-  return json(claim(course, vid, new Date()));
+  // 程式出錯（例如授權不夠）時回傳原因，網頁會顯示出來；不然 Google 會回一頁錯誤網頁，網頁只能說「連線失敗」
+  try {
+    if (tooMany(vid)) return json({ error: 'busy' });
+    return json(claim(course, vid, new Date()));
+  } catch (err) {
+    console.error(err);
+    return json({ error: 'server', detail: String(err && err.message || err).slice(0, 200) });
+  }
 }
 
 function doGet() {

@@ -337,6 +337,8 @@ window.UI_EN = {
   "這個課程的帳號已經發完了，請洽講師。": "All accounts for this course have been given out. Please ask your instructor.",
   "嘗試太多次了，請過幾分鐘再試。": "Too many tries. Please wait a few minutes and try again.",
   "連線失敗，請檢查網路後再試一次。": "Connection failed. Check your network and try again.",
+  "送出的資料不正確，請重新整理頁面再試一次。": "Something went wrong with the request. Please reload the page and try again.",
+  "體驗帳號系統出了問題，請洽講師。": "The trial account system ran into a problem. Please ask your instructor.",
   "你的體驗帳號": "Your trial account",
   "課程代號 {c}": "Course code {c}",
   "複製帳號": "Copy account",

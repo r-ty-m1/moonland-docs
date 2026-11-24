@@ -282,6 +282,8 @@ const TRIAL_ERR = {
   ended: '這個課程的體驗帳號已經結束發放。',
   empty: '這個課程的帳號已經發完了，請洽講師。',
   busy: '嘗試太多次了，請過幾分鐘再試。',
+  bad: '送出的資料不正確，請重新整理頁面再試一次。',
+  server: '體驗帳號系統出了問題，請洽講師。',
 };
 function trialSaved() {
   try {
@@ -344,12 +346,17 @@ async function onTrialSubmit(e) {
   try {
     // 不指定 content-type（預設 text/plain），Apps Script 才收得到（不會觸發跨網域預檢）
     const res = await fetch(TRIAL_URL, { method: 'POST', body: JSON.stringify({ action: 'claim', course, vid: visitorId() || 'anon-' + Date.now() }) });
-    r = await res.json();
+    const text = await res.text();
+    // 回來的不是資料（Google 的錯誤頁、登入頁）＝試算表程式那邊出問題，不是學員的網路
+    try { r = JSON.parse(text); } catch (x) { r = { error: 'server', detail: `HTTP ${res.status}` }; }
   } catch (x) { r = { error: 'network' }; }
   btn.disabled = false; btn.textContent = T('領取帳號');
   // 開始時間還沒到（2026-11-24 使用者要求開始後才能領）：顯示「這個課程從 11/25 00:00 開始發放。」
   if (r && r.error === 'notyet') { err.textContent = trialStartMsg(r.start); return; }
-  if (!r || !r.ok || !r.account) { err.textContent = T(TRIAL_ERR[r && r.error] || '連線失敗，請檢查網路後再試一次。'); return; }
+  if (!r || !r.ok || !r.account) {
+    err.textContent = T(TRIAL_ERR[r && r.error] || '連線失敗，請檢查網路後再試一次。') + (r && r.error === 'server' && r.detail ? `（${r.detail}）` : '');
+    return;
+  }
   const item = { course, account: r.account, points: r.points, start: r.start, end: r.end };
   trialSave(item);
   out.innerHTML = trialCard(item);

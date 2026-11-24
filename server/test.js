@@ -80,6 +80,8 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush() {} },
     LockService: { getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) },
     CacheService: { getScriptCache: () => { const m = {}; return { get: (k) => m[k], put: (k, v) => { m[k] = v; } }; } },
+    ContentService: { createTextOutput: (t) => ({ setMimeType: () => t }), MimeType: { JSON: 'json' } },
+    console: { error() {} },
   };
   vm.createContext(gs);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'trial-apps-script/Code.gs'), 'utf8'), gs);
@@ -114,6 +116,14 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   sheet.getRange(6, 2).setValue(true);
   assert.equal(gs.claim('AB12CD', 'vid-e', now).error, 'paused');
   assert.equal(gs.claim('AB12CD', 'vid-b', now).account, b.account, '暫停時已領過的人還是看得到自己的帳號');
+  // 試算表程式出錯（例如授權不夠）要回傳原因，網頁才不會只說「連線失敗」
+  const post = (b) => JSON.parse(gs.doPost({ postData: { contents: JSON.stringify(b) } }));
+  // doPost 用的是現在的時間：把期間放寬，測試哪天跑都在發放期間內
+  sheet.getRange(4, 2, 2, 1).setValues([[D('2000-01-01T00:00:00+08:00')], [D('2100-01-01T23:59:59+08:00')]]);
+  const viaPost = post({ action: 'claim', course: 'AB12CD', vid: 'vid-b' });
+  assert.equal(viaPost.account, b.account, 'doPost 要能正常領取：' + JSON.stringify(viaPost));
+  gs.SpreadsheetApp.getActiveSpreadsheet = () => { throw new Error('需要授權'); };
+  assert.deepEqual(post({ action: 'claim', course: 'AB12CD', vid: 'vid-b' }), { error: 'server', detail: '需要授權' });
   console.log('✓ 體驗帳號（trial-apps-script）：貼上整理、不重複發放、同一人拿回原帳號、暫停與到期都正確');
 }
 
