@@ -8,6 +8,6 @@
 //   填了左側目錄最上面才會出現「領取體驗帳號」，網址是 #trial；留空就不顯示。
 window.SITE_CONFIG = {
   noServer: false,
-  trialScriptUrl: '',
+  trialScriptUrl: 'https://script.google.com/macros/s/AKfycbxvq7v0uwn2jZXMzt6H9mLpS8aePRU8qYipRu9t3gs6TImiFZl8KQn2UBSGwHz4r2C6/exec',
   googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwDj9cdYci6890hTGUk8vuPi1HBaBej6rTwxqW8jD5VePX_oZCm3bYORbmR7v31SqccpA/exec',
 };

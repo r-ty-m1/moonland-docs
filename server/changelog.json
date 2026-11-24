@@ -1,7 +1,8 @@
 {
   "說明": "網站程式的修改紀錄，顯示在編輯後台「修改紀錄 › 網站程式修改」。每次改程式（不是在後台改內容）就在 changes 最前面加一筆：date 日期、text 白話說明改了什麼；commit 是 git 的版本代號，推送後可以補上，留空也可以。",
   "changes": [
-    { "date": "2026-11-24", "text": "體驗帳號試算表的程式只能讀寫綁定的那一份試算表（@OnlyCurrentDoc），授權時不再要求存取所有試算表" },
+    { "date": "2026-11-24", "text": "填入體驗帳號試算表的網址，公司網站左側目錄出現「領取體驗帳號」" },
+    { "date": "2026-11-24", "commit": "1566761", "text": "體驗帳號試算表的程式只能讀寫綁定的那一份試算表（@OnlyCurrentDoc），授權時不再要求存取所有試算表" },
     { "date": "2026-11-24", "commit": "03968a6", "text": "新增「領取體驗帳號」頁（#trial）：學員輸入課程代號，從獨立的「體驗帳號」Google 試算表領一組不重複的一次性體驗帳號，可一鍵複製、前往 moonland.ai 登入；試算表每個梯次一個分頁，到期隔天凌晨自動刪除。config.js 填了 trialScriptUrl 才會出現。靜態版改推到 MoonShineVFX/moonland-docs-site（私人），正式網址 https://docs.moonland.ai" },
     { "date": "2026-11-23", "commit": "aaa6784", "text": "靜態版放上 GitHub：https://github.com/r-ty-m1/moonland-docs-site（公開），之後用 node tools/build-static.js --push 更新；內容沒變時不會推送" },
     { "date": "2026-11-23", "commit": "de9c04f", "text": "靜態版的吉吉問卷也收回來了：第一次來一樣會跳出問卷，答案存到 Google 試算表的「問卷」分頁（要在 Apps Script 貼上新的 Code.gs 重新部署）" },
