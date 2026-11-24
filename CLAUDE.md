@@ -22,6 +22,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - `data/sections.js`：`SECTIONS` 決定左側目錄與分類。`markup.js`：圖示、`T()`、文章標記語法 → HTML（說明中心與編輯後台共用，要在 `script.js`／`edit.js` 之前載入）。`script.js`：搜尋、明暗模式、字體大小、側欄等說明中心功能。
 - `data/*.js`：文章內容，每篇是 `window.ARTICLES` 裡的一個物件，內文用自訂標記語法寫（見 README）。多篇共用的長段落放 `data/snippets.js`。
 - `data/media.js`：媒體編號 → `["檔案路徑", 寬高比]`。檔案在 `assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>`（區域：start chat image video lab recipes models team support unused；2026-10-30 整理，規則見 README「圖片與影片」，`server/test.js` 會檢查）。圖片 WebP、影片 H.264 MP4、音訊 MP3。文章用編號引用，編號不改，搬檔只改路徑。文章裡用 `[i 編號]`、`[v 編號]`、`[a 編號]` 引用。新增媒體時用沒用過的編號，並寫對寬高比，這樣圖片載入前就先保留位置，頁內跳轉才不會跑掉。
+- **瀏覽器相容**（2026-11-24 檢查）：說明中心目標是 iOS 12／Safari 12、Android Chrome 73、桌機 Chrome／Edge 80、Firefox 78 以上（不支援 IE）。不要用 `?.`、`??`、`replaceAll`、`.at()`、regex 後顧 `(?<=`（舊 Safari 會整支程式解析失敗）。`<dialog>` 一律用 `openDialog()`／`closeDialog()`（iOS 15.4 以前沒有 showModal）；`aspect-ratio` 撐高的區塊要在 style.css 最後的 `@supports not (aspect-ratio: 1)` 補 padding；`inset` 前面先寫 top/left。
 - **所有字級用 `rem`**，不要寫 `px`，否則右上角「字體大小」（標準 100%、大 115%、特大 130%）放大不到。
 - 手機（寬度 620px 以下）表格會改成一列一張卡片，靠每個儲存格的 `data-label`；只有圖片的並排會維持兩欄。
 - 連結寫法：`[文字](#文章代號)` 到別的文章，`[文字](#h-錨點)` 跳到本頁段落，`https://` 開新分頁。連結文字可以含方括號（例如 `FLUX.2 [Klein]`）。
