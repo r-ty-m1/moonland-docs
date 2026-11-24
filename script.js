@@ -26,6 +26,8 @@ const ALIASES = {
 // 英文版（2026-11-23 加回）：公開的英文（content.js 的 ARTICLES_EN）蓋過中文的標題、摘要與內文；
 // 等級、分鐘數、圖片等沿用中文版。還沒有英文（或英文還是草稿）的頁面顯示中文，頁面上會提示
 // 大分類與小標用編輯後台填的英文名稱（SECTIONS 的 en），沒填就查 data/en/ui.js 的對照
+// 舊瀏覽器（Chrome 73、Safari 12.1 以前）沒有 Object.fromEntries
+if (!Object.fromEntries) Object.fromEntries = (list) => { const o = {}; for (const [k, v] of list) o[k] = v; return o; };
 const ZH_ARTICLES = window.ARTICLES || {};
 const EN_ARTICLES = window.ARTICLES_EN || {};
 const ARTICLES = LANG === 'en'
@@ -448,7 +450,8 @@ async function trialSaveImage(btn) {
       catch (e) { if (e && e.name === 'AbortError') return done('儲存成圖片'); }
     }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name;
+    a.href = URL.createObjectURL(blob);
+    if ('download' in a) a.download = name; else a.target = '_blank';   // 舊 iPhone 不能下載：新分頁打開圖片，長按儲存
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     done('已儲存');
@@ -569,11 +572,11 @@ function render() {
   const id = currentId();
   let body;
   if (VIEWS[id]) body = VIEWS[id]();
-  if (id === 'trial') setTimeout(() => trialWarm(view), 0);
   else if (ARTICLES[id]) body = articleView(id) + (id === 'contact' ? mailForm() : '');
   else if (CATS[id]) body = catView(id);
   else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">${T('這篇內容整理中。')}</p>`;
   view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' || id === 'trial' ? '' : feedback()));
+  if (id === 'trial') setTimeout(() => trialWarm(view), 0);   // 先畫好「儲存成圖片」的圖
   fbFrom = '';
   document.body.classList.toggle('is-home', id === 'home');
 
@@ -694,9 +697,9 @@ const zoom = document.getElementById('zoom');
 function openZoom(img) {
   zoom.querySelector('img').src = img.currentSrc || img.src;
   zoom.querySelector('img').alt = img.alt;
-  zoom.showModal();
+  openDialog(zoom);
 }
-zoom.addEventListener('click', () => zoom.close());
+zoom.addEventListener('click', () => closeDialog(zoom));
 
 // ---------------------------------------------------------
 // 目錄收合（桌機）與抽屜（手機）
@@ -829,9 +832,9 @@ function moveSel(d) {
   as[sel].classList.add('sel');
   as[sel].scrollIntoView({ block: 'nearest' });
 }
-function openSearch() { if (!INDEX) buildIndex(); q.value = ''; search(); dlg.showModal(); q.focus(); }
+function openSearch() { if (!INDEX) buildIndex(); q.value = ''; search(); openDialog(dlg); q.focus(); }
 document.getElementById('searchBtn').addEventListener('click', openSearch);
-document.getElementById('dlgClose').addEventListener('click', () => dlg.close());
+document.getElementById('dlgClose').addEventListener('click', () => closeDialog(dlg));
 document.addEventListener('click', (e) => { if (e.target.closest('[data-open-search]')) openSearch(); });
 q.addEventListener('input', search);
 q.addEventListener('keydown', (e) => {
@@ -839,11 +842,34 @@ q.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowUp') { e.preventDefault(); moveSel(-1); }
   else if (e.key === 'Enter') {
     const a = results.querySelectorAll('a')[sel];
-    if (a) { location.hash = a.getAttribute('href'); dlg.close(); }
+    if (a) { location.hash = a.getAttribute('href'); closeDialog(dlg); }
   }
 });
-results.addEventListener('click', (e) => { if (e.target.closest('a')) dlg.close(); });
-dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+results.addEventListener('click', (e) => { if (e.target.closest('a')) closeDialog(dlg); });
+dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDialog(dlg); });
+
+// 舊瀏覽器（iOS 15.4 以前的 Safari 等）沒有 <dialog> 的 showModal／close（2026-11-24 相容性檢查）：
+// 改成加 open 屬性、自己蓋一層半透明底（style.css 的 .dlg-fallback），按 Esc 或點底色關閉
+function hasDialog(d) { return typeof d.showModal === 'function'; }
+function openDialog(d) {
+  if (hasDialog(d)) { d.showModal(); return; }
+  d.setAttribute('open', '');
+  d.classList.add('dlg-fallback');
+  document.body.classList.add('dlg-open');
+}
+function closeDialog(d) {
+  if (hasDialog(d)) { d.close(); return; }
+  d.removeAttribute('open');
+  d.classList.remove('dlg-fallback');
+  if (!document.querySelector('dialog.dlg-fallback')) document.body.classList.remove('dlg-open');
+}
+document.addEventListener('keydown', (e) => {
+  const d = e.key === 'Escape' && document.querySelector('dialog.dlg-fallback');
+  if (d) closeDialog(d);
+});
+document.addEventListener('click', (e) => {
+  if (e.target === document.body && document.body.classList.contains('dlg-open')) document.querySelectorAll('dialog.dlg-fallback').forEach(closeDialog);
+});
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   if (e.key === 'Escape') closeDrawer();

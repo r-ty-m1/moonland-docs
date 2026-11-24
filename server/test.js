@@ -64,6 +64,9 @@ for (const f of ['script.js', 'markup.js', 'edit.js', 'admin.js', 'model.js', 's
   assert.deepEqual(dup, [], `${f} 有重複的函式名稱：${dup.join('、')}`);
 }
 console.log('✓ 網站程式沒有重複的函式名稱');
+// render() 的 if／else if 鏈中間不能插別的 if（2026-11-24 曾因此讓首頁、意見回饋頁變成「這篇內容整理中」）
+assert.match(fs.readFileSync(path.join(ROOT, 'script.js'), 'utf8'), /if \(VIEWS\[id\]\) body = VIEWS\[id\]\(\);\s*
+\s*else if \(ARTICLES\[id\]\)/, 'script.js 的 render()：VIEWS 那行後面要直接接 else if (ARTICLES[id])');
 
 // 體驗帳號（trial-apps-script/Code.gs）：用假的試算表跑一次「貼上帳號 → 領取」，確認不會重複發同一組
 {
