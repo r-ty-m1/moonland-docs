@@ -10,14 +10,14 @@
 //   A1 單位      B1 神奕
 //   A2 課程代號  B2 學員要輸入的代號（留空會自動產生）
 //   A3 每日點數  B3 下拉選單
-//   A4 開始      B4 2026/11/25 00:00
+//   A4 開始      B4 2026/11/25 00:00（這個時間到了才能領）
 //   A5 結束      B5 2026/11/27 23:59:59（過了這個時間就不能領，隔天凌晨自動刪除分頁）
 //   A6 暫停發放  B6 勾選框
 //   A7 （狀態：共幾組、已領幾組，自動）
 //   第 8 列是欄位名稱；第 9 列起 A 帳號（整串貼上會自動整理）、B 領取時間、C 領取者（瀏覽器代號）
 //
 // 說明中心送來：POST { action: 'claim', course, vid }（body 是 JSON，content-type 用 text/plain）
-// 回覆：{ ok: true, account, points, start, end, again } 或 { error: 'notfound'|'paused'|'ended'|'empty'|'busy'|'bad' }
+// 回覆：{ ok: true, account, points, start, end, again } 或 { error: 'notfound'|'notyet'|'paused'|'ended'|'empty'|'busy'|'bad' }（notyet 會附 start）
 
 var ROW = { unit: 1, course: 2, points: 3, start: 4, end: 5, pause: 6, status: 7, head: 8, first: 9 };
 var POINTS = ['3,000', '5,000', '6,000', '10,000', '20,000'];
@@ -53,6 +53,8 @@ function claim(course, vid, now) {
     if (!sh) return { error: 'notfound' };
     var info = readBatch(sh);
     if (!info.end || now > info.end) return { error: 'ended' };
+    // 開始時間到了才能領（2026-11-24 使用者要求），回傳開始時間讓網頁顯示「這個課程從 … 開始發放」
+    if (!info.start || now < info.start) return { error: 'notyet', start: iso(info.start) };
     var last = sh.getLastRow();
     if (last < ROW.first) return { error: 'empty' };
     var rows = sh.getRange(ROW.first, 1, last - ROW.first + 1, 3).getValues();
@@ -244,6 +246,7 @@ function updateStatus(sh) {
   if (!total) state = '還沒有帳號';
   else if (!info.end || !info.start) state = '請填開始與結束時間';
   else if (now > info.end) state = '已結束（隔天凌晨自動刪除）';
+  else if (now < info.start) state = '還沒開始（開始時間到了才能領）';
   else if (info.paused) state = '暫停發放中';
   else if (taken >= total) state = '已全部領完';
   else state = '發放中';

@@ -302,8 +302,13 @@ function trialTime(s) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+function trialStartMsg(s) {
+  const d = new Date(s);
+  if (!s || isNaN(d)) return T('這個課程還沒開始發放，請在上課時再試一次。');
+  const p = (n) => String(n).padStart(2, '0');
+  return T('這個課程從 {t} 開始發放。', { t: `${d.getMonth() + 1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` });
+}
 function trialCard(r) {
-  const notYet = new Date(r.start).getTime() > Date.now();
   return `<section class="trial-card" tabindex="-1">
     <div class="trial-k">${T('你的體驗帳號')}<small>${T('課程代號 {c}', { c: esc(r.course) })}</small></div>
     <div class="trial-acc"><code>${esc(r.account)}</code><button type="button" class="trial-copy" data-copy="${esc(r.account)}">${ic('copy')}<span>${T('複製帳號')}</span></button></div>
@@ -311,7 +316,6 @@ function trialCard(r) {
       ${r.points ? `<li>${T('每日 {n} 點（每日點數不累加，00:00 刷新）', { n: Number(r.points).toLocaleString('en-US') })}</li>` : ''}
       <li>${T('可以使用：{a} ～ {b}', { a: trialTime(r.start), b: trialTime(r.end) })}</li>
     </ul>
-    ${notYet ? `<p class="trial-note">${T('還沒到開始時間，到時候才能登入。')}</p>` : ''}
     <a class="fb-submit trial-go" href="${TRIAL_LOGIN}" target="_blank" rel="noopener">${T('前往 moonland.ai 登入')}${ic('ext')}</a>
     <div class="trial-steps">
       <ol>
@@ -343,6 +347,8 @@ async function onTrialSubmit(e) {
     r = await res.json();
   } catch (x) { r = { error: 'network' }; }
   btn.disabled = false; btn.textContent = T('領取帳號');
+  // 開始時間還沒到（2026-11-24 使用者要求開始後才能領）：顯示「這個課程從 11/25 00:00 開始發放。」
+  if (r && r.error === 'notyet') { err.textContent = trialStartMsg(r.start); return; }
   if (!r || !r.ok || !r.account) { err.textContent = T(TRIAL_ERR[r && r.error] || '連線失敗，請檢查網路後再試一次。'); return; }
   const item = { course, account: r.account, points: r.points, start: r.start, end: r.end };
   trialSave(item);

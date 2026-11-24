@@ -91,6 +91,9 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   sheet.getRange(9, 1, 2, 5).setValues([[1, 'SY11241-AAAA1111', '', 18, 'SY11241-BBBB2222'], [2, 'SY11241-CCCC3333', '', 19, 'SY11241-AAAA1111']]);
   gs.tidy(sheet);
   assert.deepEqual(sheet.getRange(9, 1, 4, 1).getValues().map((r) => r[0]), ['SY11241-AAAA1111', 'SY11241-BBBB2222', 'SY11241-CCCC3333', ''], '貼上的帳號要整理成一列一組，略過序號與重複');
+  const early = gs.claim('AB12CD', 'vid-a', D('2026-11-24T23:59:00+08:00'));
+  assert.equal(early.error, 'notyet', '開始時間還沒到不能領');
+  assert.equal(early.start, start.toISOString(), '還沒開始時要回傳開始時間，網頁才能顯示「從幾點開始發放」');
   const now = D('2026-11-25T09:00:00+08:00');
   const a = gs.claim('AB12CD', 'vid-a', now), b = gs.claim('AB12CD', 'vid-b', now), a2 = gs.claim('AB12CD', 'vid-a', now);
   assert.equal(a.account, 'SY11241-AAAA1111');
