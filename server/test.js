@@ -59,6 +59,9 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
 
 // 體驗帳號（trial-apps-script/Code.gs）：用假的試算表跑一次「貼上帳號 → 領取」，確認不會重複發同一組
 {
+  // Apps Script 用台北時間（試算表時區）；公司 CI 是 UTC，這段測試先換成台北時間，跑完換回來
+  const oldTZ = process.env.TZ;
+  process.env.TZ = 'Asia/Taipei';
   const vm = require('node:vm');
   function fakeSheet(name) {
     const g = [];   // g[列][欄]，從 0 開始
@@ -124,6 +127,7 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   assert.equal(viaPost.account, b.account, 'doPost 要能正常領取：' + JSON.stringify(viaPost));
   gs.SpreadsheetApp.getActiveSpreadsheet = () => { throw new Error('需要授權'); };
   assert.deepEqual(post({ action: 'claim', course: 'AB12CD', vid: 'vid-b' }), { error: 'server', detail: '需要授權' });
+  if (oldTZ === undefined) delete process.env.TZ; else process.env.TZ = oldTZ;
   console.log('✓ 體驗帳號（trial-apps-script）：貼上整理、不重複發放、同一人拿回原帳號、暫停與到期都正確');
 }
 
