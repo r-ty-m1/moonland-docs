@@ -67,6 +67,9 @@ SECTIONS.forEach((sec) => sec.rows.forEach((r) => {
     ORDER.push(r.id);
   }
 }));
+// 體驗帳號專區（2026-11-24）：不在 SECTIONS（編輯後台管不到），config.js 填了 trialScriptUrl 才出現
+const TRIAL_URL = (window.SITE_CONFIG && window.SITE_CONFIG.trialScriptUrl) || '';
+if (TRIAL_URL) PAGES.trial = { t: T('領取體驗帳號'), n: T('領取體驗帳號'), crumb: [] };
 
 
 // ---------------------------------------------------------
@@ -79,9 +82,9 @@ const view = document.getElementById('view');
 // 送出程式才不會跟著沒掛上，否則表單會變成整頁重新載入、跳回頂部，回饋也沒送出
 view.addEventListener('submit', (e) => {
   const id = e.target && e.target.id;
-  if (id !== 'fbForm' && id !== 'mailForm') return;
+  if (id !== 'fbForm' && id !== 'mailForm' && id !== 'trialForm') return;
   e.preventDefault();
-  Promise.resolve().then(() => (id === 'fbForm' ? onFeedbackSubmit : onMailSubmit)(e)).catch((err) => {
+  Promise.resolve().then(() => ({ fbForm: onFeedbackSubmit, mailForm: onMailSubmit, trialForm: onTrialSubmit })[id](e)).catch((err) => {
     console.error('表單送出失敗', err);
     const msg = e.target.querySelector && e.target.querySelector('.fb-error');
     if (msg) msg.textContent = T('送出失敗，請重新整理頁面再試，或改用「聯絡我們」的管道。');
@@ -121,6 +124,7 @@ function navRow(r) {
 
 side.innerHTML =
   `<a class="nav-row" href="#home" data-id="home">${ic('home')}<span class="lbl">${T('首頁')}</span></a>` +
+  (TRIAL_URL ? `<a class="nav-row" href="#trial" data-id="trial">${ic('key')}<span class="lbl">${T('領取體驗帳號')}</span></a>` : '') +
   SECTIONS.map((sec) => `<div class="nav-sec"><div class="nav-sec-label">${sec.label}</div>${sec.rows.map(navRow).join('')}</div>`).join('') +
   // 手機上頂部列放不下語言按鈕，目錄最下面也放一個
   `<button class="nav-row lang-row" type="button" data-switch-lang lang="${LANG === 'en' ? 'zh-Hant' : 'en'}">${ic('globe')}<span class="lbl">${LANG === 'en' ? '中文' : 'English'}</span></button>` +
@@ -254,7 +258,97 @@ const VIEWS = {
       <button class="fb-submit" type="submit">${T('送出回饋')}</button>
     </form>`;
   },
+  trial: () => `<div class="cat-head"><span class="cat-icon">${ic('key')}</span><h1>${T('領取體驗帳號')}</h1></div>
+    <p class="lead">${T('輸入課程上拿到的課程代號，就能領到一組 moonland.ai 一次性體驗帳號。')}</p>
+    <form class="fb-form trial-form" id="trialForm" novalidate>
+      <label class="fb-field"><span class="fb-label">${T('課程代號')}</span>
+        <input name="course" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${T('例如：K7M2QX')}"></label>
+      <p class="fb-error" role="alert"></p>
+      <button class="fb-submit" type="submit">${T('領取帳號')}</button>
+    </form>
+    <div id="trialOut">${trialSaved().map(trialCard).join('')}</div>`,
 };
+
+// ---------------------------------------------------------
+// 體驗帳號：課程代號送到「體驗帳號」試算表的 Apps Script（trial-apps-script/Code.gs），回傳一組還沒人領的帳號。
+// 同一個瀏覽器在同一個課程只會拿到同一組（用 visitorId 認），領過的存在這台電腦，下次打開還看得到。
+// 不經過公司網站（靜態版也能用）。
+// ---------------------------------------------------------
+const TRIAL_LOCAL = 'ml-trial';
+const TRIAL_LOGIN = 'https://moonland.ai/';
+const TRIAL_ERR = {
+  notfound: '找不到這個課程代號，請確認有沒有打錯。',
+  paused: '這個課程目前暫停發放，請洽講師。',
+  ended: '這個課程的體驗帳號已經結束發放。',
+  empty: '這個課程的帳號已經發完了，請洽講師。',
+  busy: '嘗試太多次了，請過幾分鐘再試。',
+};
+function trialSaved() {
+  try {
+    const now = Date.now();
+    return (JSON.parse(localStorage.getItem(TRIAL_LOCAL) || '[]') || []).filter((x) => x && x.account && new Date(x.end).getTime() > now);
+  } catch (e) { return []; }
+}
+function trialSave(r) {
+  try {
+    const list = trialSaved().filter((x) => x.course !== r.course);
+    list.unshift(r);
+    localStorage.setItem(TRIAL_LOCAL, JSON.stringify(list.slice(0, 10)));
+  } catch (e) { /* 無痕模式等存不了：這次畫面上還是看得到 */ }
+}
+function trialTime(s) {
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function trialCard(r) {
+  const notYet = new Date(r.start).getTime() > Date.now();
+  return `<section class="trial-card" tabindex="-1">
+    <div class="trial-k">${T('你的體驗帳號')}<small>${T('課程代號 {c}', { c: esc(r.course) })}</small></div>
+    <div class="trial-acc"><code>${esc(r.account)}</code><button type="button" class="trial-copy" data-copy="${esc(r.account)}">${ic('copy')}<span>${T('複製帳號')}</span></button></div>
+    <ul class="trial-meta">
+      ${r.points ? `<li>${T('每日 {n} 點（每日點數不累加，00:00 刷新）', { n: Number(r.points).toLocaleString('en-US') })}</li>` : ''}
+      <li>${T('可以使用：{a} ～ {b}', { a: trialTime(r.start), b: trialTime(r.end) })}</li>
+    </ul>
+    ${notYet ? `<p class="trial-note">${T('還沒到開始時間，到時候才能登入。')}</p>` : ''}
+    <a class="fb-submit trial-go" href="${TRIAL_LOGIN}" target="_blank" rel="noopener">${T('前往 moonland.ai 登入')}${ic('ext')}</a>
+    <div class="trial-steps">
+      <ol>
+        <li>${T('按「複製帳號」，再按「前往 moonland.ai 登入」。')}</li>
+        <li>${T('在登入畫面選「一次性體驗帳號登入」。')}</li>
+        <li>${T('貼上帳號，登入。')}</li>
+      </ol>
+      <img src="assets/trial-guide.webp" width="564" height="723" alt="${T('登入畫面：選「一次性體驗帳號登入」')}" loading="lazy">
+    </div>
+    <div class="callout warn">${T('一組帳號同時只能一個人使用：別人用同一組登入，會把你登出。請不要把帳號給別人。')}</div>
+  </section>`;
+}
+async function onTrialSubmit(e) {
+  const form = e.target;
+  const input = form.elements.course;
+  const err = form.querySelector('.fb-error');
+  const btn = form.querySelector('.fb-submit');
+  const course = input.value.replace(/\s+/g, '').toUpperCase();
+  err.textContent = '';
+  if (!course) { err.textContent = T('請輸入課程代號。'); input.focus(); return; }
+  const out = document.getElementById('trialOut');
+  const have = trialSaved().find((x) => x.course === course);
+  if (have) { out.innerHTML = trialCard(have); out.firstElementChild.focus(); return; }
+  btn.disabled = true; btn.textContent = T('領取中…');
+  let r;
+  try {
+    // 不指定 content-type（預設 text/plain），Apps Script 才收得到（不會觸發跨網域預檢）
+    const res = await fetch(TRIAL_URL, { method: 'POST', body: JSON.stringify({ action: 'claim', course, vid: visitorId() || 'anon-' + Date.now() }) });
+    r = await res.json();
+  } catch (x) { r = { error: 'network' }; }
+  btn.disabled = false; btn.textContent = T('領取帳號');
+  if (!r || !r.ok || !r.account) { err.textContent = T(TRIAL_ERR[r && r.error] || '連線失敗，請檢查網路後再試一次。'); return; }
+  const item = { course, account: r.account, points: r.points, start: r.start, end: r.end };
+  trialSave(item);
+  out.innerHTML = trialCard(item);
+  out.firstElementChild.focus();
+}
 
 function pager(id) {
   const i = ORDER.indexOf(id);
@@ -340,7 +434,7 @@ function render() {
   else if (ARTICLES[id]) body = articleView(id) + (id === 'contact' ? mailForm() : '');
   else if (CATS[id]) body = catView(id);
   else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">${T('這篇內容整理中。')}</p>`;
-  view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' ? '' : feedback()));
+  view.innerHTML = body + (id === 'home' ? '' : pager(id) + (CATS[id] || id === 'feedback' || id === 'trial' ? '' : feedback()));
   fbFrom = '';
   document.body.classList.toggle('is-home', id === 'home');
 
@@ -407,6 +501,15 @@ document.addEventListener('click', async (e) => {
       if (d) d.open = true;
       jumpTo(el);
     }
+    return;
+  }
+  const tc = e.target.closest('.trial-copy');
+  if (tc) {
+    const label = tc.querySelector('span');
+    try { await navigator.clipboard.writeText(tc.dataset.copy); }
+    catch (err) { const r = document.createRange(); r.selectNodeContents(tc.parentElement.querySelector('code')); getSelection().removeAllRanges(); getSelection().addRange(r); }
+    tc.classList.add('done'); label.textContent = T('已複製');
+    setTimeout(() => { tc.classList.remove('done'); label.textContent = T('複製帳號'); }, 1600);
     return;
   }
   const cp = e.target.closest('.copy');
@@ -885,7 +988,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !jiji.hi
 // 換到別頁（例如點了目錄）就收起來，問卷答到一半不算略過，點吉吉可以接著答
 addEventListener('hashchange', () => { if (!jiji.hidden && jj.step !== 'hello' && jj.step !== 'q') closeJiji(); });
 // 第一次來：畫面載入後，吉吉在畫面中間打招呼、問問卷（使用者 2026-11-20 要求要主動、明顯）；答完或略過就不再出現
-if (!jijiState() && (!NO_SERVER || GOOGLE_URL)) setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]')) openJiji('hello'); }, 800);
+// 來領體驗帳號的學員（#trial）不跳，免得擋住領帳號；下次來別的頁面再問
+if (!jijiState() && (!NO_SERVER || GOOGLE_URL) && currentId() !== 'trial') setTimeout(() => { if (jiji.hidden && !document.querySelector('dialog[open]') && currentId() !== 'trial') openJiji('hello'); }, 800);
 
 // ---------------------------------------------------------
 // 8. 閱讀流量：記每篇被看了多久、捲到多深、從哪裡來（回饋後台「閱讀流量」看統計）

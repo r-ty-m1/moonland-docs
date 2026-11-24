@@ -57,6 +57,57 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   console.log('✓ Google 試算表（Code.gs）：問卷題目與檢查規則和 survey.js 一致');
 }
 
+// 體驗帳號（trial-apps-script/Code.gs）：用假的試算表跑一次「貼上帳號 → 領取」，確認不會重複發同一組
+{
+  const vm = require('node:vm');
+  function fakeSheet(name) {
+    const g = [];   // g[列][欄]，從 0 開始
+    const sh = {
+      name, getName: () => sh.name, setName: (n) => { sh.name = n; }, getSheetId: () => name,
+      getLastRow: () => { for (let r = g.length; r > 0; r--) if ((g[r - 1] || []).some((v) => v !== '' && v != null)) return r; return 0; },
+      getLastColumn: () => Math.max(0, ...Array.from(g, (row) => { for (let c = (row || []).length; c > 0; c--) if (row[c - 1] !== '' && row[c - 1] != null) return c; return 0; })),
+      getRange: (r, c, nr = 1, nc = 1) => {
+        const cells = () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => { const v = (g[r - 1 + i] || [])[c - 1 + j]; return v == null ? '' : v; }));
+        const put = (vals) => vals.forEach((row, i) => row.forEach((v, j) => { (g[r - 1 + i] = g[r - 1 + i] || [])[c - 1 + j] = v; }));
+        return { getValue: () => cells()[0][0], getValues: cells, setValue: (v) => put([[v]]), setValues: put, clearContent: () => put(cells().map((row) => row.map(() => ''))) };
+      },
+    };
+    return sh;
+  }
+  const sheet = fakeSheet('體驗1125_測試');
+  const ss = { getSheets: () => [sheet], toast() {} };
+  const gs = {
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush() {} },
+    LockService: { getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) },
+    CacheService: { getScriptCache: () => { const m = {}; return { get: (k) => m[k], put: (k, v) => { m[k] = v; } }; } },
+  };
+  vm.createContext(gs);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'trial-apps-script/Code.gs'), 'utf8'), gs);
+  // 日期要在 vm 裡建立，Code.gs 的 instanceof Date 才認得（真正的 Apps Script 沒有這個問題）
+  const D = (s) => vm.runInContext(`new Date('${s}')`, gs);
+  const start = D('2026-11-25T00:00:00+08:00'), end = D('2026-11-27T23:59:59+08:00');
+  sheet.getRange(1, 1, 6, 2).setValues([['單位', '測試'], ['課程代號', 'ab 12cd'], ['每日點數', '6,000'], ['開始', start], ['結束', end], ['暫停發放', false]]);
+  // 從 Excel 表單整塊複製貼上：序號、帳號、空格、序號、帳號…，外加重複的一組
+  sheet.getRange(9, 1, 2, 5).setValues([[1, 'SY11241-AAAA1111', '', 18, 'SY11241-BBBB2222'], [2, 'SY11241-CCCC3333', '', 19, 'SY11241-AAAA1111']]);
+  gs.tidy(sheet);
+  assert.deepEqual(sheet.getRange(9, 1, 4, 1).getValues().map((r) => r[0]), ['SY11241-AAAA1111', 'SY11241-BBBB2222', 'SY11241-CCCC3333', ''], '貼上的帳號要整理成一列一組，略過序號與重複');
+  const now = D('2026-11-25T09:00:00+08:00');
+  const a = gs.claim('AB12CD', 'vid-a', now), b = gs.claim('AB12CD', 'vid-b', now), a2 = gs.claim('AB12CD', 'vid-a', now);
+  assert.equal(a.account, 'SY11241-AAAA1111');
+  assert.equal(b.account, 'SY11241-BBBB2222', '不同瀏覽器要拿到不同帳號');
+  assert.equal(a2.account, a.account, '同一個瀏覽器再領要拿到原本那組');
+  assert.equal(a.points, 6000);
+  gs.tidy(sheet);   // 已領的帳號整理後要保留領取紀錄
+  assert.equal(gs.claim('AB12CD', 'vid-c', now).account, 'SY11241-CCCC3333');
+  assert.equal(gs.claim('AB12CD', 'vid-d', now).error, 'empty');
+  assert.equal(gs.claim('XXXXXX', 'vid-d', now).error, 'notfound');
+  assert.equal(gs.claim('AB12CD', 'vid-a', D('2026-11-28T00:00:00+08:00')).error, 'ended');
+  sheet.getRange(6, 2).setValue(true);
+  assert.equal(gs.claim('AB12CD', 'vid-e', now).error, 'paused');
+  assert.equal(gs.claim('AB12CD', 'vid-b', now).account, b.account, '暫停時已領過的人還是看得到自己的帳號');
+  console.log('✓ 體驗帳號（trial-apps-script）：貼上整理、不重複發放、同一人拿回原帳號、暫停與到期都正確');
+}
+
 // --- 1b. 站內連結：[文字](#頁面代號) 要有那一頁，[文字](#h-錨點) 要在同一篇找得到 ---
 // （英文版已在 2026-10-30 移除，舊版在 git tag english-version）
 global.SNIP = {};

@@ -55,6 +55,8 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者與工程師決定：公司網站（編輯後台）照舊；網站負責人用 `tools/build-static.js` 把已公開內容包成純靜態網站，推到另一個 GitHub repo（`moonland-docs-site`，輸出在 repo 旁的 `../moonland-docs-site`），工程師從那裡放上 moonland.ai。拔掉 3D、影片音樂重壓（快取在 `../static-cache`）。
 - **靜態版不能連公司網域**（使用者 2026-11-23：換到 moonland.ai 就是為了讓外部沒有任何方式連進公司）。`config.js` 的 `noServer`（打包時設 true）：回饋與吉吉問卷只送 Google Apps Script（問卷存試算表「問卷」分頁，`Code.gs` 的 `SURVEY` 要和 `survey.js` 一致，測試會比對）、閱讀流量不記；公司網站不開放跨網域（曾短暫開過 CORS，已拿掉）。打包程式會檢查成品裡有沒有公司網址，有就停止。
 - 之後放上 moonland.ai 不再用 mason 部署；公司網站本身仍用 mason。詳細見 `docs/STATIC.md`。
+- 2026-11-24 上線 https://docs.moonland.ai；靜態版 repo 改到公司 GitHub 組織 `MoonShineVFX/moonland-docs-site`（私人，使用者是 outside collaborator），輸出資料夾 origin 已改。更新教學 PDF 在 `F:\RD\Moonland\moonland-docs\網站更新教學.pdf`。
+- **體驗帳號專區**（2026-11-24 使用者要求）：`#trial` 頁（`script.js` 的 `VIEWS.trial`），學員輸入課程代號領一組一次性體驗帳號（沒有密碼，代碼就是帳號；重複登入會踢掉前一人，所以絕不能重複發）。帳號放在**獨立**的「體驗帳號」Google 試算表（使用者不要和回饋混在一起），程式 `trial-apps-script/Code.gs`（每梯次一個分頁、貼上自動整理、分頁名依日期與單位自動改、每天凌晨刪除過期分頁），`config.js` 的 `trialScriptUrl` 有值才顯示。主站自動填帳號使用者決定先不做（只有複製＋前往登入）。
 
 ## 維護手冊
 

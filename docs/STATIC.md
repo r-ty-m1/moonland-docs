@@ -4,7 +4,8 @@
 
 - **編輯後台照舊**：同事在公司網站（https://moonland-docs-vibe.moonshine-studio.net/edit.html）編輯、存檔、公開。
 - **網站負責人打包**：在自己電腦跑一次打包程式，把「已公開的內容」包成沒有伺服器的純靜態網站。
-- **推到靜態版的 GitHub repo**（`moonland-docs-site`）：工程師從這個 repo 放上 moonland.ai。之後更新也只要重新打包、推上去。
+- **推到靜態版的 GitHub repo**（`MoonShineVFX/moonland-docs-site`，私人）：工程師從這個 repo 放上 moonland.ai。之後更新也只要重新打包、推上去。
+- **正式網址**：https://docs.moonland.ai （2026-11-24 上線）
 
 ## 打包會做什麼
 
@@ -21,6 +22,7 @@
 | 意見回饋、「有幫助嗎」投票 | 直接送 Google 試算表（`config.js` 的 `googleScriptUrl`），不經過公司網站 |
 | 吉吉問卷 | 和公司網站一樣，第一次來會跳出來；答案送到 Google 試算表的「問卷」分頁（不在編輯後台的「訪客問卷」統計裡） |
 | 閱讀流量 | 不記 |
+| 領取體驗帳號（`#trial`） | 直接送「體驗帳號」Google 試算表（`config.js` 的 `trialScriptUrl`，見 `trial-apps-script/README.md`）；沒填網址就不顯示 |
 | 編輯後台、回饋後台、伺服器程式 | 不放 |
 | 公司網址 | **成品裡不能出現**（moonshine-studio.net 等）。有人在文章裡貼了公司網址，打包會停下來、不推送，並列出在哪裡 |
 
@@ -44,7 +46,9 @@ node tools/build-static.js --push
 - **出現 ⚠ 提醒**：照提醒做。最常見的是「找不到要拿掉的段落」：有人改了「點數 3D 模型」那篇的文字，打開 `tools/build-static.js`，把 `STATIC_EDITS` 裡的文字改成新的。
 - **找不到 ffmpeg**：影片和音樂會用原檔，網站一樣能用，只是比較大。程式會自動借用電腦裡其他軟體附的 ffmpeg（例如 Topaz、Red Giant）；要自己裝的話，裝好後重開終端機再跑一次。
 
-## 第一次設定（2026-11-23 已完成：https://github.com/r-ty-m1/moonland-docs-site，公開）
+## 第一次設定（已完成：https://github.com/MoonShineVFX/moonland-docs-site，私人）
+
+2026-11-23 先放在個人帳號 `r-ty-m1/moonland-docs-site`（公開），2026-11-24 改到公司 GitHub 組織 MoonShineVFX（私人）。輸出資料夾的 `origin` 已改成新網址。推送要用有這個 repo 寫入權限的 GitHub 帳號。
 
 換電腦或重新設定時才需要：
 
@@ -57,7 +61,7 @@ cd ..\moonland-docs-site
 git init -b main
 git add -A
 git commit -m "說明中心靜態版"
-git remote add origin https://github.com/<帳號>/moonland-docs-site.git
+git remote add origin https://github.com/MoonShineVFX/moonland-docs-site.git
 git push -u origin main
 ```
 

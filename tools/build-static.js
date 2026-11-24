@@ -258,7 +258,7 @@ async function main() {
   if (!/noServer: false/.test(config)) throw new Error('config.js 找不到 noServer 設定');
   write('config.js', config.replace(/noServer: false/, 'noServer: true'));
 
-  for (const f of ['style.css', 'markup.js', 'survey.js', 'script.js', 'data/en/ui.js', 'assets/favicon.png', 'assets/logo-white.png', 'assets/logo-dark.png']) {
+  for (const f of ['style.css', 'markup.js', 'survey.js', 'script.js', 'data/en/ui.js', 'assets/favicon.png', 'assets/logo-white.png', 'assets/logo-dark.png', 'assets/trial-guide.webp']) {
     write(f, fs.readFileSync(path.join(ROOT, f)));
   }
 
