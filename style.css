@@ -583,6 +583,7 @@ ol.steps > li::before {
 .trial-go .ic { width: 1rem; height: 1rem; }
 .trial-steps { display: grid; grid-template-columns: 1fr 13rem; gap: 18px; align-items: start; }
 .trial-steps ol { margin: 0; padding-left: 1.3em; line-height: 1.9; color: var(--fg-2); }
+.trial-steps-l { display: grid; gap: 16px; justify-items: start; align-content: start; }
 .trial-steps img { width: 100%; height: auto; border-radius: 10px; }
 .trial-card .callout { margin: 0; }
 @media (max-width: 620px) {

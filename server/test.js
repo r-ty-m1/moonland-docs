@@ -57,6 +57,14 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   console.log('✓ Google 試算表（Code.gs）：問卷題目與檢查規則和 survey.js 一致');
 }
 
+// 網站程式裡同名的函式：後面的會蓋掉前面的、不會報錯（2026-11-24 曾因此讓領到的體驗帳號沒存起來）
+for (const f of ['script.js', 'markup.js', 'edit.js', 'admin.js', 'model.js', 'survey.js']) {
+  const names = [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(/^(?:async )?function (\w+)\s*\(/gm)].map((m) => m[1]);
+  const dup = names.filter((n, i) => names.indexOf(n) !== i);
+  assert.deepEqual(dup, [], `${f} 有重複的函式名稱：${dup.join('、')}`);
+}
+console.log('✓ 網站程式沒有重複的函式名稱');
+
 // 體驗帳號（trial-apps-script/Code.gs）：用假的試算表跑一次「貼上帳號 → 領取」，確認不會重複發同一組
 {
   // Apps Script 用台北時間（試算表時區）；公司 CI 是 UTC，這段測試先換成台北時間，跑完換回來

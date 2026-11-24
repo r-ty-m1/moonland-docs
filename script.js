@@ -311,7 +311,7 @@ function trialStartMsg(s) {
   return T('這個課程從 {t} 開始發放。', { t: `${d.getMonth() + 1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` });
 }
 function trialCard(r) {
-  return `<section class="trial-card" tabindex="-1">
+  return `<section class="trial-card" tabindex="-1" data-trial="${esc(JSON.stringify(r))}">
     <div class="trial-k">${T('你的體驗帳號')}<small>${T('課程代號 {c}', { c: esc(r.course) })}</small></div>
     <div class="trial-acc"><code>${esc(r.account)}</code><button type="button" class="trial-copy" data-copy="${esc(r.account)}">${ic('copy')}<span>${T('複製帳號')}</span></button></div>
     <ul class="trial-meta">
@@ -320,15 +320,139 @@ function trialCard(r) {
     </ul>
     <a class="fb-submit trial-go" href="${TRIAL_LOGIN}" target="_blank" rel="noopener">${T('前往 moonland.ai 登入')}${ic('ext')}</a>
     <div class="trial-steps">
-      <ol>
-        <li>${T('按「複製帳號」，再按「前往 moonland.ai 登入」。')}</li>
-        <li>${T('在登入畫面選「一次性體驗帳號登入」。')}</li>
-        <li>${T('貼上帳號，登入。')}</li>
-      </ol>
+      <div class="trial-steps-l">
+        <ol>
+          <li>${T('按「複製帳號」，再按「前往 moonland.ai 登入」。')}</li>
+          <li>${T('在登入畫面選「一次性體驗帳號登入」。')}</li>
+          <li>${T('貼上帳號，登入。')}</li>
+        </ol>
+        <button type="button" class="trial-copy trial-shot">${ic('image')}<span>${T('儲存成圖片')}</span></button>
+      </div>
       <img src="assets/trial-guide.webp" width="564" height="723" alt="${T('登入畫面：選「一次性體驗帳號登入」')}" loading="lazy">
     </div>
     <div class="callout warn">${T('一組帳號同時只能一個人使用：別人用同一組登入，會把你登出。請不要把帳號給別人。')}</div>
   </section>`;
+}
+// 「儲存成圖片」（2026-11-24 使用者要求）：把帳號卡片畫成 PNG，學員可以存到手機或電腦，之後找得回帳號。
+// 用 canvas 自己畫（不靠外部程式庫、不連外部網站）；顏色跟著目前的明暗模式。
+// 手機上用分享選單（可以「儲存影像」），電腦上直接下載。卡片一出現就先畫好，按下去才來得及打開分享選單。
+const TRIAL_SHOTS = {};
+function trialShot(r) {
+  const key = r.account + '|' + getComputedStyle(document.body).backgroundColor + '|' + LANG;
+  if (!TRIAL_SHOTS[key]) TRIAL_SHOTS[key] = trialDraw(r).catch((e) => { delete TRIAL_SHOTS[key]; throw e; });
+  return TRIAL_SHOTS[key];
+}
+async function trialDraw(r) {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n, d) => cs.getPropertyValue(n).trim() || d;
+  const col = {
+    bg: getComputedStyle(document.body).backgroundColor || '#fff', fg: v('--fg', '#111'), fg2: v('--fg-2', '#333'), muted: v('--muted', '#777'),
+    soft: v('--accent-soft', '#e8f8ef'), line: v('--accent-line', '#7fd3a5'), box: v('--line', '#ddd'),
+    warnSoft: v('--warn-soft', '#fff6dd'), warnLine: v('--warn-line', '#e8c66a'), warnInk: v('--warn-ink', '#7a5300'),
+  };
+  const sans = getComputedStyle(document.body).fontFamily || 'sans-serif';
+  const mono = v('--mono', 'monospace');
+  // 字型來自 Google Fonts：擋 Google 的網路（例如公司體驗電腦）會一直等不到，最多等 1.5 秒，用系統字型畫
+  const atMost = (p, ms) => Promise.race([Promise.resolve(p).catch(() => {}), new Promise((res) => setTimeout(res, ms))]);
+  if (document.fonts) await atMost(document.fonts.ready, 1500);
+  const img = new Image();
+  img.src = 'assets/trial-guide.webp';
+  await atMost(img.decode ? img.decode() : new Promise((res) => { img.onload = img.onerror = res; }), 3000);
+  const W = 680, P = 32, S = 2, IMGW = 200;
+  const IMGH = img.naturalWidth ? Math.round(IMGW * img.naturalHeight / img.naturalWidth) : 0;
+  const c = document.createElement('canvas');
+  let g = c.getContext('2d');
+  // 中文一個字一段、英文一個字一段，量寬度換行
+  const wrap = (text, maxW) => {
+    const lines = []; let line = '';
+    for (const t of String(text).match(/[⺀-鿿豈-﫿＀-￯]|[^\s⺀-鿿豈-﫿＀-￯]+\s*|\s+/g) || []) {
+      // 句號、逗號、右括號不放在行首（排不下就讓它稍微超出一點）
+      if (line && !/^[，。、；：！？）」』〉》,.;:!?)]/.test(t) && g.measureText(line + t).width > maxW) { lines.push(line.trimEnd()); line = t.trimStart(); } else line += t;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const rr = (x, y, w, h, rad) => { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad); g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); };
+  // 同一套排版跑兩次：第一次只算高度，第二次真的畫
+  const layout = (paint) => {
+    let y = P;
+    const text = (t, x, yy, font, color) => { g.font = font; if (paint) { g.fillStyle = color; g.fillText(t, x, yy); } return g.measureText(t).width; };
+    g.textBaseline = 'top';
+    const tw = text(T('你的體驗帳號'), P, y, `600 20px ${sans}`, col.fg);
+    text(T('課程代號 {c}', { c: r.course }), P + tw + 12, y + 5, `400 14px ${sans}`, col.muted);
+    y += 40;
+    g.font = `700 30px ${mono}`;
+    const aw = g.measureText(r.account).width + 40;
+    if (paint) { rr(P, y, aw, 60, 12); g.fillStyle = col.bg; g.fill(); g.strokeStyle = col.box; g.lineWidth = 1; g.stroke(); }
+    text(r.account, P + 20, y + 15, `700 30px ${mono}`, col.fg);
+    y += 60 + 20;
+    g.font = `400 16px ${sans}`;
+    const bullets = [];
+    if (r.points) bullets.push(T('每日 {n} 點（每日點數不累加，00:00 刷新）', { n: Number(r.points).toLocaleString('en-US') }));
+    bullets.push(T('可以使用：{a} ～ {b}', { a: trialTime(r.start), b: trialTime(r.end) }));
+    for (const b of bullets) {
+      g.font = `400 16px ${sans}`;
+      wrap(b, W - 2 * P - 18).forEach((l, i) => { if (i === 0) text('•', P, y, `400 16px ${sans}`, col.fg2); text(l, P + 18, y, `400 16px ${sans}`, col.fg2); y += 28; });
+    }
+    y += 14;
+    const top = y, colW = W - 2 * P - (IMGH ? IMGW + 24 : 0);
+    const steps = [T('按「複製帳號」，再按「前往 moonland.ai 登入」。'), T('在登入畫面選「一次性體驗帳號登入」。'), T('貼上帳號，登入。')];
+    steps.forEach((st, n) => {
+      g.font = `400 16px ${sans}`;
+      wrap(st, colW - 24).forEach((l, i) => { if (i === 0) text(`${n + 1}.`, P, y, `400 16px ${sans}`, col.fg2); text(l, P + 24, y, `400 16px ${sans}`, col.fg2); y += 28; });
+    });
+    y += 10;
+    text(T('登入網址：moonland.ai'), P, y, `600 16px ${sans}`, col.fg);
+    y += 28;
+    if (IMGH) {
+      if (paint) { g.save(); rr(W - P - IMGW, top, IMGW, IMGH, 10); g.clip(); g.drawImage(img, W - P - IMGW, top, IMGW, IMGH); g.restore(); }
+      y = Math.max(y, top + IMGH);
+    }
+    y += 20;
+    g.font = `500 15px ${sans}`;
+    const warn = wrap(T('一組帳號同時只能一個人使用：別人用同一組登入，會把你登出。請不要把帳號給別人。'), W - 2 * P - 36);
+    const wh = warn.length * 26 + 28;
+    if (paint) { rr(P, y, W - 2 * P, wh, 12); g.fillStyle = col.warnSoft; g.fill(); g.strokeStyle = col.warnLine; g.stroke(); }
+    warn.forEach((l, i) => text(l, P + 18, y + 14 + i * 26, `500 15px ${sans}`, col.warnInk));
+    y += wh + 16;
+    text(T('moonland.ai 說明中心'), P, y, `400 13px ${sans}`, col.muted);
+    return y + 18 + P - 8;
+  };
+  const H = layout(false);
+  c.width = W * S; c.height = H * S;
+  g = c.getContext('2d');
+  g.scale(S, S);
+  g.fillStyle = col.bg; g.fillRect(0, 0, W, H);
+  rr(0.5, 0.5, W - 1, H - 1, 16); g.fillStyle = col.soft; g.fill(); g.strokeStyle = col.line; g.lineWidth = 1; g.stroke();
+  layout(true);
+  return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('toBlob'))), 'image/png'));
+}
+function trialWarm(root) {
+  (root || document).querySelectorAll('.trial-card[data-trial]').forEach((el) => {
+    try { trialShot(JSON.parse(el.dataset.trial)).catch(() => {}); } catch (e) { /* 資料壞了就不預先畫 */ }
+  });
+}
+async function trialSaveImage(btn) {
+  const label = btn.querySelector('span');
+  const done = (t) => { label.textContent = T(t); setTimeout(() => { label.textContent = T('儲存成圖片'); }, 1800); };
+  let r;
+  try { r = JSON.parse(btn.closest('.trial-card').dataset.trial); } catch (e) { return done('儲存失敗'); }
+  label.textContent = T('製作中…');
+  try {
+    const blob = await trialShot(r);
+    const name = `moonland-${r.account}.png`;
+    const file = typeof File === 'function' ? new File([blob], name, { type: 'image/png' }) : null;
+    // 手機：分享選單（iPhone 可「儲存影像」、Android 可存到相簿）；不支援或被擋就改成下載
+    if (file && matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return done('已儲存'); }
+      catch (e) { if (e && e.name === 'AbortError') return done('儲存成圖片'); }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    done('已儲存');
+  } catch (e) { console.error('儲存圖片失敗', e); done('儲存失敗'); }
 }
 async function onTrialSubmit(e) {
   const form = e.target;
@@ -340,7 +464,7 @@ async function onTrialSubmit(e) {
   if (!course) { err.textContent = T('請輸入課程代號。'); input.focus(); return; }
   const out = document.getElementById('trialOut');
   const have = trialSaved().find((x) => x.course === course);
-  if (have) { out.innerHTML = trialCard(have); out.firstElementChild.focus(); return; }
+  if (have) { out.innerHTML = trialCard(have); trialWarm(out); out.firstElementChild.focus(); return; }
   btn.disabled = true; btn.textContent = T('領取中…');
   let r;
   try {
@@ -360,6 +484,7 @@ async function onTrialSubmit(e) {
   const item = { course, account: r.account, points: r.points, start: r.start, end: r.end };
   trialSave(item);
   out.innerHTML = trialCard(item);
+  trialWarm(out);
   out.firstElementChild.focus();
 }
 
@@ -444,6 +569,7 @@ function render() {
   const id = currentId();
   let body;
   if (VIEWS[id]) body = VIEWS[id]();
+  if (id === 'trial') setTimeout(() => trialWarm(view), 0);
   else if (ARTICLES[id]) body = articleView(id) + (id === 'contact' ? mailForm() : '');
   else if (CATS[id]) body = catView(id);
   else body = `${crumb(id)}<h1>${esc(PAGES[id].t)}</h1><p class="lead">${T('這篇內容整理中。')}</p>`;
@@ -516,6 +642,8 @@ document.addEventListener('click', async (e) => {
     }
     return;
   }
+  const shot = e.target.closest('.trial-shot');
+  if (shot) { trialSaveImage(shot); return; }
   const tc = e.target.closest('.trial-copy');
   if (tc) {
     const label = tc.querySelector('span');
