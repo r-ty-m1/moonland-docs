@@ -11,7 +11,7 @@
 //   A2 課程代號  B2 學員要輸入的代號（留空會自動產生）
 //   A3 每日點數  B3 下拉選單
 //   A4 開始      B4 2026/11/25 00:00（這個時間到了才能領）
-//   A5 結束      B5 2026/11/27 23:59:59（過了這個時間就不能領，隔天凌晨自動刪除分頁）
+//   A5 結束      B5 2026/11/27 23:59:59（過了這個時間就不能領，隔天凌晨自動刪除分頁；只選日期會自動補 23:59:59）
 //   A6 暫停發放  B6 勾選框
 //   A7 （狀態：共幾組、已領幾組，自動）
 //   第 8 列是欄位名稱；第 9 列起 A 帳號（整串貼上會自動整理）、B 領取時間、C 領取者（瀏覽器代號）
@@ -125,7 +125,7 @@ function newBatch() {
     .setHelpText('從選單挑，或直接輸入其他點數').build());
   sh.getRange(ROW.start, 2, 2, 1).setNumberFormat('yyyy/mm/dd hh:mm:ss')
     .setDataValidation(SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false)
-      .setHelpText('日期加時間，例如 2026/11/27 23:59:59').build());
+      .setHelpText('雙擊選日期就好：開始自動是 00:00:00，結束自動是 23:59:59。要其他時間再自己打，例如 2026/11/27 18:00').build());
   sh.getRange(ROW.pause, 2).insertCheckboxes();
   sh.getRange(ROW.first, 2, 500, 1).setNumberFormat('yyyy/mm/dd hh:mm');
   sh.setColumnWidth(1, 220);
@@ -146,6 +146,7 @@ function onEdit(e) {
   if (lastR >= ROW.first) tidy(sh);
   if (r <= ROW.end) {
     if (r <= ROW.course && lastR >= ROW.course) checkCourse(sh);
+    if (r <= ROW.end && lastR >= ROW.end) fixEndTime(sh);
     renameBatch(sh);
   }
   updateStatus(sh);
@@ -213,6 +214,24 @@ function renameBatch(sh) {
   var ss = sh.getParent(), name = want;
   for (var n = 2; ss.getSheetByName(name); n++) name = want + ' (' + n + ')';
   sh.setName(name);
+}
+
+// 結束只選了日期（時間是 00:00:00）就改成當天 23:59:59（2026-11-24 使用者要求）；開始只選日期本來就是 00:00:00
+function fixEndTime(sh) {
+  var cell = sh.getRange(ROW.end, 2), v = cell.getValue();
+  if (v instanceof Date && isMidnight(v)) cell.setValue(endOfDay(v));
+}
+
+// 結束時間是 00:00:00 一律當成那天的 23:59:59（萬一沒經過 onEdit，例如整列貼上，也不會提早一天結束）
+function endOfDay(d) {
+  if (!isMidnight(d)) return d;
+  var e = new Date(d.getTime());
+  e.setHours(23, 59, 59, 0);
+  return e;
+}
+
+function isMidnight(d) {
+  return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
 }
 
 // 課程代號：空白就產生一個；和其他梯次重複就提醒
@@ -326,7 +345,7 @@ function readBatch(sh) {
     course: normCourse(v[ROW.course - 1]),
     points: Number(String(v[ROW.points - 1]).replace(/[^\d]/g, '')) || 0,
     start: v[ROW.start - 1] instanceof Date ? v[ROW.start - 1] : null,
-    end: v[ROW.end - 1] instanceof Date ? v[ROW.end - 1] : null,
+    end: v[ROW.end - 1] instanceof Date ? endOfDay(v[ROW.end - 1]) : null,
     paused: v[ROW.pause - 1] === true,
   };
 }

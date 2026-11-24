@@ -105,6 +105,12 @@ console.log(`✓ 網站程式修改紀錄 ${CHANGES.length} 筆，格式正確`)
   assert.equal(gs.claim('AB12CD', 'vid-d', now).error, 'empty');
   assert.equal(gs.claim('XXXXXX', 'vid-d', now).error, 'notfound');
   assert.equal(gs.claim('AB12CD', 'vid-a', D('2026-11-28T00:00:00+08:00')).error, 'ended');
+  // 結束只選日期（00:00:00）要當成那天 23:59:59：最後一天下午還能拿回帳號，隔天就不行
+  sheet.getRange(5, 2).setValue(D('2026-11-27T00:00:00+08:00'));
+  assert.equal(gs.claim('AB12CD', 'vid-a', D('2026-11-27T15:00:00+08:00')).account, a.account, '結束只選日期時，最後一天整天都要能領');
+  assert.equal(gs.claim('AB12CD', 'vid-a', D('2026-11-28T00:00:00+08:00')).error, 'ended');
+  gs.fixEndTime(sheet);
+  assert.equal(sheet.getRange(5, 2).getValue().toISOString(), D('2026-11-27T23:59:59+08:00').toISOString(), '選了結束日期要自動改成 23:59:59');
   sheet.getRange(6, 2).setValue(true);
   assert.equal(gs.claim('AB12CD', 'vid-e', now).error, 'paused');
   assert.equal(gs.claim('AB12CD', 'vid-b', now).account, b.account, '暫停時已領過的人還是看得到自己的帳號');
