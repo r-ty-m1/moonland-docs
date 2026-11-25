@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant-TW"><head><meta charset="utf-8"><title>推送到 GitHub 教學</title>
+<!-- 這份是「推送到 GitHub 教學.pdf」的原始檔（2026-11-25）。改了之後用 Edge 另存 PDF：
+     msedge --headless --no-pdf-header-footer --print-to-pdf="..\..\推送到 GitHub 教學.pdf" push-guide.html -->
+<style>
+@page { size: A4; margin: 13mm 14mm; }
+* { box-sizing: border-box; }
+body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; color: #1d2421; font-size: 10pt; line-height: 1.48; margin: 0; }
+h1 { font-size: 17pt; margin: 0 0 2px; }
+.sub { color: #5b6661; margin: 0 0 10px; font-size: 9.5pt; }
+h2 { font-size: 11.5pt; margin: 14px 0 5px; padding: 4px 10px; background: #e3f6ec; border-left: 4px solid #12b866; border-radius: 3px; break-after: avoid; }
+ol, ul { margin: 3px 0 3px; padding-left: 1.4em; }
+li { margin: 2px 0; }
+code, .cmd { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+.cmd { display: block; background: #1d2421; color: #e8f5ee; padding: 6px 10px; border-radius: 6px; margin: 4px 0; white-space: pre-wrap; }
+code { background: #eef1ef; padding: 0 4px; border-radius: 3px; }
+table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 9.2pt; }
+th, td { border: 1px solid #cfd8d3; padding: 4px 7px; text-align: left; vertical-align: top; }
+th { background: #f2f5f3; }
+.flow { display: flex; gap: 6px; align-items: stretch; margin: 6px 0 2px; }
+.flow div { flex: 1; border: 1px solid #12b866; border-radius: 8px; padding: 6px 8px; font-size: 9pt; background: #f6fcf9; }
+.flow b { display: block; font-size: 9.6pt; }
+.flow span.arrow { flex: none; align-self: center; color: #12b866; font-weight: bold; }
+.note { background: #fff6e0; border: 1px solid #f0cf7a; border-radius: 6px; padding: 6px 10px; font-size: 9.2pt; margin: 6px 0; }
+.page { break-before: page; }
+</style></head><body>
+<h1>moonland.ai 說明中心：推送到 GitHub 教學</h1>
+<p class="sub">資料夾已從負責人的 F 槽搬到共用槽，同事也能接手。2026-11-25 版（取代 11-24 的「網站更新教學」）。</p>
+
+<table>
+<tr><th style="width:24%">名稱</th><th>位置</th></tr>
+<tr><td>共用資料夾</td><td><code>U:\_研發\tznung\moonland-docs</code>（網路路徑 <code>\\qsan\share\_研發\tznung\moonland-docs</code>）</td></tr>
+<tr><td>程式（repo）</td><td><code>U:\_研發\tznung\moonland-docs\repo</code></td></tr>
+<tr><td>打包出來的靜態版</td><td><code>U:\_研發\tznung\moonland-docs\moonland-docs-site</code>（不要手動改裡面的檔案）</td></tr>
+<tr><td>壓好的影片音樂</td><td><code>U:\_研發\tznung\moonland-docs\static-cache</code>（不要刪，刪了下次要重壓很久）</td></tr>
+<tr><td>編輯後台（公司網站）</td><td><code>https://moonland-docs-vibe.moonshine-studio.net/edit.html</code></td></tr>
+<tr><td>對外網站</td><td><code>https://docs.moonland.ai</code></td></tr>
+</table>
+
+<p>這裡有<b>兩種推送</b>，要推到不同地方：</p>
+<table>
+<tr><th style="width:24%">改了什麼</th><th style="width:38%">推到哪裡</th><th>結果</th></tr>
+<tr><td><b>A. 只改內容</b><br>（同事在後台改文章、圖片）</td><td>GitHub <code>MoonShineVFX/moonland-docs-site</code>（私人）</td><td>docs.moonland.ai 更新</td></tr>
+<tr><td><b>B. 改了程式</b><br>（版面、功能、<code>config.js</code>）</td><td>先推公司 Gitea 與 GitHub <code>r-ty-m1/moonland-docs</code>，再做 A</td><td>公司網站先更新，docs.moonland.ai 接著更新</td></tr>
+</table>
+
+<div class="note">⚠ 共用資料夾一次只讓<b>一個人</b>打包或推送。開始前在群組說一聲，做完再說一聲，避免兩個人同時改同一個資料夾。</div>
+
+<h2>A. 只改內容：打包並推送到 MoonShineVFX</h2>
+<div class="flow">
+  <div><b>① 編輯</b>同事在後台改好、按公開</div><span class="arrow">→</span>
+  <div><b>② 打包</b>把已公開的內容包成靜態版</div><span class="arrow">→</span>
+  <div><b>③ 預覽</b>在自己電腦看一遍</div><span class="arrow">→</span>
+  <div><b>④ 推送</b>推到 GitHub</div><span class="arrow">→</span>
+  <div><b>⑤ 上線</b>docs.moonland.ai 更新</div>
+</div>
+<ol>
+  <li><b>確認內容</b>：只有<b>已公開</b>的頁面會進靜態版（草稿、封存不會）。先在公司網站的說明中心看一遍。</li>
+  <li><b>開終端機</b>：檔案總管打開 <code>U:\_研發\tznung\moonland-docs\repo</code>，在網址列輸入 <code>powershell</code> 按 Enter。</li>
+  <li><b>打包（先不推送）</b>：輸入下面這行按 Enter。最後出現「完成」和檔案數、大小就好了；有新影片時要等幾分鐘。
+    <span class="cmd">node tools/build-static.js</span></li>
+  <li><b>預覽</b>：輸入下面這行，用瀏覽器打開 <code>http://localhost:8091</code> 看改過的頁面，看完回終端機按 <code>Ctrl + C</code>。
+    <span class="cmd">python -m http.server 8091 -d ..\moonland-docs-site</span></li>
+  <li><b>推送</b>：沒問題就輸入下面這行。出現<b>「已推送」</b>就完成；出現<b>「內容和上次一樣」</b>表示沒有新內容，不會推送。
+    <span class="cmd">node tools/build-static.js --push</span></li>
+  <li><b>確認上線</b>：用手機或公司外的網路打開 docs.moonland.ai。公司電腦連不到外部網址時，不代表網站壞了。</li>
+</ol>
+
+<h2>B. 改了程式：先推公司網站</h2>
+<p>程式改好、在 repo 資料夾的終端機輸入（每行按一次 Enter）：</p>
+<span class="cmd">node server/test.js
+git add -A
+git commit -m "這次改了什麼（用一句話寫）"
+git push gitea main
+git push origin main</span>
+<ul>
+  <li><code>node server/test.js</code> 最後沒有出現錯誤才繼續；有錯誤時不要推，公司網站的自動部署也會因為同樣的錯誤失敗。</li>
+  <li><code>git push gitea main</code> 會自動部署公司網站，約 5～10 分鐘。部署好、在公司網站確認新功能正常後，再照 <b>A</b> 打包推送到 docs.moonland.ai。</li>
+  <li>改了 css 或 js，要把 <code>index.html</code>、<code>edit.html</code>、<code>admin.html</code> 裡的 <code>?v=</code> 版本號換掉，否則讀者會看到瀏覽器快取的舊檔。</li>
+</ul>
+
+<h2>遇到狀況</h2>
+<table>
+<tr><th style="width:34%">畫面出現</th><th>怎麼辦</th></tr>
+<tr><td>⚠ 發現公司網址，停止打包</td><td>有文章貼了 moonshine-studio.net 等公司網址。照畫面列出的頁面，到後台拿掉網址、儲存，再打包一次。<b>對外網站絕不能出現公司網址。</b></td></tr>
+<tr><td>⚠ 找不到要拿掉的段落</td><td>有人改了「點數 3D 模型」介紹 3D 範例的文字。網站還是能用，請負責程式的人更新 <code>tools/build-static.js</code> 的 <code>STATIC_EDITS</code>。</td></tr>
+<tr><td>找不到 ffmpeg</td><td>新影片和音樂會用原檔，網站一樣能用，只是比較大。</td></tr>
+<tr><td>讀取內容失敗</td><td>要在公司網路裡、公司說明中心打得開才能打包。</td></tr>
+<tr><td>dubious ownership、unsafe repository</td><td>資料夾在共用槽，Git 不認得擁有者。照下面「第一次在新電腦使用」第 3 步加一次就好。</td></tr>
+<tr><td>推送失敗：403、Permission denied</td><td>登入的 GitHub 帳號沒有寫入權限：靜態版找 MoonShineVFX 的管理員、程式 repo 找 r-ty-m1 的擁有者加權限。推 gitea 出現 403 或 authentication failed：照公司 mason 的 gitea-access 設定個人 access token。</td></tr>
+<tr><td>推送失敗：rejected、fetch first</td><td>有人先推了新的內容。<b>不要強制推送</b>。程式 repo 先輸入 <code>git pull gitea main</code> 再推；靜態版請負責程式的人處理。</td></tr>
+</table>
+
+<h2>第一次在新電腦使用（同事接手時）</h2>
+<ol>
+  <li><b>安裝</b>：Node.js（LTS 版）、Git、Python。裝好後重開終端機，輸入 <code>node -v</code>、<code>git --version</code>、<code>python --version</code> 都有出現版本號就好。</li>
+  <li><b>權限</b>（找管理員加）：
+    <ul>
+      <li>GitHub <code>MoonShineVFX/moonland-docs-site</code> 的寫入權限（推靜態版，A 需要）</li>
+      <li>GitHub <code>r-ty-m1/moonland-docs</code> 的寫入權限，與公司 Gitea <code>ufst47/moonland-docs</code> 的寫入權限（改程式，B 才需要）</li>
+    </ul></li>
+  <li><b>讓 Git 信任共用資料夾</b>（每台電腦做一次）：
+    <span class="cmd">git config --global --add safe.directory U:/_研發/tznung/moonland-docs/repo
+git config --global --add safe.directory U:/_研發/tznung/moonland-docs/moonland-docs-site</span></li>
+  <li><b>第一次推送</b>時會跳出 GitHub 登入視窗：用有權限的<b>自己的</b>帳號登入。不要用別人的帳號或把密碼、token 貼給別人。</li>
+</ol>
+
+<h2>不用再管的東西</h2>
+<ul>
+  <li><b>.env</b>：2026-11-25 拿掉 Zulip 通知後，網站不需要 <code>.env</code>，所以共用資料夾裡沒有這個檔案，也不要放金鑰進來。</li>
+  <li><b>F 槽的舊資料夾</b>（<code>F:\RD\Moonland\moonland-docs</code>）：只是備份，之後都在共用槽改。</li>
+  <li>更完整的說明（給負責程式的人）：<code>repo\docs\STATIC.md</code>、<code>repo\docs\MAINTENANCE.md</code>。</li>
+</ul>
+</body></html>

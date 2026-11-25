@@ -34,7 +34,7 @@
 
 ## 每次更新
 
-在 repo 資料夾（`F:\RD\Moonland\moonland-docs\repo`）打開終端機：
+在 repo 資料夾（`U:\_研發\tznung\moonland-docs\repo`（2026-11-25 從 F 槽搬到共用槽））打開終端機：
 
 ```powershell
 node tools/build-static.js --push
@@ -42,7 +42,7 @@ node tools/build-static.js --push
 
 畫面最後出現「已推送」就完成了。內容沒有變的話會顯示「內容和上次一樣」，不會推送。
 
-- **只想先看看、不推送**：拿掉 `--push`。打包好的網站在 `F:\RD\Moonland\moonland-docs\moonland-docs-site`，用 `python -m http.server 8091 -d ..\moonland-docs-site` 開，再用瀏覽器打開 http://localhost:8091。
+- **只想先看看、不推送**：拿掉 `--push`。打包好的網站在 `U:\_研發\tznung\moonland-docs\moonland-docs-site`，用 `python -m http.server 8091 -d ..\moonland-docs-site` 開，再用瀏覽器打開 http://localhost:8091。
 - **出現 ⚠ 提醒**：照提醒做。最常見的是「找不到要拿掉的段落」：有人改了「點數 3D 模型」那篇的文字，打開 `tools/build-static.js`，把 `STATIC_EDITS` 裡的文字改成新的。
 - **找不到 ffmpeg**：影片和音樂會用原檔，網站一樣能用，只是比較大。程式會自動借用電腦裡其他軟體附的 ffmpeg（例如 Topaz、Red Giant）；要自己裝的話，裝好後重開終端機再跑一次。
 

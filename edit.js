@@ -1364,18 +1364,18 @@ function viewHelp() {
       <li>網站打不開、圖片全部不見、登入失敗：找平台組，並告訴他們網站網址和發生時間。工程師用的維護手冊在程式碼的 <code>docs/MAINTENANCE.md</code>。</li>
       <li>讀者的意見回饋在「回饋後台」（<a href="admin.html">admin.html</a>）。</li></ul>`)}
     ${sec('10. 更新對外網站 docs.moonland.ai（網站負責人）', `
-      <p>在這裡儲存、公開的內容，只會馬上出現在<b>公司內部</b>的說明中心。對外的 <a href="https://docs.moonland.ai" target="_blank" rel="noopener">docs.moonland.ai</a> 是另外打包的「靜態版」：沒有後台、不會連回公司，要由網站負責人在<b>自己的電腦（F 槽）</b>打包、推送後才會更新。</p>
+      <p>在這裡儲存、公開的內容，只會馬上出現在<b>公司內部</b>的說明中心。對外的 <a href="https://docs.moonland.ai" target="_blank" rel="noopener">docs.moonland.ai</a> 是另外打包的「靜態版」：沒有後台、不會連回公司，要由網站負責人在共用槽 <code>U:\\_研發\\tznung\\moonland-docs</code> 打包、推送後才會更新（2026-11-25 從負責人的 F 槽搬過來，同事也能接手；完整步驟見那個資料夾裡的「推送到 GitHub 教學.pdf」）。</p>
       <p><b>位置</b></p>
       <ul>
-        <li>程式：<code>F:\\RD\\Moonland\\moonland-docs\\repo</code></li>
-        <li>打包好的靜態版：<code>F:\\RD\\Moonland\\moonland-docs\\moonland-docs-site</code>（不要手動改裡面的檔案）</li>
-        <li>壓好的影片音樂：<code>F:\\RD\\Moonland\\moonland-docs\\static-cache</code>（不要刪，刪了下次要重壓很久）</li>
+        <li>程式：<code>U:\\_研發\\tznung\\moonland-docs\\repo</code></li>
+        <li>打包好的靜態版：<code>U:\\_研發\\tznung\\moonland-docs\\moonland-docs-site</code>（不要手動改裡面的檔案）</li>
+        <li>壓好的影片音樂：<code>U:\\_研發\\tznung\\moonland-docs\\static-cache</code>（不要刪，刪了下次要重壓很久）</li>
         <li>推送到：GitHub <code>MoonShineVFX/moonland-docs-site</code>（私人），工程師從這裡放上 docs.moonland.ai</li>
       </ul>
       <p><b>步驟</b></p>
       <ol>
         <li><b>確認內容</b>：同事改好的頁面已經公開（不是草稿），先在公司的說明中心看一遍。只有公開的頁面會進靜態版；3D 模型會自動拿掉，圖片轉 WebP、影片音樂會壓小。</li>
-        <li><b>開終端機</b>：檔案總管打開 <code>F:\\RD\\Moonland\\moonland-docs\\repo</code>，在網址列輸入 <code>powershell</code> 按 Enter。</li>
+        <li><b>開終端機</b>：檔案總管打開 <code>U:\\_研發\\tznung\\moonland-docs\\repo</code>，在網址列輸入 <code>powershell</code> 按 Enter。</li>
         <li><b>打包（先不推送）</b>：輸入 <code>node tools/build-static.js</code> 按 Enter。最後出現「完成」和檔案數、大小就好了；有新影片時要等幾分鐘。</li>
         <li><b>預覽</b>：輸入 <code>python -m http.server 8091 -d ..\\moonland-docs-site</code>，用瀏覽器打開 <code>http://localhost:8091</code> 看改過的頁面。看完回終端機按 Ctrl + C。</li>
         <li><b>推送</b>：輸入 <code>node tools/build-static.js --push</code>。出現「已推送」就完成；出現「內容和上次一樣」表示沒有新內容，不會推送。</li>

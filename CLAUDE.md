@@ -46,7 +46,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 說明中心不用登入、網址對外公開；編輯後台要公司帳號登入（`vibe.yaml` 的 `auth.mode: oidc`、`callback_path: /api/auth/callback/authentik`）。內容、上傳、回饋存在 persistence（`mount_path: /app/storage`，Dockerfile 的 `DATA_DIR`；不能用 `/app/data`，那是程式附的文章資料夾）。後台上傳的圖片與影片存物件儲存（2026-11-18 使用者要求，`vibe.yaml` 的 `storage: s3`，`server/s3.js` 自己實作 SigV4、不裝 SDK，簽章用 AWS 官方範例釘在 `server/test.js`）：圖片經伺服器 PUT、影片由瀏覽器拿預簽網址直接 PUT（單次、上限 90 MB，避開 Cloudflare 100 MB）、`/video/start` 先保留檔名、`/video/finish` HEAD 確認後才給編號；讀取時 302 到簽章時間取整到小時的預簽網址。沒有 `S3_*` 時圖片退回 `DATA_DIR/media`、影片回 503。程式附的 `assets/media/` 不搬。本機 `compose.yaml` 已併入 mason 的本機 Silo；Docker Desktop 在使用者電腦 2026-11-18 起不來，還沒用真的 Silo 測過。
 - 回饋後台：使用者選用公司 Google 試算表（2026-11-18），後台讀試算表、密碼是 Apps Script 指令碼屬性 `ADMIN_TOKEN`。伺服器端的 `ADMIN_TOKEN` 沒有宣告在 `vibe.yaml`，所以沒設試算表時正式站的後台讀不到伺服器上的回饋。
 - `ci.yaml` 由公司範本產生，不要手動改；要更新用 mason 的 containerize skill（`ci_template.py`），`deploy-site` 部署前會自動更新。2026-11-18 檢查是 `outdated`（舊的 vibe-deploy 範本），第一次部署時更新。
-- 部署流程用 mason plugin（取代 vibe-deploy，原始碼 `U:\_研發\tznung\mason`，使用者已安裝）：assess-readiness → containerize → deploy-site；推送權限用 gitea-access。推送需要用使用者的公司帳號，所以要在使用者自己的電腦上做。工作用的 clone 在 `F:\RD\Moonland\moonland-docs\repo`。網站不需要 `.env`（2026-11-25 拿掉 Zulip 通知）。
+- 部署流程用 mason plugin（取代 vibe-deploy，原始碼 `U:\_研發\tznung\mason`，使用者已安裝）：assess-readiness → containerize → deploy-site；推送權限用 gitea-access。推送需要用使用者的公司帳號，所以要在使用者自己的電腦上做。工作用的 clone 在共用槽 `U:\_研發\tznung\moonland-docs\repo`（2026-11-25 從 `F:\RD\Moonland\moonland-docs` 搬來，F 槽的舊資料夾留著當備份，不要再在那裡改）。網站不需要 `.env`（2026-11-25 拿掉 Zulip 通知）。
 - 2026-11-18 使用者決定：網址 `https://moonland-docs-vibe.moonshine-studio.net`（應用名稱 moonland-docs）、說明中心對外公開、登入沿用公司 SSO 不加「登出公司帳號」、上傳的圖片與影片改存 S3、正式站讓搜尋引擎收錄、主管理員是使用者本人（員編 20261004，`server/owners.json`）。`config.js` 已填 Google Apps Script 網址，但 2026-11-18 從公司網路打開回 403，要請使用者把部署的「誰可以存取」設成「任何人」。測試用環境變數 `GOOGLE_SCRIPT_URL=""` 關掉轉存。
 - **Zulip 通知已拿掉**（2026-11-25 使用者要求，準備把資料夾移到共用槽）：`server/notify.js` 刪除、`vibe.yaml` 不再有 `environment.required`，網站不需要 `.env`。平台上之前送上去的四個值留著不影響。
 - 容器映像已由公司 CI 建置並通過健康檢查（2026-11-18）。使用者電腦的 Docker Desktop 引擎回 500、起不來，本機的 compose（含 Silo）還沒跑過；真的 Silo 上傳要在正式站實測。
@@ -58,7 +58,7 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - 使用者與工程師決定：公司網站（編輯後台）照舊；網站負責人用 `tools/build-static.js` 把已公開內容包成純靜態網站，推到另一個 GitHub repo（`moonland-docs-site`，輸出在 repo 旁的 `../moonland-docs-site`），工程師從那裡放上 moonland.ai。拔掉 3D、影片音樂重壓（快取在 `../static-cache`）。
 - **靜態版不能連公司網域**（使用者 2026-11-23：換到 moonland.ai 就是為了讓外部沒有任何方式連進公司）。`config.js` 的 `noServer`（打包時設 true）：回饋與吉吉問卷只送 Google Apps Script（問卷存試算表「問卷」分頁，`Code.gs` 的 `SURVEY` 要和 `survey.js` 一致，測試會比對）、閱讀流量不記；公司網站不開放跨網域（曾短暫開過 CORS，已拿掉）。打包程式會檢查成品裡有沒有公司網址，有就停止。
 - 之後放上 moonland.ai 不再用 mason 部署；公司網站本身仍用 mason。詳細見 `docs/STATIC.md`。
-- 2026-11-24 上線 https://docs.moonland.ai；靜態版 repo 改到公司 GitHub 組織 `MoonShineVFX/moonland-docs-site`（私人，使用者是 outside collaborator），輸出資料夾 origin 已改。更新教學 PDF 在 `F:\RD\Moonland\moonland-docs\網站更新教學.pdf`。
+- 2026-11-24 上線 https://docs.moonland.ai；靜態版 repo 改到公司 GitHub 組織 `MoonShineVFX/moonland-docs-site`（私人，使用者是 outside collaborator），輸出資料夾 origin 已改。教學 PDF 在 `U:\_研發\tznung\moonland-docs\`（「推送到 GitHub 教學.pdf」是 2026-11-25 的新版，「網站更新教學.pdf」是 11-24 的舊版、路徑還是 F 槽）。
 - **體驗帳號專區**（2026-11-24 使用者要求）：`#trial` 頁（`script.js` 的 `VIEWS.trial`），學員輸入課程代號領一組一次性體驗帳號（沒有密碼，代碼就是帳號；重複登入會踢掉前一人，所以絕不能重複發）。帳號放在**獨立**的「體驗帳號」Google 試算表（使用者不要和回饋混在一起），程式 `trial-apps-script/Code.gs`（每梯次一個分頁、貼上自動整理、分頁名依日期與單位自動改、每天凌晨刪除過期分頁），`config.js` 的 `trialScriptUrl` 有值才顯示。主站自動填帳號使用者決定先不做（只有複製＋前往登入）。
 
 ## 維護手冊
