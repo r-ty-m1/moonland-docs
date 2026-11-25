@@ -130,10 +130,21 @@ async function getSource(rel) {
   // 編輯後台上傳的檔案不在 repo 裡：從公司網站下載一次，存在快取資料夾
   const dl = path.join(CACHE, 'download', rel);
   if (fs.existsSync(dl)) return dl;
-  const r = await fetch(`${SITE}/assets/media/${rel.split('/').map(encodeURIComponent).join('/')}`);
-  if (!r.ok) throw new Error(`下載 ${rel} 失敗（${r.status}）`);
+  // 上傳的檔案會轉到公司的物件儲存，偶爾連線中斷（2026-11-25 遇過）：失敗就等一下重試，最多 3 次
+  let buf;
+  for (let i = 1; ; i++) {
+    try {
+      const r = await fetch(`${SITE}/assets/media/${rel.split('/').map(encodeURIComponent).join('/')}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      buf = Buffer.from(await r.arrayBuffer());
+      break;
+    } catch (e) {
+      if (i >= 3) throw new Error(`下載 ${rel} 失敗（${(e.cause && e.cause.code) || e.message}）`);
+      await new Promise((res) => setTimeout(res, 2000 * i));
+    }
+  }
   fs.mkdirSync(path.dirname(dl), { recursive: true });
-  fs.writeFileSync(dl + '.part', Buffer.from(await r.arrayBuffer()));
+  fs.writeFileSync(dl + '.part', buf);
   fs.renameSync(dl + '.part', dl);
   return dl;
 }
