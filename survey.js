@@ -62,7 +62,7 @@
     learn: [['quick-start', '五分鐘看完整個流程'], ['credits', '先搞懂點數怎麼算'], ['gallery', '看看別人做了什麼'], ['trial-login', '有體驗帳號的話從這裡登入']],
     first: [['quick-start', '跟著做出第一張圖和影片'], ['chat-intro', '最容易上手的「交談」'], ['chat-prompts', '提示詞怎麼寫比較準'], ['credits', '點數怎麼算']],
     problem: [['faq', '常見問題可能已經有答案'], ['contact', '找不到答案就直接問客服'], ['feedback', '說明看不懂可以告訴我們']],
-    advanced: [['lab', '實驗室：LoRA、ControlNet 精修'], ['chat-edit', '編輯與合成'], ['v-path', '控制影片裡的運動軌跡'], ['m-choose', '不同模型怎麼挑']],
+    advanced: [['lab', '主題：LoRA、ControlNet 精修'], ['chat-edit', '編輯與合成'], ['v-path', '控制影片裡的運動軌跡'], ['m-choose', '不同模型怎麼挑']],
     team: [['admin', '管理員六堂課'], ['team-login', '成員怎麼註冊與登入'], ['admin-4', '點數怎麼分給成員']],
   };
   function recommend(a) {

@@ -209,7 +209,7 @@ const VIEWS = {
     <section class="hero">
       <div class="eyebrow">${T('MOONLAND.AI 說明中心')}</div>
       <h1><span class="seg">${T('從第一張圖到團隊管理，')}</span><span class="seg">${T('<em>所有操作</em>都查得到')}</span></h1>
-      <p>${T('交談、圖片、影片、音樂、實驗室與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。')}</p>
+      <p>${T('交談、圖片、影片、音樂、主題與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。')}</p>
       <button class="hero-search" type="button" data-open-search>${ic('search')}<span class="sp-text">${T('例如：換衣服、頭尾幀、ControlNet、點數')}</span><kbd>Ctrl K</kbd></button>
       <div class="popular">${T('熱門：')}<a href="#chat-prompts">${T('提示詞寫法')}</a><a href="#outfit">${T('人物換衣')}</a><a href="#v-i2v">${T('圖片生成影片')}</a><a href="#v-mimic">${T('動作模仿')}</a><a href="#credits">${T('點數怎麼算')}</a></div>
     </section>
@@ -217,7 +217,7 @@ const VIEWS = {
     <h2 id="h-path">${T('依你的程度開始')}</h2>
     <div class="grid">
       ${card('#quick-start', 'rocket', T('第一次使用'), T('五分鐘走完登入、用交談生成第一張圖，再把它變成影片。'), T('新手'))}
-      ${card('#lab', 'flask', T('想要更多控制'), T('到實驗室用 LoRA、ControlNet、IP-Adapter 精修畫面。'))}
+      ${card('#lab', 'flask', T('想要更多控制'), T('到「主題」用 LoRA、ControlNet、IP-Adapter 精修畫面。'))}
       ${card('#admin', 'shield', T('管理團隊'), T('管理員六堂課：邀請成員、貼標籤、分配點數。'))}
     </div>
 
@@ -226,7 +226,7 @@ const VIEWS = {
       ${card('#chat', 'chat', T('交談'), T('用對話生成與編輯，最容易上手。'))}
       ${card('#image', 'image', T('圖片生成'), T('生成、放大、拓展、旋轉視角。'))}
       ${card('#video', 'video', T('影片生成'), T('圖片轉影片、運動軌跡、動作模仿。'))}
-      ${card('#lab', 'flask', T('實驗室'), T('LoRA、ControlNet、IP-Adapter。'))}
+      ${card('#lab', 'flask', T('主題'), T('LoRA、ControlNet、IP-Adapter。'))}
       ${card('#music-3d', 'music', T('音樂與 3D'), T('歌曲、BGM、音效與 3D 模型。'))}
       ${card('#models', 'layers', T('模型指南'), T('依用途挑選圖片、影片、音樂模型。'))}
     </div>

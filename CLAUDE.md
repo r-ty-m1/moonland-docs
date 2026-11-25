@@ -34,7 +34,8 @@ moonland.ai（AI 生成平台）的使用手冊網站，由 Notion 手冊改寫�
 - **布告欄**（2026-11-20 使用者要求）：編輯後台「布告欄」，主管理員的公告置頂且顯示在頁面列表上方，大家討論文章缺什麼、可以調整什麼。
 - **新編輯器（Notion 式）暫停中**：半成品在本機分支 `editor-rich`（沒有推上去），使用者說暫緩；要繼續時從那個分支接著做（剩下：樣式、瀏覽器實測、試用開關上線）。
 - **首頁縮圖**（2026-11-20）：預設值是 AI 依文章圖片挑的（`markup.js` 的 `HOME_THUMBS`），使用者會上線替換不適合的。
-- **英文版**（2026-11-23 使用者要求加回；2026-10-30 曾移除，舊版在 git tag `english-version`）：使用者決定翻譯先存成「英文草稿」（同事看過才公開）、預設中文、全部頁面都翻、閱讀流量分語言。**功能名稱一律照 moonland.ai 本站英文版**（點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery，對照表 `data/en/terms.json`），不要再用 credits、Moon Coins（測試會擋）。設計見 README〈英文版〉。
+- **英文版**（2026-11-23 使用者要求加回；2026-10-30 曾移除，舊版在 git tag `english-version`）：使用者決定翻譯先存成「英文草稿」（同事看過才公開）、預設中文、全部頁面都翻、閱讀流量分語言。**功能名稱一律照 moonland.ai 本站英文版**（點數 Points、登月幣 Coins、交談 Chat、主題 Topics、剪輯 Montages、藍圖 Blueprints、素材庫 Library、社群藝廊 Gallery，對照表 `data/en/terms.json`），不要再用 credits、Moon Coins（測試會擋）。設計見 README〈英文版〉。
+- **2026-11-25**：使用者要求英文「由 AI 檢查確認後直接發布，不再存英文草稿」，59 頁英文已公開（後台版本 185）。moonland.ai 同日把「實驗室」改名「主題」（英文 Topics）、移除「合併影片」改用「剪輯」，網站已跟著改；藍圖、剪輯、Vibe API 三篇介紹在草稿箱（缺截圖，待同事補）。`data/*.js` 只是初始內容，還寫著實驗室，不影響網站。
 
 - 編輯後台 `edit.html`（2026-11-02 起有正式版）：同一份程式，伺服器回應 `/api/me` 就是正式版，否則（GitHub Pages）是示範版（模擬登入、存在 localStorage `ml-editor-demo`，給主管審核用）。正式版：公司帳號登入（`server/editor.js` 自己做 OIDC＋PKCE，請求 `employee_number`；本機用 `DEV_LOGIN=1` 假登入）、`server/owners.json` 是固定主管理員、其他編輯者存伺服器名單；內容存 `DATA_DIR/content.json`（第一次啟動從 `data/*.js` 複製，**之後 `data/*.js` 只是初始內容，改它不會影響公司網站**），說明中心讀伺服器產生的 `/content.js`（`index.html`／`edit.html` 的 `<!-- content -->` 區塊會被換掉）；上傳圖片存 `DATA_DIR/media/`，伺服器依命名規則命名、給編號；存檔帶版本號，衝突回 409；「檢查與備份」分頁可下載／還原備份；草稿（`draft: true`）只在後台「草稿箱」看得到，`toSite` 會跳過，初始草稿在 `data/drafts.js`（index.html 不載入、伺服器不對外提供）。內容格式轉換與檢查在 `model.js`（瀏覽器與伺服器共用）。`server/test.js` 會用假登入和模擬的 Authentik 測完整流程。
 

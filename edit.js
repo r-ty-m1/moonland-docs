@@ -1154,7 +1154,7 @@ cmpForm.addEventListener('submit', async (e) => {
 // ---------------------------------------------------------
 // 6b. 圖庫：說明中心用到的所有媒體，依區域（assets/media 的資料夾）分類，可搜尋、複製；編輯時可直接挑圖
 // ---------------------------------------------------------
-const AREAS = { start: '開始使用', chat: '交談', image: '圖片生成', video: '影片生成', lab: '實驗室', recipes: '應用範例', models: '模型指南', team: '團隊管理', support: '支援', unused: '暫時沒用到', upload: '示範上傳' };
+const AREAS = { start: '開始使用', chat: '交談', image: '圖片生成', video: '影片生成', lab: '主題', recipes: '應用範例', models: '模型指南', team: '團隊管理', support: '支援', unused: '暫時沒用到', upload: '示範上傳' };
 const KINDS = { image: ['圖片', 'i'], video: ['影片', 'v'], audio: ['音訊', 'a'], '3d': ['3D 模型', '3d'] };
 const kindOf = (f) => (/\.glb$/i.test(f) ? '3d' : /\.mp4$/i.test(f) ? 'video' : /\.mp3$/i.test(f) ? 'audio' : 'image');
 // 每個編號：檔名、區域、類型，以及用在哪些頁面的哪個段落（從目前的頁面內容即時算出）
@@ -1320,7 +1320,7 @@ function viewHelp() {
       <li><b>英文草稿</b>：勾選時說明中心切到英文還是顯示中文。AI 翻譯的英文一開始都是草稿，請對照中文看過，沒問題再取消勾選並儲存。</li>
       <li>頁面列表上的標示：<b>EN 草稿</b>（還沒公開）、<b>EN 待更新</b>（中文改過，英文要跟著改）、<b>EN</b>（已公開）。英文改好後勾「英文已經對照目前的中文更新好了」再儲存，就不再標待更新。</li>
       <li>大分類的英文名稱：頁面列表大分類旁的「加英文名稱」。分類裡小標的英文：在那個分類的 English 填。</li>
-      <li><b>功能名稱要和 moonland.ai 英文版一致</b>：點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery、素材庫 Library、體驗代碼 Trial code。不要寫 credits 或 Moon Coins。</li></ul>`)}
+      <li><b>功能名稱要和 moonland.ai 英文版一致</b>：點數 Points、登月幣 Coins、交談 Chat、主題 Topics（舊稱實驗室 Lab）、剪輯 Montages、藍圖 Blueprints、社群藝廊 Gallery、素材庫 Library、體驗代碼 Trial code。不要寫 credits 或 Moon Coins。</li></ul>`)}
     ${sec('3. 編輯一篇文章', `<ol>
       <li>右邊的預覽點任何一段，左邊語法就會跳到那一段並選起來；在語法裡移動游標，預覽也會標出對應的那一段。</li>
       <li>填<b>標題</b>（必填）與<b>摘要</b>（一兩句話，會出現在搜尋結果）。</li>

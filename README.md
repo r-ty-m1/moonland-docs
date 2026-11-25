@@ -59,7 +59,7 @@
 
 2026-11-23 加回（2026-10-30 曾移除，舊版在 git 標籤 `english-version`）。預設中文，右上角「EN」切換（手機在目錄最下面），網址加 `?lang=en` 直接開英文，選擇記在 `localStorage ml-lang`。
 
-- **名稱照 moonland.ai 本站英文版**：點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery…。對照表在 `data/en/terms.json`（更新方法見 `tools/moonland-terms.js` 開頭：在瀏覽器打開本站、貼到主控台執行）。`server/test.js` 會擋下英文裡的舊說法（credits、Moon Coins）。
+- **名稱照 moonland.ai 本站英文版**：點數 Points、登月幣 Coins、交談 Chat、主題 Topics（2026-11-25 前叫實驗室 Lab）、剪輯 Montages、藍圖 Blueprints、社群藝廊 Gallery…。對照表在 `data/en/terms.json`（更新方法見 `tools/moonland-terms.js` 開頭：在瀏覽器打開本站、貼到主控台執行）。`server/test.js` 會擋下英文裡的舊說法（credits、Moon Coins）。
 - **介面文字**：程式裡的中文包 `T()`，英文對照在 `data/en/ui.js`（`UI_EN`，查不到就顯示中文）。
 - **文章的英文**：存在編輯後台每頁的「English」（`content.json` 頁面的 `en: { t, n, d, body, draft, src }`；大分類 `sections[].en`、小標 `groups[].en`）。說明中心只顯示公開的英文（`content.js` 的 `ARTICLES_EN`），還沒有英文或英文是草稿的頁面顯示中文並提示。
 - **英文待更新**：`en.src` 是翻譯時中文的簽章（`model.js` 的 `zhSig`），中文之後改過就和現在不同，後台標「EN 待更新」；改好英文時勾「英文已經對照目前的中文更新好了」再存。
@@ -125,7 +125,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 | `chat` | 交談 |
 | `image` | 圖片生成 |
 | `video` | 影片生成 |
-| `lab` | 實驗室 |
+| `lab` | 主題（舊稱實驗室） |
 | `recipes` | 應用範例 |
 | `models` | 模型指南 |
 | `team` | 團隊管理 |
@@ -148,7 +148,7 @@ assets/media/<區域資料夾>/<文章代號>-<序號>.<副檔名>
 
 ## 發布更新時
 
-`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261124f`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
+`index.html`、`admin.html`、`edit.html` 引用的 css、js 檔名後面有版本號（例如 `script.js?v=20261125a`）。每次更新內容後把版本號改掉，GitHub Pages 的訪客才會抓到新版，而不是用快取的舊檔。
 
 ## 回饋與後台
 

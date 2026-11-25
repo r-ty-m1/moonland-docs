@@ -1,11 +1,11 @@
 // 英文版介面文字（2026-11-23 加回）：左邊是程式裡的中文原文（一字不差），右邊是英文
 // 程式裡用 T('中文') 的地方，切到英文時會查這張表；查不到就顯示中文
 // 平台名詞照 moonland.ai 本站英文版（對照表見 data/en/terms.json，用 tools/moonland-terms.js 更新）：
-//   點數 Points、登月幣 Coins、交談 Chat、實驗室 Lab、社群藝廊 Gallery、素材庫 Library、模仿動作 Motion transfer
+//   點數 Points、登月幣 Coins、交談 Chat、主題 Topics（舊稱實驗室 Lab）、剪輯 Montages、藍圖 Blueprints、社群藝廊 Gallery、素材庫 Library、模仿動作 Motion transfer
 // 文章的英文版不在這裡，在編輯後台每頁的「English」（程式附的翻譯在 data/en/*.js，只在第一次匯入成英文草稿）
 window.UI_EN = {
   "moonland.ai 說明中心": "moonland.ai Help Center",
-  "moonland.ai 官方使用教學：交談、圖片生成、影片生成、音樂、實驗室、模型指南與團隊管理。": "Official moonland.ai guides: Chat, image generation, video generation, music, Lab, model guides and team management.",
+  "moonland.ai 官方使用教學：交談、圖片生成、影片生成、音樂、主題、模型指南與團隊管理。": "Official moonland.ai guides: Chat, image generation, video generation, music, Topics, model guides and team management.",
   "跳到主要內容": "Skip to main content",
   "說明中心": "Help Center",
   "moonland.ai 說明中心首頁": "moonland.ai Help Center home",
@@ -43,7 +43,7 @@ window.UI_EN = {
   "交談": "Chat",
   "圖片生成": "Image generation",
   "影片生成": "Video generation",
-  "實驗室": "Lab",
+  "主題": "Topics",
   "音樂與 3D": "Music & 3D",
   "應用範例": "Tutorials",
   "模型指南": "Model guide",
@@ -108,7 +108,7 @@ window.UI_EN = {
   "MOONLAND.AI 說明中心": "MOONLAND.AI HELP CENTER",
   "從第一張圖到團隊管理，": "From your first image to managing a team,",
   "<em>所有操作</em>都查得到": "<em>every step</em> is here",
-  "交談、圖片、影片、音樂、實驗室與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。": "Official guides for Chat, images, video, music, the Lab and team admin. Not sure where to start? Search for what you want to do.",
+  "交談、圖片、影片、音樂、主題與團隊後台的官方教學。不知道從哪裡開始？直接搜尋你想做的事。": "Official guides for Chat, images, video, music, Topics and team admin. Not sure where to start? Search for what you want to do.",
   "例如：換衣服、頭尾幀、ControlNet、點數": "e.g. outfits, first & last frames, Points",
   "熱門：": "Popular:",
   "人物換衣": "Change outfits",
@@ -118,7 +118,7 @@ window.UI_EN = {
   "第一次使用": "New here",
   "五分鐘走完登入、用交談生成第一張圖，再把它變成影片。": "In five minutes: log in, create your first image in Chat, then turn it into a video.",
   "想要更多控制": "Want more control",
-  "到實驗室用 LoRA、ControlNet、IP-Adapter 精修畫面。": "Refine your images in the Lab with LoRA, ControlNet and IP-Adapter.",
+  "到「主題」用 LoRA、ControlNet、IP-Adapter 精修畫面。": "Refine your images in Topics with LoRA, ControlNet and IP-Adapter.",
   "管理團隊": "Managing a team",
   "管理員六堂課：邀請成員、貼標籤、分配點數。": "Six admin lessons: invite members, tag them, allocate Points.",
   "用對話生成與編輯，最容易上手。": "Create and edit by chatting. The easiest way in.",
@@ -292,7 +292,7 @@ window.UI_EN = {
   "常見問題可能已經有答案": "The FAQ may already have the answer",
   "找不到答案就直接問客服": "Can’t find it? Ask support",
   "說明看不懂可以告訴我們": "Tell us if something is unclear",
-  "實驗室：LoRA、ControlNet 精修": "Lab: refine with LoRA and ControlNet",
+  "主題：LoRA、ControlNet 精修": "Topics: refine with LoRA and ControlNet",
   "控制影片裡的運動軌跡": "Control motion paths in videos",
   "不同模型怎麼挑": "How to choose a model",
   "管理員六堂課": "Six lessons for admins",
