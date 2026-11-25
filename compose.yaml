@@ -10,8 +10,6 @@ services:
     environment:
       DEV_LOGIN: "1"
       EDITOR_OWNERS: "T0001"
-      # 本機測試不真的發 Zulip 通知，只寫進 log
-      ZULIP_DELIVERY: "dry-run"
       # 本機測試不轉存到真的 Google 試算表
       GOOGLE_SCRIPT_URL: ""
       # 容器內呼叫 S3 用

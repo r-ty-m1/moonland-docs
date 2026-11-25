@@ -500,7 +500,7 @@ function pager(id) {
 const feedback = () => `<div class="feedback">${T('這篇有幫助嗎？')}<button type="button" aria-pressed="false" data-vote="up">${T('有幫助')}</button><button type="button" aria-pressed="false" data-vote="down">${T('還需要改進')}</button><span class="fb-thanks" role="status"></span></div>`;
 
 // ---------------------------------------------------------
-// 回饋：先送網站伺服器（server/server.js 的 /api/feedback，會轉存 Google 試算表並用 Zulip 通知負責人），後台頁 admin.html 查看。
+// 回饋：先送網站伺服器（server/server.js 的 /api/feedback，會轉存 Google 試算表），後台頁 admin.html 查看。
 // GitHub Pages 預覽版沒有伺服器，改存在這台電腦的瀏覽器裡，後台頁也會讀出來。
 // ---------------------------------------------------------
 const FB_TYPES = [

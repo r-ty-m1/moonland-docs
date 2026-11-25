@@ -20,7 +20,7 @@
 | 部署平台 | MoonShine vibe 平台（Gitea Actions → Deployment API → 中央 CD） |
 | 回饋存放 | 網站伺服器存一份；填了 Google 試算表網址時再轉存到試算表（擁有者：　　），見〈5. 回饋〉 |
 | 編輯後台 | `/edit.html`；主管理員：（填，員工編號也要寫進 `server/owners.json`） |
-| 回饋後台 | `/admin.html`；密碼保管人：（填）。新的文字回饋會用 Zulip 私訊通知：（填收件人） |
+| 回饋後台 | `/admin.html`；密碼保管人：（填） |
 
 ---
 
@@ -41,11 +41,10 @@
 server/server.js（Node 22，只用內建模組）
   ├─ 提供上面的檔案；css/js 網址自動加內容雜湊，部署新版時不怕快取
   ├─ GET  /healthz          健康檢查（平台與 Docker HEALTHCHECK 用）
-  ├─ POST/GET /api/feedback 收回饋（存一份、轉存 Google 試算表、用 Zulip 通知負責人）、讀回饋
+  ├─ POST/GET /api/feedback 收回饋（存一份、轉存 Google 試算表）、讀回饋
   ├─ POST /api/survey       收訪客問卷（吉吉問的匿名問卷，題目在 survey.js；後台「訪客問卷」讀取）
   ├─ POST /api/view         收閱讀紀錄（server/views.js）；GET /api/views 回饋後台「閱讀流量」讀統計（要登入編輯後台）
   ├─ /api/editor/board      編輯後台的布告欄（server/board.js）
-  ├─ server/notify.js       Zulip 通知
   └─ server/editor.js       編輯後台：公司帳號登入、/api/editor/*（讀寫內容、上傳、備份、還原）
         server/s3.js           物件儲存（S3）的存取與簽章
         │
@@ -102,18 +101,9 @@ server/server.js（Node 22，只用內建模組）
 
 1. `gitea-access`：每台電腦第一次推送前，在 Gitea 網頁建立個人 access token（權限只開 repository 讀寫、user 讀取），用腳本存進電腦。**不要用瀏覽器授權（OAuth）**，會觸動公司防火牆。
 2. `assess-readiness`：檢查缺什麼（2026-11-18 檢查結果：沒有 blocking 項目）。
-3. `deploy-site`：把 `vibe.yaml` 的 `environment.required` 列的設定，從負責人電腦專案根目錄的 `.env` 送上平台，再推到 Gitea。第一次部署可能因為設定還沒送上去而失敗一次，送完重新部署即可。
+3. `deploy-site`：推到 Gitea。網站不需要 `.env`（2026-11-25 拿掉 Zulip 通知後，`vibe.yaml` 沒有 `environment.required`）。
 4. 推完約半小時再打開網址（DNS 要時間）。
 
-`.env` 要有這幾個值（不進 git，不要貼到聊天或工單）：
-
-| 名稱 | 內容 |
-| --- | --- |
-| `ZULIP_SITE` | `https://chat.moonshine.tw` |
-| `ZULIP_BOT_EMAIL`、`ZULIP_API_KEY` | 負責人自己在 Zulip 建的「傳入 webhook」機器人的 email 與 API key |
-| `FEEDBACK_NOTIFY_EMAIL` | 收回饋通知的人的公司 email |
-
-改了 `.env` 的值不會自動生效：要用 `deploy-site` 重新送值並重新部署（redeploy）。
 
 ### 注意
 - `ci.yaml` 由公司範本產生，**不要手動改**；範本更新時 mason 的 `deploy-site` 會在部署前自動換成新版（2026-11-18 時是舊版，第一次部署會更新）。
@@ -146,7 +136,6 @@ CI 也會跑同一支測試，沒通過就不會部署。
 
 1. 存一份在 `DATA_DIR/feedback.jsonl`（persistence，部署不會清空）。
 2. `config.js` 的 `googleScriptUrl` 有填網址時，伺服器再轉存到 Google 試算表。設定步驟見 `google-apps-script/README.md`。改了 `Code.gs` 之後，一定要在 Apps Script 按「部署 → 管理部署作業 → 編輯 → 新版本」，否則還是跑舊程式。
-3. 文字回饋（意見回饋頁）用 Zulip 私訊 `FEEDBACK_NOTIFY_EMAIL`，訊息只有類型、頁面和後台連結，不含訪客寫的內容；每小時最多 20 則。沒設定 `ZULIP_*` 時直接略過，不影響存檔。「這篇有幫助嗎？」的投票不通知。
 
 回饋後台（`admin.html`）：有 Google 試算表時讀試算表，密碼是 Apps Script「指令碼屬性」的 `ADMIN_TOKEN`；也可以直接打開試算表看。沒有試算表時讀伺服器，要平台上有 `ADMIN_TOKEN` 環境變數（目前沒有宣告，所以建議用試算表）。
 
@@ -172,7 +161,6 @@ GitHub Pages 預覽版沒有伺服器：有填 Google 網址就直接送到試�
 | 誤刪或改壞很多內容 | 單頁用「版本紀錄」、刪除或封存的頁在「草稿・封存・刪除」放回；整站用備份檔在「檢查與備份」還原（主管理員）。 |
 | persistence 資料不見了 | 用最近一次下載的備份檔還原；沒有備份時，網站會回到 `data/*.js` 的初始內容。 |
 | 收不到回饋 | 伺服器 log 有沒有「回饋轉存 Google 試算表失敗」；`config.js` 的網址是否正確、Apps Script 是否部署了最新版本、試算表是否還在。 |
-| 收不到 Zulip 通知 | 伺服器 log：`notify skipped` 是 `.env` 的四個值沒送上平台；`notify failed` 後面的訊息：401 是機器人金鑰錯或機器人被停用，`Invalid email` 是收件 email 在 Zulip 找不到人。 |
 | 回饋後台讀不到資料 | 密碼（`ADMIN_TOKEN`）是否正確；Google 試算表模式下密碼在 Apps Script 的「指令碼屬性」。 |
 | 公司網路看不到某些內容 | 文章裡若有 `[embed 外部網址]`，外部網站被擋就看不到。目前沒有文章使用。 |
 | 手機上版面跑掉 | 字級要用 `rem`；手機版斷點是 620px；用 360、390 寬加三種字體大小測。 |
@@ -220,8 +208,7 @@ GitHub Pages 預覽版沒有伺服器：有填 Google 網址就直接送到試�
 ### 回饋
 - [ ] 建立公司 Google 帳號的試算表、部署 Apps Script、把網址填進 `config.js`
 - [ ] 指定回饋後台密碼保管人（Apps Script 的 `ADMIN_TOKEN`）
-- [x] 文字回饋用 Zulip 通知負責人（2026-11-18，程式已完成）
-- [ ] 在 Zulip 建「傳入 webhook」機器人，把四個值寫進 `.env`，部署後送一則回饋確認收得到
+- [x] ~~文字回饋用 Zulip 通知負責人~~（2026-11-25 使用者決定拿掉）
 
 ### 正式版編輯後台
 - [ ] **填主管理員**：把網站負責人的員工編號寫進 `server/owners.json` 的 `owners`（目前是空的，沒填就沒人能管理名單）

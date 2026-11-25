@@ -4,14 +4,13 @@
 // - 所有檔案都帶 cache-control: no-cache（每次先問伺服器有沒有更新）
 // - index.html 裡的 css / js 網址改成內容雜湊，部署新版時瀏覽器與 Cloudflare 一定抓新檔
 // - /api/feedback：POST 收回饋（任何人）；GET 讀全部回饋（後台用，見 canReadFeedback）
-//   收到後存一份在伺服器；config.js 有填 Google 試算表網址時再轉存過去；文字回饋另用 Zulip 通知負責人（server/notify.js）
+//   收到後存一份在伺服器；config.js 有填 Google 試算表網址時再轉存過去
 // - /api/survey：POST 收訪客問卷（任何人，匿名）；存在 DATA_DIR/survey.jsonl，編輯後台「訪客問卷」用 /api/editor/survey 讀（server/editor.js）
 // - 編輯後台（公司帳號登入、內容存放、上傳）在 server/editor.js；說明中心的內容從 /content.js 讀
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { notifyFeedback } = require('./notify.js');
 const Survey = require('../survey.js');
 
 const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, '..'));
@@ -150,7 +149,6 @@ function postFeedback(req, res) {
     }
     sendJson(res, 201, { ok: true });
     forwardToGoogle(entry);
-    if (entry.kind === 'note') notifyFeedback(entry);
   });
 }
 
