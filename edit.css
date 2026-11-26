@@ -569,3 +569,7 @@ a.ed-btn { text-decoration: none; }
 }
 .ed-update b { color: var(--warn-ink, #7a5300); }
 .ed-pagefilter { margin-top: 0; }
+
+/* 修改紀錄的搜尋（edit.js 的 viewLog） */
+.ed-logq { flex: 1 1 260px; align-self: flex-end; }
+.ed-logday mark { background: var(--warn-soft, #fff3c4); color: inherit; border-radius: 3px; padding: 0 1px; }

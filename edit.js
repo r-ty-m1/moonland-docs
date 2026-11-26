@@ -1365,7 +1365,7 @@ function viewHelp() {
     ${sec('7. 改錯了怎麼辦', `<ul>
       <li><b>版本紀錄</b>：編輯畫面右上角。每次儲存都會留一版，選一版載入、確認後再按儲存，就還原了。</li>
       <li><b>草稿與封存</b>：封存和最近刪除都可以勾選多篇（或全選）一起處理。封存按「放回目錄」回到原本的位置；最近刪除按「還原到封存」放回封存。誰在什麼時候封存、刪除，都記在修改紀錄裡。</li>
-      <li><b>修改紀錄</b>：「內容修改」是誰在什麼時候改了哪一頁；「網站程式修改」是網站本身的版面、功能改了什麼（工程師更新程式時記的）。</li>
+      <li><b>修改紀錄</b>：「內容修改」是誰在什麼時候改了哪一頁；「網站程式修改」是網站本身的版面、功能改了什麼（工程師更新程式時記的）。今天以前的日期會先收合，點日期展開；上方的搜尋框輸入關鍵字（頁面名稱、動作、編輯者、版本代號），只留下符合的紀錄，關鍵字會標黃。</li>
       <li><b>檢查與備份</b>：一次檢查全站的圖片和連結；下載整個網站的備份檔。網站的儲存空間不是備份，建議每個月、或大改之前下載一次，存到公司雲端硬碟。主管理員可以用備份檔還原整個網站。</li>
       <li>兩個人同時改內容時，後存的人會看到「其他人剛剛也改了內容」，畫面會換成最新版本；正在編輯的文字還在，再按一次儲存就好。</li></ul>`)}
     ${sec('8. 編輯者名單（主管理員）', `<ul>
@@ -1458,47 +1458,72 @@ function loadChanges() {
   loadChanges.p = fetch('server/changelog.json', { cache: 'no-cache' }).then((r) => r.json()).then((j) => { codeChanges = j.changes || []; })
     .catch(() => { codeChanges = []; }).then(() => { loadChanges.p = null; if (/^#log\/code/.test(location.hash)) render(); });
 }
+// 修改紀錄（2026-11-26 使用者要求）：今天以前的日期一律收合；上方可以用關鍵字搜尋（頁面、動作、編輯者、程式修改的說明與版本代號），
+// 搜尋時符合的日期全部展開、關鍵字標黃
+const logDayKey = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || '') : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function logMark(text) {
+  const q = logF.q.trim();
+  const h = esc(text);
+  if (!q) return h;
+  const e = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return h.replace(new RegExp(e, 'gi'), (m) => `<mark>${m}</mark>`);
+}
+const logHit = (...vals) => { const q = logF.q.trim().toLowerCase(); return !q || vals.some((v) => v && String(v).toLowerCase().includes(q)); };
+function logSearchBox(ph) {
+  return `<label class="ed-pageq ed-logq">${ic('search')}<span class="vh">搜尋修改紀錄</span><input type="search" id="logQ" placeholder="${ph}" value="${esc(logF.q)}" autocomplete="off"></label>`;
+}
 function viewLog(sub) {
   const code = sub === 'code';
   const seg = `<div class="ed-seg" role="tablist" aria-label="修改紀錄的種類">
     <a href="#log" role="tab" aria-selected="${!code}"${code ? '' : ' aria-current="page"'}>內容修改</a>
     <a href="#log/code" role="tab" aria-selected="${code}"${code ? ' aria-current="page"' : ''}>網站程式修改</a></div>`;
+  const today = logDayKey(new Date().toISOString());
+  const yest = logDayKey(new Date(Date.now() - 864e5).toISOString());
+  const WEEK = '日一二三四五六';
+  const dayName = (k) => { const [y, m, d] = k.split('-').map(Number); if (!d) return esc(k); const w = WEEK[new Date(y, m - 1, d).getDay()]; return `${k === today ? '今天・' : k === yest ? '昨天・' : ''}${y !== new Date().getFullYear() ? `${y}/` : ''}${m}/${d}（${w}）`; };
+  const searching = !!logF.q.trim();
+  const isOpen = (k) => searching || k === today;
+  const group = (rows, keyOf) => { const days = []; for (const x of rows) { const k = keyOf(x); if (!days.length || days[days.length - 1].k !== k) days.push({ k, rows: [] }); days[days.length - 1].rows.push(x); } return days; };
+  const foldBtn = (n) => (n > 1 ? '<button type="button" class="ed-btn sm" data-act="log-fold">全部收合／展開</button>' : '');
+  const noHit = `<p class="ed-hint ed-empty">找不到含「${esc(logF.q.trim())}」的紀錄。</p>`;
   if (code) {
     loadChanges();
-    const list = codeChanges;
-    return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">網站本身的程式（版面、功能、修正錯誤）改了什麼。這些修改由工程師或網站負責人更新程式，不是在後台改的；文章內容的修改在「內容修改」。</p></div></div>${seg}
-      ${!list ? '<p class="ed-hint">讀取中…</p>' : list.length ? `<div class="ed-tbl"><table class="ed-table ed-code-log"><thead><tr><th>日期</th><th>改了什麼</th><th>版本</th></tr></thead><tbody>
-        ${list.map((x) => `<tr><td data-label="日期">${esc(String(x.date || '').replace(/-/g, '/'))}</td><td data-label="改了什麼">${esc(x.text || '')}</td><td data-label="版本">${x.commit ? `<code>${esc(x.commit)}</code>` : '<span class="ed-hint">最新</span>'}</td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="ed-hint">還沒有網站程式的修改紀錄。</p>'}`;
+    const all = codeChanges;
+    const head = `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">網站本身的程式（版面、功能、修正錯誤）改了什麼。這些修改由工程師或網站負責人更新程式，不是在後台改的；文章內容的修改在「內容修改」。今天以前的日期先收合，點日期展開。</p></div></div>${seg}`;
+    if (!all) return `${head}<p class="ed-hint">讀取中…</p>`;
+    if (!all.length) return `${head}<p class="ed-hint">還沒有網站程式的修改紀錄。</p>`;
+    const days = group(all.filter((x) => logHit(x.text, x.commit, x.date)), (x) => logDayKey(x.date));
+    return `${head}
+      <div class="ed-logbar">${logSearchBox('搜尋：輸入關鍵字，例如 英文、體驗帳號、版本代號')}${foldBtn(days.length)}</div>
+      ${!days.length ? noHit : days.map((g) => `<details class="ed-logday"${isOpen(g.k) ? ' open' : ''}>
+        <summary><b>${dayName(g.k)}</b><span>${g.rows.length} 筆</span></summary>
+        <div class="ed-tbl"><table class="ed-table ed-code-log"><thead><tr><th>改了什麼</th><th>版本</th></tr></thead><tbody>
+        ${g.rows.map((x) => `<tr><td data-label="改了什麼"><span>${logMark(x.text || '')}</span></td><td data-label="版本">${x.commit ? `<code>${logMark(x.commit)}</code>` : '<span class="ed-hint">最新</span>'}</td></tr>`).join('')}
+        </tbody></table></div></details>`).join('')}`;
   }
-  // 依日期分組（每天一段，可以收合），上方篩選期間與編輯者
-  const dayKey = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-  const today = dayKey(new Date().toISOString());
-  const yest = dayKey(new Date(Date.now() - 864e5).toISOString());
-  const since = logF.days ? dayKey(new Date(Date.now() - (logF.days - 1) * 864e5).toISOString()) : '';
+  // 內容修改：依日期分組（每天一段，可以收合），上方搜尋、篩選期間與編輯者
+  const since = logF.days ? logDayKey(new Date(Date.now() - (logF.days - 1) * 864e5).toISOString()) : '';
   const people = [...new Set(S.log.map((x) => x.by).filter(Boolean))];
-  const list = S.log.filter((x) => (!since || dayKey(x.at) >= since) && (!logF.by || x.by === logF.by));
-  const days = [];
-  for (const x of list) { const k = dayKey(x.at); if (!days.length || days[days.length - 1].k !== k) days.push({ k, rows: [] }); days[days.length - 1].rows.push(x); }
-  const WEEK = '日一二三四五六';
-  const dayName = (k) => { const [y, m, d] = k.split('-').map(Number); const w = WEEK[new Date(y, m - 1, d).getDay()]; return `${k === today ? '今天・' : k === yest ? '昨天・' : ''}${y !== new Date().getFullYear() ? `${y}/` : ''}${m}/${d}（${w}）`; };
+  const list = S.log.filter((x) => (!since || logDayKey(x.at) >= since) && (!logF.by || x.by === logF.by) && logHit(x.t, x.action, x.by, x.id));
+  const days = group(list, (x) => logDayKey(x.at));
   const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const filters = `<div class="ed-logbar">
+      ${logSearchBox('搜尋：輸入頁面名稱、動作或編輯者')}
       <div class="ed-seg ed-seg-btn" role="group" aria-label="期間">${[[1, '今天'], [7, '最近 7 天'], [30, '最近 30 天'], [0, '全部']].map(([d, t]) => `<button type="button" data-act="log-days" data-days="${d}" aria-pressed="${logF.days === d}">${t}</button>`).join('')}</div>
       <label class="ed-logby"><span>編輯者</span><select data-act="log-by"><option value="">所有人</option>${people.map((p) => `<option${p === logF.by ? ' selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
-      ${days.length > 1 ? '<button type="button" class="ed-btn sm" data-act="log-fold">全部收合／展開</button>' : ''}
+      ${foldBtn(days.length)}
     </div>`;
-  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁，依日期分組，點日期可以收合。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>${seg}
+  return `${tabs('log')}<div class="ed-head"><div><h1>修改紀錄</h1><p class="ed-hint">誰在什麼時候改了哪一頁，依日期分組；今天以前的日期先收合，點日期展開。${LIVE ? '所有編輯者都看得到。' : '正式版會記在伺服器上，所有編輯者都看得到。'}</p></div></div>${seg}
     ${S.log.length ? filters : ''}
-    ${!S.log.length ? '<p class="ed-hint">還沒有任何修改。</p>' : !days.length ? `<p class="ed-hint ed-empty">${logF.days === 1 ? '今天' : '這段期間'}${logF.by ? `「${esc(logF.by)}」` : ''}沒有修改。</p>`
-      : days.map((g, gi) => { const who = [...new Set(g.rows.map((x) => x.by))]; return `<details class="ed-logday"${gi < 3 || logF.days ? ' open' : ''}>
+    ${!S.log.length ? '<p class="ed-hint">還沒有任何修改。</p>' : !days.length ? (searching ? noHit : `<p class="ed-hint ed-empty">${logF.days === 1 ? '今天' : '這段期間'}${logF.by ? `「${esc(logF.by)}」` : ''}沒有修改。</p>`)
+      : days.map((g) => { const who = [...new Set(g.rows.map((x) => x.by))]; return `<details class="ed-logday"${isOpen(g.k) ? ' open' : ''}>
         <summary><b>${dayName(g.k)}</b><span>${g.rows.length} 筆・${esc(who.join('、'))}</span></summary>
         <div class="ed-tbl"><table class="ed-table"><thead><tr><th>時間</th><th>誰</th><th>做了什麼</th><th>頁面</th></tr></thead><tbody>
-        ${g.rows.map((x) => `<tr><td data-label="時間">${hm(x.at)}</td><td data-label="誰">${esc(x.by)}</td><td data-label="做了什麼">${esc(x.action)}</td>
-          <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${esc(x.t)}</a>` : esc(x.t)}</td></tr>`).join('')}
+        ${g.rows.map((x) => `<tr><td data-label="時間">${hm(x.at)}</td><td data-label="誰"><span>${logMark(x.by || '')}</span></td><td data-label="做了什麼"><span>${logMark(x.action || '')}</span></td>
+          <td data-label="頁面">${S.pages[x.id] && !S.pages[x.id].system ? `<a href="#edit/${x.id}">${logMark(x.t || '')}</a>` : `<span>${logMark(x.t || '')}</span>`}</td></tr>`).join('')}
         </tbody></table></div></details>`; }).join('')}`;
 }
-const logF = { days: 0, by: '' };
+const logF = { days: 0, by: '', q: '' };
 // ---------------------------------------------------------
 // 訪客問卷：說明中心的吉吉問的匿名問卷（題目在 survey.js），這裡看統計、下載 CSV
 // 同一個訪客重填只算最後一次（伺服器 /api/editor/survey 已經處理）
@@ -2308,8 +2333,16 @@ document.addEventListener('click', (e) => {
   if (ln && !e.target.closest('.cmp-view, video, audio, .copy, .m3d-load')) jumpToLine(+ln.dataset.ln);
 });
 
+function logSearch(v) {
+  logF.q = v;
+  render();
+  const i = app.querySelector('#logQ');
+  if (i) { i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }
+}
+app.addEventListener('compositionend', (e) => { if (e.target.id === 'logQ') logSearch(e.target.value); });
 app.addEventListener('input', (e) => {
   if (e.target.id === 'pageQ') { pageQuery = e.target.value; filterPages(); return; }
+  if (e.target.id === 'logQ') { if (!e.isComposing) logSearch(e.target.value); return; }
   const f = e.target.form;
   if (!f || f.id !== 'pageForm') return;
   setDirty(true);
