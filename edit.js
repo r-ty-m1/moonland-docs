@@ -252,12 +252,16 @@ function viewDenied() {
 // ---------------------------------------------------------
 // 5. 頁面列表：新增、刪除、排序
 // ---------------------------------------------------------
+// 「已修改」只標今天（這台電腦的日期）改過的頁面，隔天就不再顯示（2026-11-26 使用者要求，原本改過就一直留著）
+const dayOf = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+const modToday = (id) => { const h = S.history[id]; return !!(S.pages[id] && h && h[0] && h[0].at && dayOf(h[0].at) === dayOf(Date.now())); };
+const enStale = (id) => !!S.pages[id] && Model.enState(S.pages[id]) === 'stale';
 function badge(id) {
   const p = S.pages[id];
   const en = enBadge(id);
   if (p.draft) return '<span class="chip ed-draft">草稿</span>' + en;
   if (p.isNew) return '<span class="chip ed-new">新頁面</span>' + en;
-  if (S.history[id] && S.history[id].length) return '<span class="chip ed-mod">已修改</span>' + en;
+  if (modToday(id)) return '<span class="chip ed-mod" title="今天改過">今天修改</span>' + en;
   return en;
 }
 // 英文版的狀態（model.js 的 enState）：EN 草稿、EN 待更新（中文改過）、EN（已公開）
@@ -297,6 +301,7 @@ try { folded = new Set(JSON.parse(localStorage.getItem(FOLD) || '[]')); } catch 
 function saveFold() { try { localStorage.setItem(FOLD, JSON.stringify([...folded])); } catch (x) {} }
 const foldBtn = (key, label) => `<button type="button" class="ed-fold" data-act="fold" data-fold="${key}" aria-expanded="${!folded.has(key)}" aria-label="${folded.has(key) ? '展開' : '收合'}「${esc(label)}」" title="${folded.has(key) ? '展開' : '收合'}">${ic('chev')}</button>`;
 let pageQuery = '';
+let pageFilter = '';   // '' 全部、'today' 今天修改、'stale' EN 待更新（2026-11-26 使用者要求）
 let pagesScroll = 0;
 function catLi(r) {
   const p = S.pages[r.id];
@@ -314,15 +319,19 @@ function catLi(r) {
   </li>`;
 }
 function viewPages() {
-  const changed = Object.keys(S.history).filter((k) => S.pages[k] && S.history[k].length).length;
+  const ids = Object.keys(S.pages).filter((k) => !S.pages[k].system);
+  const changed = ids.filter(modToday).length;
+  const stale = ids.filter(enStale).length;
+  const fbtn = (key, label, n) => `<button type="button" class="ed-filter" data-act="page-filter" data-f="${key}" aria-pressed="${pageFilter === key}">${label}<span>${n}</span></button>`;
   return `${tabs('pages')}${noticeBar()}
-    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。按 ${ic('listadd', 'ic sm')} 記下某篇要修改的地方。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「已修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
+    <div class="ed-head"><div><h1>頁面</h1><p class="ed-hint">點頁面名稱開始編輯；按住左邊的 ${ic('grip', 'ic sm')} 拖曳，可以調整在左側目錄裡的順序，或拖進別的分類。按 ${ic('listadd', 'ic sm')} 記下某篇要修改的地方。${LIVE ? '修改儲存後，說明中心馬上就會更新。' : '標示「今天修改」「新頁面」的是這台電腦上的示範修改。'}</p></div></div>
     <div class="ed-pagebar">
       <label class="ed-pageq">${ic('search')}<span class="vh">找頁面</span><input type="search" id="pageQ" placeholder="找頁面：輸入標題或網址代號" value="${esc(pageQuery)}" autocomplete="off"></label>
       <span class="ed-row-acts"><button type="button" class="ed-btn" data-act="fold-all">全部收合</button><button type="button" class="ed-btn" data-act="unfold-all">全部展開</button></span>
+      <span class="ed-tagbar ed-pagefilter" role="group" aria-label="篩選頁面">${fbtn('today', '今天修改', changed)}${fbtn('stale', 'EN 待更新', stale)}</span>
       <nav class="ed-jump" aria-label="跳到大分類">${S.sections.map((sec, si) => `<button type="button" class="ed-filter" data-act="jump" data-si="${si}">${esc(sec.label)}</button>`).join('')}</nav>
     </div>
-    <p class="ed-hint ed-noresult" id="pageNone" hidden>找不到符合的頁面。</p>
+    <p class="ed-hint ed-noresult" id="pageNone" hidden>${pageFilter === 'today' ? '今天還沒有修改過的頁面。' : pageFilter === 'stale' ? '沒有要補英文的頁面。' : '找不到符合的頁面。'}</p>
     ${S.sections.map((sec, si) => `<section class="ed-sec${folded.has(`sec:${si}`) ? ' is-folded' : ''}" id="psec${si}" aria-labelledby="sec${si}" data-fold-box="sec:${si}">
       <div class="ed-sec-head">${foldBtn(`sec:${si}`, sec.label)}<h2 id="sec${si}">${esc(sec.label)}</h2>
         <button type="button" class="ed-link" data-act="rename-sec" data-si="${si}">改名稱</button>
@@ -332,14 +341,17 @@ function viewPages() {
       <div class="ed-adds"><a class="ed-add" href="#new/s${si}">${ic('plus')}新增頁面</a><button type="button" class="ed-add" data-act="add-cat" data-si="${si}">${ic('folder')}新增分類</button></div>
       </div>
     </section>`).join('')}
-    <p class="ed-hint ed-count">${changed ? `目前有 ${changed} 頁${LIVE ? '在後台改過' : '在這台電腦上改過'}。` : ''}</p>`;
+    <p class="ed-hint ed-count">${changed ? `今天有 ${changed} 頁${LIVE ? '在後台改過' : '在這台電腦上改過'}。` : ''}</p>`;
 }
 // 找頁面：只留下標題、目錄名稱或網址代號符合的頁面（分類符合就整個分類都留）
+// 按了「今天修改」「EN 待更新」時，只留下符合的頁面（和搜尋字可以一起用）
 function filterPages() {
-  const q = pageQuery.trim().toLowerCase();
+  const text = pageQuery.trim().toLowerCase();
+  const q = text || pageFilter;
   app.classList.toggle('is-searching', !!q);
   let hits = 0;
-  const match = (id) => { const p = S.pages[id]; return !!p && [p.t, p.n, id].some((v) => v && String(v).toLowerCase().includes(q)); };
+  const byFilter = (id) => (pageFilter === 'today' ? modToday(id) : pageFilter === 'stale' ? enStale(id) : true);
+  const match = (id) => { const p = S.pages[id]; return !!p && byFilter(id) && (!text || [p.t, p.n, id].some((v) => v && String(v).toLowerCase().includes(text))); };
   app.querySelectorAll('.ed-sec').forEach((sec) => {
     let secHit = 0;
     sec.querySelectorAll(':scope > .ed-sec-body > ul > li[data-id]').forEach((li) => {
@@ -1288,11 +1300,13 @@ function viewHelp() {
       <li><b>調整順序、換分類</b>：按住頁面左邊的 ${ic('grip', 'ic sm')} 拖到想放的位置再放開，可以拖進別的分類或小標底下（手機一樣用手指按住拖）。拖到一半想取消就按 Esc。用鍵盤的話，按 Tab 移到 ${ic('grip', 'ic sm')} 再按上下鍵。也可以進入頁面，改「放在哪裡」再儲存，頁面會移到新位置的最後面。</li>
       <li>「分類」是一組頁面（例如「圖片生成」底下的多篇）。分類只能放在大分類底下；分類裡還有頁面時不能封存，要先把頁面搬走。</li>
       <li><b>封存鈕</b>：把頁面從目錄拿下來放進封存，讀者就看不到了。封存會一直保留，之後可以放回原位。不要的頁面，到「草稿與封存」勾選後按「刪除」，會先放在「最近刪除」30 天，之後自動永久清除。</li>
-      <li>標示「已修改」「新頁面」的，是和說明中心目前內容不同的地方。</li>
+      <li>標示「今天修改」的是<b>今天</b>有人改過的頁面（隔天就不再顯示）；「新頁面」是新增的頁面；「EN 待更新」是中文改過、英文還沒跟上的頁面。</li>
+      <li><b>篩選</b>：按「今天修改」或「EN 待更新」，列表只留下符合的頁面（數字是篇數），再按一次取消。可以和找頁面一起用。</li>
+      <li><b>編輯後台有新版本</b>時，畫面上方會跳出提醒：先把正在編輯的內容儲存，再按「重新整理」。不會自動重新整理，編輯到一半的內容不會不見。</li>
       <li><b>草稿</b>：還沒寫完、不想讓讀者看到的頁面，在編輯畫面勾選「草稿，先不公開」再儲存。所有草稿都列在「草稿與封存」；寫好後取消勾選再儲存，就會公開。公開的頁面不要連到草稿，儲存時會提醒你。</li></ul>`)}
     ${sec('2-1. 待辦清單與功能許願池', `<ul>
       <li>待辦分成<b>新增文章</b>和<b>修改文章</b>兩類，用上方的切換鈕切換。</li>
-      <li><b>新增文章</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序，按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
+      <li><b>新增文章</b>：先記下要寫、還沒寫的文章，填暫定標題、預計放的位置、優先級和備註。由上往下是預計的製作順序：<b>優先級「高」的會自動排在最上面</b>，其次中、低；同一個優先級裡可以按住 ${ic('grip', 'ic sm')} 拖曳調整（或聚焦後按上下鍵）。</li>
       <li>每一列可以直接改<b>優先級</b>和<b>製作狀態</b>（還沒開始、撰寫中、待確認、完成）。完成的會收到下方「已完成」。</li>
       <li>按<b>開始寫</b>會在預計的位置開一篇新頁面並帶入暫定標題，存檔後這個待辦會連到那一頁。</li>
       <li><b>修改文章</b>：已經有的文章想改但還沒空改，在「頁面」列表那篇右邊按 ${ic('listadd', 'ic sm')}，寫下要改什麼就加進待辦；有待辦的頁面會顯示「待修改」。打開那篇編輯時，上方會列出它的修改待辦，改好按「完成」。</li>
@@ -1554,7 +1568,11 @@ let pendingTodo = null;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // 待辦分兩種：kind 'new' 新增文章（舊資料沒有 kind，也算這種）、'edit' 修改文章（page 是要改的頁面）
 const todoKind = (t) => (t.kind === 'edit' ? 'edit' : 'new');
-const openTodos = (kind) => S.todos.filter((t) => t.status !== 'done' && (!kind || todoKind(t) === kind));
+// 未完成的待辦：優先「高」自動排到最上面，其次中、低（2026-11-26 使用者要求）；同一級照拖曳排好的順序
+const PRI_RANK = { high: 0, mid: 1, low: 2 };
+const priRank = (t) => (t.pri in PRI_RANK ? PRI_RANK[t.pri] : 1);
+const openTodos = (kind) => S.todos.filter((t) => t.status !== 'done' && (!kind || todoKind(t) === kind))
+  .map((t, i) => [t, i]).sort((a, b) => priRank(a[0]) - priRank(b[0]) || a[1] - b[1]).map((x) => x[0]);
 const fixesFor = (id) => S.todos.filter((t) => t.status !== 'done' && todoKind(t) === 'edit' && t.page === id);
 // 可以選來修改的頁面（照目錄順序，不含系統頁面）
 function pageChoices(cur) {
@@ -2221,6 +2239,7 @@ document.addEventListener('click', (e) => {
     else if (a === 'spot-open') { pendingSpot = +b.dataset.i; pendingLang = b.dataset.lang || 'zh'; location.hash = `#edit/${b.dataset.id}`; }
     else if (a.startsWith('board-') || a === 'notice-hide') boardAct(a, b);
     else if (a === 'fold') setFold([b.dataset.fold], !folded.has(b.dataset.fold));
+    else if (a === 'page-filter') { pageFilter = pageFilter === b.dataset.f ? '' : b.dataset.f; render(); }
     else if (a === 'fold-all' || a === 'unfold-all') setFold([...app.querySelectorAll('[data-fold-box]')].map((x) => x.dataset.foldBox), a === 'fold-all');
     else if (a === 'jump') {
       setFold(['sec:' + b.dataset.si], false);
@@ -2416,7 +2435,35 @@ async function boot() {
     }
   }
   render();
+  checkUpdate();
 }
+// 程式更新通知（2026-11-26 使用者要求）：每 5 分鐘、切回這個分頁時，看 edit.html 的 ETag 有沒有變
+// （伺服器用程式檔案的雜湊產生，部署新程式就會變）。變了就在畫面上方提醒「先儲存，再重新整理」；
+// 不會自動重新整理，正在編輯的內容不會不見
+let buildTag = '';
+async function checkUpdate() {
+  if (!LIVE || document.hidden || document.getElementById('edUpdate')) return;
+  let tag = '';
+  try { tag = (await fetch('edit.html', { method: 'HEAD', cache: 'no-store' })).headers.get('etag') || ''; } catch (e) { return; }
+  if (!tag) return;
+  if (!buildTag) { buildTag = tag; return; }
+  if (tag === buildTag) return;
+  const bar = document.createElement('div');
+  bar.id = 'edUpdate';
+  bar.className = 'ed-update';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = `<span>編輯後台有新版本。<b>請先儲存正在編輯的內容</b>，再重新整理頁面。</span>
+    <button type="button" class="ed-btn ed-primary" id="edUpdateGo">重新整理</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector('#edUpdateGo').addEventListener('click', () => {
+    if (dirty && !confirm('你有還沒儲存的修改，重新整理會不見。\n要先回去按「儲存」的話，請按「取消」。')) return;
+    dirty = false;
+    location.reload();
+  });
+}
+setInterval(checkUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', checkUpdate);
+
 // 切回這個分頁時，順便讀一次最新內容（別人可能剛改過）；編輯到一半時不讀
 document.addEventListener('visibilitychange', async () => {
   if (!LIVE || !LIVE.role || document.hidden || draft || dirty) return;
