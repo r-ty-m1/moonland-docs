@@ -681,8 +681,13 @@ dialog.search::backdrop { background: var(--overlay); }
   }
   .drawer-open .side { transform: none; }
   .drawer-open .scrim { display: block; position: fixed; top: var(--top-h); right: 0; bottom: 0; left: 0; inset: var(--top-h) 0 0 0; z-index: 20; background: var(--overlay); }
-  .top-links, .brand-sub, .lang-btn { display: none; }
-  .side .lang-row { display: flex; }
+  /* 英文切換鍵留在右上角（2026-11-26 使用者要求：縮小後原本收進目錄最下面，找不到） */
+  .top-links, .brand-sub { display: none; }
+  .lang-btn { min-width: 34px; padding-inline: 6px; }
+  /* 按鈕多了一顆：窄螢幕讓 logo 縮小、間距變小，版頭才不會超出螢幕 */
+  .top { gap: 6px; padding-inline: 10px; }
+  .brand { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+  .logo { max-width: 100%; }
   .search-pill { flex: none; width: 38px; height: 38px; padding: 0; justify-content: center; margin-left: auto; margin-right: 0; border-color: transparent; background: none; }
   .search-pill .sp-text, .search-pill kbd { display: none; }
   .page { padding-top: 28px; }
@@ -891,7 +896,7 @@ dialog.zoom img { display: block; max-width: 96vw; max-height: 94vh; width: auto
 .fs-btn-txt { font: 600 15px/1 var(--sans); letter-spacing: -.02em; }
 .fs-btn-txt small { font-size: 11px; }
 
-/* 語言切換：桌機在頂部列，手機改放在目錄最下面 */
+/* 語言切換：一律在頂部列（2026-11-26 起手機也是；目錄最下面那一列不再顯示） */
 
 /* ---------- 手機 ---------- */
 @media (hover: none) {
@@ -902,6 +907,11 @@ dialog.zoom img { display: block; max-width: 96vw; max-height: 94vh; width: auto
   .nav-row { min-height: 44px; }
   .nav-child { padding: 10px 8px; }
   .cat-toggle { width: 40px; height: 40px; }
+}
+/* 很窄的手機（例如 360px 以下）：頂部按鈕縮小一點，留空間給 logo */
+@media (max-width: 400px) {
+  .top .icon-btn { width: 38px; height: 38px; }
+  .search-pill { width: 38px; }
 }
 @media (max-width: 620px) {
   /* 表格改成一列一張卡片，避免欄位被擠到一行兩三個字 */
